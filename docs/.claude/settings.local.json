@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"因子挖掘_介绍_20260518.md\" -o \"因子挖掘_介绍_20260518.pdf\" --pdf-engine=wkhtmltopdf -V CJKmainfont=\"PingFang SC\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-pdf-header-footer --virtual-time-budget=10000 --run-all-compositor-stages-before-draw --print-to-pdf=\"因子挖掘_介绍_20260518.pdf\" \"file://$\\(pwd\\)/因子挖掘_介绍_20260518.html\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-pdf-header-footer --virtual-time-budget=10000 --run-all-compositor-stages-before-draw --print-to-pdf=\"端到端模型_介绍_20260518.pdf\" \"file://$\\(pwd\\)/端到端模型_介绍_20260518.html\")",
+      "Read(//Users/xiehao/.claude/**)",
+      "Read(//Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/data/datasource/**)",
+      "Skill(bigalpha-data-builder)",
+      "Bash(jupyter nbconvert *)",
+      "Bash(python3 -c \"import jupyter\")",
+      "Bash(python3 -m jupyter --version)",
+      "Bash(python3 -c ' *)",
+      "Bash(/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/.venv/bin/python -c ' *)",
+      "Bash(/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/.venv/bin/pip list *)",
+      "Bash(/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/.venv/bin/pip install *)"
+    ]
+  }
+}
