@@ -1,0 +1,16 @@
+# macOS 系统文件
+.DS_Store
+._.DS_Store
+
+# Python 编译文件
+__pycache__/
+
+# 环境变量
+.env
+
+# 虚拟环境
+.venv/
+*.pyc
+
+# 忽略 MinerU 代码目录
+mineru/

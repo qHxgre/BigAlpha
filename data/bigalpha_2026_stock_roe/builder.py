@@ -26,7 +26,7 @@ class Bigalpha2026StockRoeBuilder(BaseBuilder):
 
     def dai_write(self, df: pd.DataFrame):
         default_docs = self.schema.default_docs()
-        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.strftime("%Y").astype("int64")
+        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.year.astype("int64")
         dai.DataSource.write_bdb(
             df,
             id=self.datasource_id,
@@ -36,64 +36,93 @@ class Bigalpha2026StockRoeBuilder(BaseBuilder):
             docs=default_docs,
         )
 
-    def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        # 交易日历：取全市场每个交易日的 instrument 列表
-        sql_bar = """
-        SELECT date, instrument
+    def get_financial_data(self) -> pd.DataFrame:
+        """从财务表取 shift=0 的最新一期数据，计算 ROE
+
+        向前多取 1 年，确保 start_date 附近的交易日有足够的历史公告可供 forward-fill。
+        """
+        fin_start = (pd.Timestamp(self.start_date) - pd.DateOffset(years=1)).strftime("%Y-%m-%d")
+        sql = f"""
+        SELECT
+            lf.date AS ann_date,
+            lf.instrument,
+            lf.report_date,
+            lf.net_profit_to_parent_shareholders_lf,
+            lf.total_equity_to_parent_shareholders_lf,
+            ttm.net_profit_to_parent_shareholders_ttm
+        FROM cn_stock_financial_lf_shift lf
+        LEFT JOIN cn_stock_financial_ttm_shift ttm
+            ON lf.date = ttm.date
+            AND lf.instrument = ttm.instrument
+            AND ttm.shift = 0
+        WHERE lf.shift = 0
+          AND lf.date >= '{fin_start}'
+          AND lf.date <= '{self.end_date}'
+        """
+        df = dai.query(sql, filters={"date": [fin_start, self.end_date]}).df()
+
+        df["roe_lf"] = (
+            df["net_profit_to_parent_shareholders_lf"]
+            / df["total_equity_to_parent_shareholders_lf"]
+        )
+        df["roe_ttm"] = (
+            df["net_profit_to_parent_shareholders_ttm"]
+            / df["total_equity_to_parent_shareholders_lf"]
+        )
+        return df[["ann_date", "instrument", "report_date", "roe_lf", "roe_ttm"]]
+
+    def get_trading_days(self) -> pd.DataFrame:
+        """获取指定区间内的全市场交易日"""
+        sql = f"""
+        SELECT DISTINCT date
         FROM cn_stock_bar1d
+        WHERE date >= '{self.start_date}' AND date <= '{self.end_date}'
+        ORDER BY date
         """
-        df_bar = dai.query(sql_bar, filters={"date": [start_date, end_date]}).df()
-
-        # lf：最新一期归母净利润、归母净资产（shift=0）
-        sql_lf = """
-        SELECT
-            date,
-            instrument,
-            report_date,
-            net_profit_to_parent_shareholders_lf AS net_profit_lf,
-            total_equity_to_parent_shareholders_lf AS total_equity_lf
-        FROM cn_stock_financial_lf_shift
-        WHERE shift = 0
-        """
-        df_lf = dai.query(sql_lf, filters={"date": [start_date, end_date]}).df()
-
-        # ttm：归母净利润 TTM（shift=0）
-        sql_ttm = """
-        SELECT
-            date,
-            instrument,
-            net_profit_to_parent_shareholders_ttm AS net_profit_ttm
-        FROM cn_stock_financial_ttm_shift
-        WHERE shift = 0
-        """
-        df_ttm = dai.query(sql_ttm, filters={"date": [start_date, end_date]}).df()
-
-        # 合并财务数据
-        df_fin = df_lf.merge(df_ttm, on=["date", "instrument"], how="left")
-
-        # 以交易日历为基准，将财务数据 forward-fill 到每个交易日
-        df_bar = df_bar.sort_values(["instrument", "date"])
-        df_fin = df_fin.sort_values(["instrument", "date"])
-
-        df = df_bar.merge(df_fin, on=["date", "instrument"], how="left")
-        df = df.sort_values(["instrument", "date"])
-        fin_cols = ["report_date", "net_profit_lf", "total_equity_lf", "net_profit_ttm"]
-        df[fin_cols] = df.groupby("instrument")[fin_cols].ffill()
-
-        return df
+        return dai.query(sql, filters={"date": [self.start_date, self.end_date]}).df()
 
     def build(self) -> pd.DataFrame:
         t0 = datetime.now()
-        df = self.get_data(self.start_date, self.end_date)
+
+        # 1. 获取财务数据并计算 ROE（全历史，供 forward-fill 使用）
+        df_fin = self.get_financial_data()
+        df_fin["ann_date"] = pd.to_datetime(df_fin["ann_date"])
+        df_fin["report_date"] = pd.to_datetime(df_fin["report_date"])
+        df_fin = df_fin.sort_values(["instrument", "ann_date"]).reset_index(drop=True)
+
+        # 2. 获取目标区间交易日
+        df_td = self.get_trading_days()
+        df_td["date"] = pd.to_datetime(df_td["date"])
+
         t1 = datetime.now()
-        print(f"获取数据耗时: {round((t1-t0).total_seconds(), 4)} 秒")
+        print(f"获取数据耗时: {round((t1 - t0).total_seconds(), 4)} 秒")
 
-        # 计算 ROE，分母为零时置 NaN 避免 inf
-        df["roe_lf"] = df["net_profit_lf"] / df["total_equity_lf"].replace(0, float("nan"))
-        df["roe_ttm"] = df["net_profit_ttm"] / df["total_equity_lf"].replace(0, float("nan"))
+        # 3. 对每只股票，将公告日数据 merge_asof 到交易日（forward-fill）
+        instruments = df_fin["instrument"].unique()
+        pieces = []
+        for inst in instruments:
+            fin_inst = df_fin[df_fin["instrument"] == inst].copy()
+            # merge_asof: 每个交易日匹配 <= 该日的最近公告日
+            merged = pd.merge_asof(
+                df_td.rename(columns={"date": "date"}),
+                fin_inst.rename(columns={"ann_date": "ann_date"}),
+                left_on="date",
+                right_on="ann_date",
+                direction="backward",
+            )
+            merged["instrument"] = inst
+            pieces.append(merged)
 
+        df = pd.concat(pieces, ignore_index=True)
+        df = df[["date", "instrument", "report_date", "ann_date", "roe_lf", "roe_ttm"]]
+
+        t2 = datetime.now()
+        print(f"forward-fill 耗时: {round((t2 - t1).total_seconds(), 4)} 秒")
+
+        # 4. normalize & 落库
         df = self.normalize(df)
         self.dai_write(df)
-        t2 = datetime.now()
-        print(f"数据存储耗时: {round((t2-t1).total_seconds(), 4)} 秒")
+
+        t3 = datetime.now()
+        print(f"数据存储耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
         return df

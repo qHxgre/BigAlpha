@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Skill(bigalpha-data-builder)"
+      "Skill(bigalpha-data-builder)",
+      "Bash(pandoc *)",
+      "Bash(wkhtmltopdf *)",
+      "Bash(python3 *)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --no-sandbox --disable-gpu --print-to-pdf=/tmp/factor_intro_chrome.pdf --print-to-pdf-no-header --virtual-time-budget=15000 file:///tmp/factor_intro_styled.html)",
+      "Bash(xelatex --version)",
+      "Bash(pdflatex --version)",
+      "Bash(npm list *)",
+      "WebSearch",
+      "WebFetch(domain:bigquant.com)",
+      "Bash(grep *)"
     ]
   }
 }

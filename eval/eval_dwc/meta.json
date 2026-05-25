@@ -1,0 +1,69 @@
+{
+  "name": "eval_dwc",
+  "version": 9999,
+  "owner": "bigquant",
+  "shared": true,
+  "data": {
+    "source_code": "",
+    "source_deps": "",
+    "cacheable": true,
+    "opensource": false,
+    "serviceversion": 9999,
+    "friendly_name": "蝶威量2026年因子大赛评估系统",
+    "category": "量化比赛",
+    "arguments": "(data=, check_data=None, factor_col=None, show=True)",
+    "doc": "",
+    "doc_url": "https://bigquant.com/wiki/",
+    "interface": [
+      {
+        "type_name": null,
+        "desc": "输出数据",
+        "specific_type_name": null,
+        "name": "data",
+        "optional": false,
+        "type": "通用",
+        "type_code": "output_port"
+      },
+      {
+        "type_name": null,
+        "desc": "因子数据: 包含列 (date, instrument, factor) 的DataFrame/DataSource",
+        "specific_type_name": null,
+        "name": "data",
+        "optional": false,
+        "type": "通用",
+        "type_code": "input_port"
+      },
+      {
+        "type_name": null,
+        "desc": "因子检查数据: 包含列 (date, instrument, factor) 的DataFrame/DataSource",
+        "specific_type_name": null,
+        "name": "check_data",
+        "optional": false,
+        "type": "通用",
+        "type_code": "input_port",
+        "default": null
+      },
+      {
+        "type_name": "String",
+        "desc": "因子列名,如果不指定则优先使用'factor'列,否则使用date和instrument外的列",
+        "specific_type_name": null,
+        "can_set_liverun_param": null,
+        "type_code": "str",
+        "name": "factor_col",
+        "default": null
+      },
+      {
+        "type_name": "Boolean",
+        "desc": "画出绩效图",
+        "specific_type_name": null,
+        "type_code": "bool",
+        "name": "show",
+        "default": true
+      }
+    ],
+    "visible": true,
+    "created_by": "biglearning"
+  },
+  "rank": 0,
+  "keep_source": false
+}
