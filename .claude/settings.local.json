@@ -11,7 +11,10 @@
       "Bash(npm list *)",
       "WebSearch",
       "WebFetch(domain:bigquant.com)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(python -m py_compile datachecker.py dataprocess.py factoranalyze.py elasticnet.py render.py)",
+      "Bash(command -v python3)",
+      "Bash(python -m py_compile eval/eval_dwc/datachecker.py)"
     ]
   }
 }
