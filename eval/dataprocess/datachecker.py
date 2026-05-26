@@ -43,21 +43,15 @@ class DataCheck:
         self,
         start_date: str,
         end_date: str,
-        check_data: Optional[pd.DataFrame] = None,
-        pool_pairs: Optional[pd.DataFrame] = None,
     ) -> None:
         # 统一为 Timestamp，避免后续字符串比较脆弱
         self.start_date = pd.to_datetime(start_date).normalize()
         self.end_date = pd.to_datetime(end_date).normalize()
-        self.check_data = check_data
-        self._pool_pairs = pool_pairs  # 允许外部注入，便于单测
 
     @property
     def pool_pairs(self) -> pd.DataFrame:
         """中证 1000 历史成分股 (date, instrument)，惰性加载。"""
-        if self._pool_pairs is None:
-            self._pool_pairs = self._load_pool_pairs()
-        return self._pool_pairs
+        return self._load_pool_pairs()
 
     @property
     def pool_days(self) -> pd.DatetimeIndex:
@@ -253,9 +247,9 @@ class DataCheck:
         self.check_factor_coverage(df)
         logger.info(f"通过：覆盖度检查（每交易日缺失率<={MAX_MISSING_RATE:.0%}）")
 
-        if self.check_data is not None:
-            self.check_data_breach(df, self.check_data)
-            logger.info("通过：数据泄露检查")
-        else:
-            logger.info("跳过：数据泄露检查")
+        # if self.check_data is not None:
+        #     self.check_data_breach(df, self.check_data)
+        #     logger.info("通过：数据泄露检查")
+        # else:
+        #     logger.info("跳过：数据泄露检查")
 

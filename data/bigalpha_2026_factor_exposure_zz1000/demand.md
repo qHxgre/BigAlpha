@@ -1,0 +1,1 @@
+构建中证1000成分股的因子暴露表，表名为：bigalpha_2026_factor_exposure_zz1000

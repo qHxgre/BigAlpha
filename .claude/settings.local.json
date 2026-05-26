@@ -14,7 +14,9 @@
       "Bash(grep *)",
       "Bash(python -m py_compile datachecker.py dataprocess.py factoranalyze.py elasticnet.py render.py)",
       "Bash(command -v python3)",
-      "Bash(python -m py_compile eval/eval_dwc/datachecker.py)"
+      "Bash(python -m py_compile eval/eval_dwc/datachecker.py)",
+      "Bash(rm -f judge/judge-5c3f7783-4158-4196-97ab-171b27218c7c-private.py judge/judge-fe59d6c6-04c6-41cc-b125-cd01872494fa.py judge/judge-bf1b4468-6b4d-43dc-98e1-8c2358c61793.py judge/judge-5c3f7783-4158-4196-97ab-171b27218c7c.py judge/judge-bf1b4468-6b4d-43dc-98e1-8c2358c61793-private.py judge/manual-judge.py)",
+      "Bash(rm -rf judge/__pycache__)"
     ]
   }
 }
