@@ -39,7 +39,9 @@
 
 ## 数据抽取来源
 
-`build()` 中通常使用 `dai.query(sql, filters={...}).df()` 拉取底层表。具体表名/字段引导用户参考 [datasource_reference.md](./datasource_reference.md)；`dai.query` / `dai.DataSource.write_bdb` 的完整用法参考 [sdk_reference.md](./sdk_reference.md)。
+`build()` 中通常使用 `dai.query(sql, filters={...}).df()` 拉取底层表。具体表名/字段引导用户参考 [datasource_reference.md](./datasource_reference.md)；`dai.query` / `dai.DataSource.write_bdb` / 截面 SQL 函数 / 分区字段等完整用法参考 [dai.md](./dai.md)。
+
+> **进入本步骤前必须先 Read [dai.md](./dai.md)**，确认 `filters` 写法、分区列类型、`c_avg` / `c_std` / `c_normalize` 的 `pb:=` 用法等关键点。
 
 ## 示例代码
 

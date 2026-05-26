@@ -20,11 +20,12 @@ description: BigAlpha 量化大赛数据表构建助手。当用户要新建/修
 |---|---|---|
 | Step 1 | 架构设计与需求确认 | [references/step1_architecture.md](./references/step1_architecture.md) |
 | Step 2 | 生成 `schema.py` | [references/step2_schema.md](./references/step2_schema.md) |
-| Step 3 | 生成 `builder.py` | [references/step3_builder.md](./references/step3_builder.md) |
+| Step 3 | 生成 `builder.py` | [references/step3_builder.md](./references/step3_builder.md) + [references/dai.md](./references/dai.md) |
 | Step 4 | 生成 `running.ipynb` | [references/step4_running.md](./references/step4_running.md) |
 | 辅助 | 底层数据源文档索引 | [references/datasource_reference.md](./references/datasource_reference.md) |
+| 辅助 | dai 数据引擎核心用法 | [references/dai.md](./references/dai.md) |
 
-**重要**：每一步开始前，先用 Read 读取对应的引用文件，再按其规范执行。不要一次性把所有引用文件全部读进上下文。
+**重要**：每一步开始前，先用 Read 读取对应的引用文件，再按其规范执行。不要一次性把所有引用文件全部读进上下文。**进入 Step 3 之前必须先 Read `references/dai.md`**，否则 builder.py 中 `dai.query` / `write_bdb` / 分区字段 / 截面 SQL 函数容易出错。
 
 ## 项目目录约定
 
