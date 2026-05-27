@@ -3,15 +3,16 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from bigalpha_2026_factor_exposure_zz1000.schema import Bigalpha2026FactorExposureZZ1000Schema
+from bigalpha_factor_2026_stock_bar1m.schema import BigalphaFactor2026StockBar1mSchema
 
 
-class Bigalpha2026FactorExposureZZ1000Builder(BaseBuilder):
-    datasource_id = "bigalpha_2026_factor_exposure_zz1000"
+class BigalphaFactor2026StockBar1mBuilder(BaseBuilder):
+    datasource_id = "bigalpha_factor_2026_stock_bar1m"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
-    schema = Bigalpha2026FactorExposureZZ1000Schema
+    schema = BigalphaFactor2026StockBar1mSchema
+
 
     def __init__(self, start_date: str, end_date: str) -> None:
         self.start_date = start_date
@@ -26,7 +27,7 @@ class Bigalpha2026FactorExposureZZ1000Builder(BaseBuilder):
 
     def dai_write(self, df: pd.DataFrame):
         default_docs = self.schema.default_docs()
-        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.strftime("%Y").astype("int64")
+        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.strftime("%Y%m").astype("int64")
         dai.DataSource.write_bdb(
             df,
             id=self.datasource_id,
@@ -35,22 +36,21 @@ class Bigalpha2026FactorExposureZZ1000Builder(BaseBuilder):
             indexes=self.indexes,
             docs=default_docs,
         )
-
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
         sql = """
         WITH cte_index AS (
-            SELECT date, member_code AS instrument
+            SELECT CAST(strftime(date, '%Y%m%d') AS INT32) AS trading_day, member_code as instrument
             FROM cn_stock_index_component
             WHERE instrument = '000852.SH'
         )
-        SELECT e.*
-        FROM bq_exposure e
-        INNER JOIN cte_index c
-            ON e.date = c.date
-            AND e.instrument = c.instrument
+        SELECT s.*
+        FROM cn_stock_bar1m_derived_c s
+        INNER JOIN cte_index
+            ON s.trading_day = cte_index.trading_day
+            AND s.instrument = cte_index.instrument
         """
 
-        df = dai.query(sql, filters={"date": [start_date, end_date]}).df()
+        df = dai.query(sql, filters={"date": [f"{start_date} 00:00:00", f"{end_date} 23:59:59"]}, compression=True).df()
         return df
 
     def build(self) -> pd.DataFrame:
@@ -65,4 +65,3 @@ class Bigalpha2026FactorExposureZZ1000Builder(BaseBuilder):
         self.dai_write(df)
         t2 = datetime.now()
         print(f"数据存储耗时: {round((t2-t1).total_seconds(), 4)} 秒")
-        return df

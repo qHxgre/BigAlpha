@@ -4,9 +4,7 @@ from pydantic import Field
 
 from base import BaseSchema
 
-
-# fmt: off
-class Bigalpha2026FactorExposureZZ1000Schema(BaseSchema):
+class BigalphaFactor2026ExposureSchema(BaseSchema):
     """中证1000成分股的 Barra 风格因子暴露表（扩展自 bq_exposure / jq_style_factor）"""
 
     date: np.datetime64 = Field(description="日期", default=np.nan, primary=True)
