@@ -8,7 +8,7 @@
 
 * 文件名：`schema.py`
 * 类名：表名转**大驼峰** + `Schema` 后缀
-  * 例如表名 `bigalpha_stock_bar_1m_zz1000` → 类名 `BigalphaStockBar1mZz1000Schema`
+  * 例如表名 `bigalpha_stock_bar1m_zz1000` → 类名 `BigalphaStockBar1mZz1000Schema`
 * 继承自 `BaseSchema`（来自 `base.py`，环境已提供，无需创建）
 
 ## 字段定义规则

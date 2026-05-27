@@ -1,5 +1,14 @@
 # 股票数据源
 
+
+## cn_stock_instruments
+
+- **中文名**：每日股票列表
+- **描述**：A 股每日全市场证券列表，记录每个交易日的证券代码、简称及证券类型。
+- **字段**：`date` / `instrument` / `name` / `type`
+- **完整文档**：`data/datasource/tables/cn_stock_instruments.md`
+
+
 ## cn_stock_bar1d
 
 - **中文名**：股票后复权日行情

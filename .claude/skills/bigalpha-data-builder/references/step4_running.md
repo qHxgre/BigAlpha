@@ -21,7 +21,7 @@ project_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from bigalpha_stock_bar_1m_zz1000.builder import BigalphaStockBar1mZz1000Builder
+from bigalpha_stock_bar1m_zz1000.builder import BigalphaStockBar1mZz1000Builder
 
 # 执行数据构建
 builder = BigalphaStockBar1mZz1000Builder(start_date='2026-01-01', end_date='2026-02-01')

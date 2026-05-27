@@ -50,11 +50,11 @@ from bigquant import dai
 import pandas as pd
 from datetime import datetime
 from base import BaseBuilder
-from bigalpha_stock_bar_1m_zz1000.schema import BigalphaStockBar1mZz1000Schema
+from bigalpha_stock_bar1m_zz1000.schema import BigalphaStockBar1mZz1000Schema
 
 
 class BigalphaStockBar1mZz1000Builder(BaseBuilder):
-    datasource_id = "bigalpha_stock_bar_1m_zz1000"
+    datasource_id = "bigalpha_stock_bar1m_zz1000"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
