@@ -12,10 +12,11 @@
 
 | 文件 | 适用场景 |
 |---|---|
-| `datasource_stock.md` | 股票行情、复权因子等 |
+| `datasource_stock.md` | 股票行情、基本信息等 |
 | `datasource_index.md` | 指数成分、指数行情 |
 | `datasource_financial.md` | 三大报表、财务衍生指标 |
 | `datasource_industry.md` | 行业分类、行业指数 |
+| `datasource_factor.md` | 股票因子、风险因子 |
 
 ## 第二级：完整表文档（按需读）
 
