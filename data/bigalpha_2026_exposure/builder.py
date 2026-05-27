@@ -3,15 +3,15 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from bigalpha_factor_2026_exposure.schema import BigalphaFactor2026ExposureSchema
+from bigalpha_2026_exposure.schema import Bigalpha2026ExposureSchema
 
 
-class BigalphaFactor2026ExposureBuilder(BaseBuilder):
-    datasource_id = "bigalpha_factor_2026_exposure"
+class Bigalpha2026ExposureBuilder(BaseBuilder):
+    datasource_id = "bigalpha_2026_exposure"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
-    schema = BigalphaFactor2026ExposureSchema
+    schema = Bigalpha2026ExposureSchema
 
     def __init__(self, start_date: str, end_date: str) -> None:
         self.start_date = start_date

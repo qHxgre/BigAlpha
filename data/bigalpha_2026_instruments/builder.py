@@ -3,15 +3,15 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from bigalpha_factor_2026_instruments.schema import BigalphaFactor2026InstrumentsSchema
+from bigalpha_2026_instruments.schema import Bigalpha2026InstrumentsSchema
 
 
-class BigalphaFactor2026InstrumentsBuilder(BaseBuilder):
-    datasource_id = "bigalpha_factor_2026_instruments"
+class Bigalpha2026InstrumentsBuilder(BaseBuilder):
+    datasource_id = "bigalpha_2026_instruments"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
-    schema = BigalphaFactor2026InstrumentsSchema
+    schema = Bigalpha2026InstrumentsSchema
 
     def __init__(self, start_date: str, end_date: str) -> None:
         self.start_date = start_date
