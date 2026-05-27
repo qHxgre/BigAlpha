@@ -58,16 +58,12 @@ class DataCheck:
         return pd.DatetimeIndex(self.pool_pairs["date"].unique())
 
     def _load_pool_pairs(self) -> pd.DataFrame:
-        sql = f"""
-            SELECT date, member_code as instrument
-            FROM cn_stock_index_component
-            WHERE instrument = '{INDEX_CODE}'
-        """
+        sql = "SELECT date, instrument FROM bigalpha_2026_instruments"
         df = dai.query(
             sql,
             filters={"date": [
-                f"{self.start_date.strftime('%Y-%m-%d')} 00:00:00",
-                f"{self.end_date.strftime('%Y-%m-%d')} 23:59:59",
+                self.start_date.strftime('%Y-%m-%d'),
+                self.end_date.strftime('%Y-%m-%d'),
             ]},
         ).df()
 

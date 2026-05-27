@@ -76,126 +76,96 @@ def _neutralize_one_day(date_df: pd.DataFrame, factor_name: str, exposure_cols: 
 
 class DataProcess:
     """因子预处理：去极值 / 标准化 / 风格剔除（残差）。"""
+    def __init__(self, start_date: str, end_date: str):
+        self.start_date = start_date
+        self.end_date = end_date
 
-    def drop_inf(self, factor_data: pd.DataFrame, factor_name: str) -> pd.DataFrame:
+    def drop_inf(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """把 inf/-inf 置为 NaN，不删行。"""
         df = factor_data.copy()
-        x = pd.to_numeric(df[factor_name], errors="coerce").to_numpy(dtype=float)
+        x = pd.to_numeric(df['factor'], errors="coerce").to_numpy(dtype=float)
         inf_mask = np.isinf(x)
         if inf_mask.any():
             logger.warning("发现 inf/-inf，已置为 NaN", count=int(inf_mask.sum()))
             x[inf_mask] = np.nan
-        df[factor_name] = x
+        df['factor'] = x
         return df
 
-    def winsorize(self, factor_data: pd.DataFrame, factor_name: str) -> pd.DataFrame:
+    def winsorize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """3 倍标准差去极值（按 date 截面）。"""
         sql = f"""
         SELECT
             date,
             instrument,
             clip(
-                {factor_name},
-                c_avg({factor_name}, pb:=date) - 3 * c_std({factor_name}, pb:=date),
-                c_avg({factor_name}, pb:=date) + 3 * c_std({factor_name}, pb:=date)
-            ) AS {factor_name}
+                factor,
+                c_avg(factor, pb:=date) - 3 * c_std(factor, pb:=date),
+                c_avg(factor, pb:=date) + 3 * c_std(factor, pb:=date)
+            ) AS factor
         FROM factor_data
         ORDER BY date, instrument
         """
         return dai.query(sql, bind_relations={"factor_data": factor_data}).df()
 
-    def normalize(self, factor_data: pd.DataFrame, factor_name: str) -> pd.DataFrame:
+    def normalize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """截面 z-score 标准化（按 date 截面）。"""
         sql = f"""
         SELECT
             date,
             instrument,
-            c_normalize({factor_name}, pb:=date) AS {factor_name}
+            c_normalize(factor, pb:=date) AS factor
         FROM factor_data
         ORDER BY date, instrument
         """
         return dai.query(sql, bind_relations={"factor_data": factor_data}).df()
 
-    def neutralize(self, factor_data: pd.DataFrame, factor_name: str) -> pd.DataFrame:
+    def neutralize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """风格剔除：因子 ~ BARRA 风格暴露 + 行业哑变量，取残差。"""
         df = factor_data.copy()
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        if df["date"].isna().any():
-            raise ValueError("neutralize: factor 数据 date 列存在无法解析的值")
-        df["trading_day"] = df["date"].dt.strftime("%Y-%m-%d")
-        df["instrument"] = df["instrument"].astype(str)
 
-        start_date = df["trading_day"].min()
-        end_date = df["trading_day"].max()
-        instruments = df["instrument"].unique().tolist()
+        sql = """
+        SELECT
+            date, instrument,
+            SIZE, BETA, MOMENTUM, RESVOL, SIZENL, BTOP, LIQUIDTY, EARNYILD, GROWTH, LEVERAGE,
+            AGRIFOREST, MINING, CHEM, IRONSTEEL, NONFERMETAL, ELECTRONICS, AUTO, HOUSEAPP,
+            FOODBEVER, TEXTILE, LIGHTINDUS, HEALTH, UTILITIES, TRANSPORTATION, REALESTATE, 
+            COMMETRADE, LEISERVICE, BANK, NONBANKFINAN, CONGLOMERATES, CONMAT, BUILDDECO,
+            ELECEQP, AERODEF, COMPUTER, MEDIA, TELECOM, COAL, PETRO, ENVP, BEAUTY
+        FROM bigalpha_2026_exposure
+        """
+        neutralize_df = dai.query(sql, filters={'date': [self.start_date, self.end_date]}).df()
 
-        # 行业数据
-        industry_df = dai.query(
-            """
-            SELECT date as trading_day, instrument, industry_level1_code as industry
-            FROM cpt_dwc_2026_stock_industry_component
-            """,
-            filters={"date": [start_date, end_date], "instrument": instruments},
-        ).df()
-        industry_df["trading_day"] = pd.to_datetime(industry_df["trading_day"], errors="coerce").dt.strftime("%Y-%m-%d")
-        industry_df["instrument"] = industry_df["instrument"].astype(str)
-        industry_df["industry"] = industry_df["industry"].fillna("Unknown")
+        merge_df = pd.merge(df, neutralize_df, how="left", on=["date", "instrument"])
 
-        industry_dummies = pd.get_dummies(industry_df["industry"], prefix="IND").astype(float)
-        dummy_cols = list(industry_dummies.columns)
-        industry_df = pd.concat(
-            [industry_df[["trading_day", "instrument"]], industry_dummies], axis=1
-        )
-
-        # BARRA 风险因子
-        style_factors_df = dai.query(
-            """
-            SELECT
-                * exclude(date),
-                date as trading_day
-            FROM cpt_dwc_factorlib
-            """,
-            filters={"date": [start_date, end_date], "instrument": instruments},
-        ).df()
-        style_factors_df["trading_day"] = pd.to_datetime(
-            style_factors_df["trading_day"], errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
-        style_factors_df["instrument"] = style_factors_df["instrument"].astype(str)
-
-        merge_df = pd.merge(
-            style_factors_df, industry_df, how="left", on=["trading_day", "instrument"]
-        )
-        merge_df = pd.merge(df, merge_df, how="left", on=["trading_day", "instrument"])
-
-        exclude = {"date", "trading_day", "instrument", factor_name}
+        exclude = {"date", "instrument", "factor"}
         exposure_cols = [c for c in merge_df.columns if c not in exclude]
 
         if exposure_cols:
             merge_df[exposure_cols] = merge_df[exposure_cols].fillna(0)
 
         parallel_result = Parallel(backend="threading", n_jobs=-1)(
-            delayed(_neutralize_one_day)(group_df, factor_name, exposure_cols)
+            delayed(_neutralize_one_day)(group_df, 'factor', exposure_cols)
             for _, group_df in merge_df.groupby("date")
         )
 
         return pd.concat(parallel_result, ignore_index=True)
 
-    def validate(self, factor_data: pd.DataFrame, factor_name: str='factor') -> pd.DataFrame:
+    def validate(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """完整预处理流程。"""
         t0 = datetime.now()
-        factor_data = self.drop_inf(factor_data, factor_name)
+        factor_data = self.drop_inf(factor_data)
         t1 = datetime.now()
         logger.info(f"inf 处理, 耗时: {round((t1 - t0).total_seconds(), 4)} 秒")
 
-        factor_data = self.winsorize(factor_data, factor_name)
+        factor_data = self.winsorize(factor_data)
         t2 = datetime.now()
         logger.info(f"去极值, 耗时: {round((t2 - t1).total_seconds(), 4)} 秒")
 
-        factor_data = self.normalize(factor_data, factor_name)
+        factor_data = self.normalize(factor_data)
         t3 = datetime.now()
         logger.info(f"标准化, 耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
 
-        factor_data = self.neutralize(factor_data, factor_name)
+        factor_data = self.neutralize(factor_data)
         t4 = datetime.now()
         logger.info(f"风格剔除(取残差), 耗时: {round((t4 - t3).total_seconds(), 4)} 秒")
 
