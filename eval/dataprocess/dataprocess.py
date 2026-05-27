@@ -180,7 +180,7 @@ class DataProcess:
 
         return pd.concat(parallel_result, ignore_index=True)
 
-    def validate(self, factor_data: pd.DataFrame, factor_name: str) -> pd.DataFrame:
+    def validate(self, factor_data: pd.DataFrame, factor_name: str='factor') -> pd.DataFrame:
         """完整预处理流程。"""
         t0 = datetime.now()
         factor_data = self.drop_inf(factor_data, factor_name)

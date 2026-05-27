@@ -1,106 +1,128 @@
-"""绘图工具 —— 输出 base64 PNG 字符串。
+"""评估主流程
 
-绘制项：
-- 滚动 IC 曲线（含均值线）
-- 分组累计收益（含多空 ls）
-- Elastic Net 滚动权重曲线（多因子时）
+串联：
+1. 数据校验（DataCheck）
+2. 数据预处理：去极值 + 标准化 + 风格剔除（DataProcess）
+3. 单因子 A 项：IC_mean / IC_IR / 多空 SR / Stress IC_IR（FactorAnalyze）
+4. Elastic Net 滚动 B 项：ModelScore（ElasticNetEvaluator）
+5. 输出指标 + 可视化
+
+A 项 / B 项的"团队 Rank 归一化"由官方全局回归完成，本地工具仅给出
+原始指标和单因子归一化得分，便于参赛者横向对比自己的因子。
 """
 
-import base64
-import io
+from datetime import datetime
 
+import dai
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import structlog
+from pandas.api.types import is_integer_dtype
+
+from bigmodule import I
+
+logger = structlog.get_logger()
 
 
-def _fig_to_base64() -> str:
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
-    img = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
-    return img
+def run(
+    data: I.port("因子数据: 包含列 (date, instrument, factor) 的DataFrame/DataSource"),
+    show: I.bool("画出绩效图") = True,
+):
+    start_date = data["date"].min().strftime("%Y-%m-%d")
+    end_date = data["date"].max().strftime("%Y-%m-%d")
+
+    # 1. 数据校验 
+    # 2. 数据预处理（去极值 / 标准化 / 风格剔除）
+    from .dataprocess import DataProcess
+    logger.info("========== 2. 数据预处理 ==========")
+    processed = DataProcess().validate(data, "factor")
+
+    # 3. A 项：单因子指标
+    from .factoranalyze import FactorAnalyze
+    logger.info("========== 3. 单因子 A 项指标 ==========")
+    fa = FactorAnalyze(start_date, end_date)
+    a_metrics = fa.validate(processed, "factor")
+
+    # 单因子场景 Rank 退化：直接以原始指标作为代理。多因子团队评估时
+    # 由官方全局回归再做 cross-team rank。
+    factor_score = float(np.nanmean(
+        [a_metrics["ic_mean"], a_metrics["ic_ir"], a_metrics["ls_sharpe"], a_metrics["stress_ic_ir"]]
+    ))
+
+    # 4. B 项：Elastic Net 滚动 ModelScore
+    from .elasticnet import ElasticNetEvaluator
+    logger.info("========== 4. Elastic Net B 项 ==========")
+    panel = processed.rename(columns={"factor": "factor"}).copy()
+    panel["trading_day"] = pd.to_datetime(panel["date"]).dt.normalize()
+    panel = panel[["trading_day", "instrument", "factor"]].dropna(subset=["factor"])
+
+    en = ElasticNetEvaluator(start_date, end_date)
+    en_result = en.run(panel, ["factor"])
+    per_factor = en_result["per_factor_scores"]
+    weights_history = en_result["weights_history"]
+    model_score = float(per_factor["model_score"].iloc[0]) if not per_factor.empty else np.nan
+
+    # 5. 汇总得分
+    score_data = pd.DataFrame({
+        "ic_mean": [round(a_metrics["ic_mean"], 6)],
+        "ic_ir": [round(a_metrics["ic_ir"], 6)],
+        "ls_sharpe": [round(a_metrics["ls_sharpe"], 6)],
+        "stress_ic_ir": [round(a_metrics["stress_ic_ir"], 6)],
+        "factor_score_proxy": [round(factor_score, 6)],
+        "model_score": [round(model_score, 6) if pd.notna(model_score) else np.nan],
+        "selection_rate": [round(float(per_factor["selection_rate"].iloc[0]), 6)
+                           if not per_factor.empty else np.nan],
+    })
+
+    details = {
+        "a_metrics": a_metrics,
+        "daily_ic": fa.daily_ic.reset_index().rename(columns={"index": "trading_day"}),
+        "group_cumret": fa.group_cumret.reset_index(),
+        "long_short_ret": fa.long_short_ret.reset_index().rename(columns={"index": "trading_day"}),
+        "per_factor_scores": per_factor,
+        "weights_history": weights_history,
+    }
+
+    # 6. 可视化
+    if show:
+        from .render import plot_ic, plot_group_cumret, plot_weights_history
+        from IPython.display import HTML, display
+
+        c1 = plot_ic(fa.daily_ic)
+        c2 = plot_group_cumret(fa.group_cumret, fa.group_num)
+        c3 = plot_weights_history(weights_history, ["factor"])
+
+        html_content = f"""
+        <div>
+            <h1>A 项 单因子指标</h1>
+            <ul>
+                <li>IC_mean      = {a_metrics['ic_mean']:.4f}</li>
+                <li>IC_IR        = {a_metrics['ic_ir']:.4f}</li>
+                <li>多空 SR      = {a_metrics['ls_sharpe']:.4f}</li>
+                <li>Stress IC_IR = {a_metrics['stress_ic_ir']:.4f}</li>
+                <li>FACTOR(代理) = {factor_score:.4f}（单因子场景下取四指标均值）</li>
+            </ul>
+            <img src="data:image/png;base64,{c1}" alt="Daily IC"/>
+            <br/>
+            <img src="data:image/png;base64,{c2}" alt="Group Cumret"/>
+            <br/>
+
+            <h1>B 项 Elastic Net</h1>
+            <ul>
+                <li>ModelScore    = {model_score:.4f}</li>
+                <li>SelectionRate = {(per_factor['selection_rate'].iloc[0] if not per_factor.empty else float('nan')):.4f}</li>
+                <li>窗口长度=60 个交易日；步长=20 个交易日</li>
+            </ul>
+            <img src="data:image/png;base64,{c3}" alt="Rolling Weights"/>
+        </div>
+        """
+        display(HTML(html_content))
+
+    return dict(
+        result=dai.DataSource.write_pickle(score_data),
+        details=dai.DataSource.write_pickle(details),
+    )
 
 
-def plot_ic(daily_ic: pd.Series) -> str:
-    """绘制日度 IC 曲线 + 累计 IC。"""
-    if daily_ic is None or daily_ic.empty:
-        plt.figure(figsize=(12, 4))
-        plt.title("Daily IC (empty)")
-        return _fig_to_base64()
-
-    s = daily_ic.copy().sort_index()
-    s.index = pd.to_datetime(s.index)
-    cum_ic = s.cumsum()
-
-    fig, ax1 = plt.subplots(figsize=(12, 5))
-    ax1.bar(s.index, s.values, color="#4ECDC4", alpha=0.6, width=1.0, label="Daily IC")
-    ax1.axhline(0, color="black", linewidth=0.6)
-    ax1.set_ylabel("Daily IC")
-    ax1.set_xlabel("Date")
-    ax1.tick_params(axis="x", rotation=45)
-
-    ax2 = ax1.twinx()
-    ax2.plot(cum_ic.index, cum_ic.values, color="#FF6B6B", linewidth=1.6, label="Cumulative IC")
-    ax2.set_ylabel("Cumulative IC")
-
-    plt.title(f"Daily IC (mean={s.mean():.4f}, IR={s.mean()/s.std(ddof=1)*np.sqrt(252):.4f})")
-    fig.tight_layout()
-    return _fig_to_base64()
-
-
-def plot_group_cumret(group_cum: pd.DataFrame, group_num: int) -> str:
-    """分组累计收益曲线（含多空 ls）。"""
-    if group_cum is None or group_cum.empty:
-        plt.figure(figsize=(12, 4))
-        plt.title("Group Cumulative Returns (empty)")
-        return _fig_to_base64()
-
-    df = group_cum.copy().sort_index()
-    df.index = pd.to_datetime(df.index)
-
-    plt.figure(figsize=(12, 6))
-    blues = plt.cm.Blues(np.linspace(0.25, 0.90, group_num))
-    for i in range(group_num):
-        col = str(i)
-        if col in df.columns:
-            plt.plot(df.index, df[col].values, color=blues[i], linewidth=1.5, label=f"G{i}")
-    if "ls" in df.columns:
-        plt.plot(df.index, df["ls"].values, linestyle="--", color="red", label="Long-Short")
-
-    plt.title("Group Cumulative Returns")
-    plt.xlabel("Date")
-    plt.ylabel("Cumulative Net Value")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    return _fig_to_base64()
-
-
-def plot_weights_history(weights_history: pd.DataFrame, factor_cols: list) -> str:
-    """Elastic Net 滚动权重曲线。"""
-    if weights_history is None or weights_history.empty:
-        plt.figure(figsize=(12, 4))
-        plt.title("Elastic Net Rolling Weights (empty)")
-        return _fig_to_base64()
-
-    df = weights_history.copy()
-    df["window_end"] = pd.to_datetime(df["window_end"])
-    df = df.sort_values("window_end")
-
-    plt.figure(figsize=(12, 5))
-    for col in factor_cols:
-        if col in df.columns:
-            plt.plot(df["window_end"], df[col].values, linewidth=1.4, label=col)
-    plt.axhline(0, color="black", linewidth=0.6)
-
-    plt.title("Elastic Net Rolling Weights")
-    plt.xlabel("Window End")
-    plt.ylabel("Weight")
-    plt.grid(True, alpha=0.3)
-    plt.legend(loc="best", fontsize=9)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    return _fig_to_base64()
+def post_run(outputs):
+    return outputs
