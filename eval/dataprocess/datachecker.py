@@ -1,23 +1,8 @@
-"""数据校验
-
-按 docs/因子挖掘_介绍_20260525.md "数据校验与预处理" 章节实现：
-- 列检查：必须且仅包含 date / instrument / factor 三列
-- instrument 格式：^\\d{6}\\.(SZ|SH)$
-- factor：可数值化、不允许 inf；NaN 受覆盖度规则约束
-- 时间范围：[start_date, end_date]
-- 交易日完整性：评估期内不得缺失任何交易日
-- 唯一性：(date, instrument) 不重复
-- 股票池：中证 1000（000852.SH）历史成分；不允许包含非当日成分股
-- 覆盖度：每个交易日 factor 缺失率 <= 40%
-- 数据泄露：与 check_data 比对，验证不存在未来函数
-"""
-
 import re
 import dai
 import numpy as np
 import pandas as pd
 import structlog
-from typing import Optional
 
 logger = structlog.get_logger()
 

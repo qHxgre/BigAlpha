@@ -1,250 +1,616 @@
-"""单因子评估（A 项）
-
-按 docs/因子挖掘_介绍_20260525.md "单因子得分（A 项）" 实现：
-
-    FACTOR = 0.25 * Rank_IC_mean + 0.25 * Rank_IC_IR
-           + 0.25 * Rank_SR      + 0.25 * Rank_Stress
-
-输出原始指标（IC_mean、IC_IR、long-short SR、Stress IC_IR），
-排名归一化由汇总层（todo.py）完成 —— 单因子场景下 Rank_X 退化为按指标本身归一化。
-
-Stress 行情定义：以中证 1000（基准）月度收益作为分位标准，
-取月度收益最低 20% 的月份作为压力期，计算压力期内的 IC_IR。
-"""
-
 import dai
-import empyrical
-import structlog
-import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from functools import partial
+from typing import Tuple
+from dataclasses import dataclass, fields, asdict
+from enum import Enum
+import numpy as np
+import empyrical
+from typing import List, Literal
 
-logger = structlog.get_logger()
+
+@dataclass
+class TurnoverPerf:
+    turnover: float
+
+BM_DICT = {
+    "中证500": "000905.SH",
+    "中证1000": "000852.SH",
+    "沪深300": "000300.SH",
+}
+
+class DataType(str, Enum):
+    LONG = "long"
+    SHORT = "short"
+    LONG_SHORT = "long_short"
+
+    def __str__(self):
+        return self.value
+
+class PortfolioCode(str, Enum):
+    ll_pos = "9"
+    ss_pos = "0"
+    ls_pos = "ls"
+    bm_pos = "bm"
+
+    def __str__(self):
+        return self.value
 
 
-# 评估期间无风险年化（与原实现保持一致）
-RISK_FREE_DAILY = 0.035 / 242
-# 分组数量（多空收益用最高组 - 最低组）
-GROUP_NUM = 5
-# 基准指数（中证 1000）
-BENCHMARK_CODE = "000852.SH"
-# 压力期分位（基准月度收益的最低 20%）
-STRESS_QUANTILE = 0.2
+@dataclass
+class ICPerf:
+    ic: float
+    ir: float
+    ic_3: float
+    ic_10: float
+    ic_21: float
+    ic_63: float
+    ic_126: float
+    ic_252: float
+
+
+
+@dataclass
+class BasicPerf:
+
+    return_ratio: float
+    annual_return_ratio: float
+    ex_return_ratio: float
+    ex_annual_return_ratio: float
+    sharp_ratio: float
+    return_volatility: float
+    information_ratio: float
+    max_drawdown: float
+    win_percent: float
+    trading_days: float
+    ret_3: float
+    ret_10: float
+    ret_21: float
+    ret_63: float
+    ret_126: float
+    ret_252: float
+
+
+@dataclass
+class Performance:
+    return_ratio: list
+    annual_return_ratio: list
+    ex_return_ratio: list
+    ex_annual_return_ratio: list
+    sharp_ratio: list
+    return_volatility: list
+    max_drawdown: list
+    win_percent: list
+    trading_days: list
+
+    def to_dataframe(self):
+        data_dict = asdict(self)
+        df = pd.DataFrame(data_dict)
+        return df
+
+
+@dataclass
+class SummaryPerf:
+    portfolio: str
+    basic_perf: BasicPerf
+    ic_perf: ICPerf
+    turnover_perf: TurnoverPerf
+
+    def __post_init__(self):
+        for field in fields(BasicPerf):
+            setattr(self, field.name, getattr(self.basic_perf, field.name))
+        for field in fields(ICPerf):
+            setattr(self, field.name, getattr(self.ic_perf, field.name))
+        for field in fields(TurnoverPerf):
+            setattr(self, field.name, getattr(self.turnover_perf, field.name))
+
+    def to_dataframe(self):
+        flat_data = {"portfolio": self.portfolio}
+        flat_data.update(
+            {
+                f"{field.name}": getattr(self.basic_perf, field.name)
+                for field in fields(BasicPerf)
+            }
+        )
+        flat_data.update(
+            {
+                f"{field.name}": getattr(self.ic_perf, field.name)
+                for field in fields(ICPerf)
+            }
+        )
+        flat_data.update(
+            {
+                f"{field.name}": getattr(self.turnover_perf, field.name)
+                for field in fields(TurnoverPerf)
+            }
+        )
+        df = pd.DataFrame([flat_data])
+        return df
+
+
+
+def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    计算A股每日收益。
+
+    Args:
+        start_date (str): 开始日期，格式为 'YYYY-MM-DD'。
+        end_date (str): 结束日期，格式为 'YYYY-MM-DD'。
+
+    Returns:
+        pd.DataFrame: A股每日收益数据。
+    """
+    sql = f"""
+        SELECT 
+            date, 
+            instrument, 
+            (m_lead(open, 2)/ m_lead(open, 1) - 1) AS daily_ret 
+        FROM cn_stock_bar1d 
+        WHERE date BETWEEN DATE '{start_date}' - INTERVAL 10 DAY AND '{end_date}'
+        ORDER BY date, instrument
+    """
+    daily_ret_data = dai.query(sql).df()
+    return daily_ret_data
+
+
+
+def cal_Performance(
+    df: pd.DataFrame, ll_pos: str, bm_pos: str
+) -> pd.DataFrame:
+    ll_series = df[ll_pos]
+    bm_series = df[bm_pos]
+    trading_days = len(ll_series)
+    return_ratio = ll_series.sum()
+    annual_return_ratio = ll_series.sum() * 242 / trading_days
+    ex_return_ratio = (ll_series - bm_series).sum()
+    ex_annual_return_ratio = (ll_series - bm_series).sum() * 242 / trading_days
+    sharp_ratio = empyrical.sharpe_ratio(ll_series, 0.035 / 242)  # type: ignore
+    return_volatility = empyrical.annual_volatility(ll_series)
+    max_drawdown = empyrical.max_drawdown(ll_series)
+    information_ratio = ll_series.mean() / ll_series.std()
+    win_percent = len(ll_series[ll_series > 0]) / trading_days
+    perf = Performance(
+        return_ratio=[return_ratio],
+        annual_return_ratio=[annual_return_ratio],
+        ex_return_ratio=[ex_return_ratio],
+        ex_annual_return_ratio=[ex_annual_return_ratio],
+        sharp_ratio=[sharp_ratio],
+        return_volatility=[return_volatility],
+        max_drawdown=[max_drawdown],
+        win_percent=[win_percent],
+        trading_days=[int(trading_days)],
+    )
+    return perf.to_dataframe()
+
+def cal_stats(series: pd.Series, bm_series: pd.Series) -> BasicPerf:
+    """
+    计算因子基础指标。
+
+    Args:
+        series (pd.Series): 因子的收益率序列。
+        bm_series (pd.Series): 基准指数的收益率序列。
+
+    Returns:
+        BasicPerf: 包含各项基础指标的命名元组。
+    """
+    series = series.fillna(0)
+    trading_days = len(series)
+    return_ratio = series.sum()
+    annual_return_ratio = series.sum() * 242 / trading_days
+    ex_return_ratio = (series - bm_series).sum()
+    ex_annual_return_ratio = (series - bm_series).sum() * 242 / trading_days
+    sharp_ratio = empyrical.sharpe_ratio(series, 0.035 / 242)  # type: ignore
+    return_volatility = empyrical.annual_volatility(series)
+    max_drawdown = empyrical.max_drawdown(series)
+    information_ratio = series.mean() / series.std()
+    win_percent = len(series[series > 0]) / trading_days
+    ret_3 = series.tail(3).sum()
+    ret_10 = series.tail(10).sum()
+    ret_21 = series.tail(21).sum()
+    ret_63 = series.tail(63).sum()
+    ret_126 = series.tail(126).sum()
+    ret_252 = series.tail(252).sum()
+    return BasicPerf(
+        return_ratio=return_ratio,
+        annual_return_ratio=annual_return_ratio,
+        ex_return_ratio=ex_return_ratio,
+        ex_annual_return_ratio=ex_annual_return_ratio,
+        sharp_ratio=sharp_ratio,  # type: ignore
+        return_volatility=return_volatility,  # type: ignore
+        information_ratio=information_ratio,
+        max_drawdown=max_drawdown,  # type: ignore
+        win_percent=win_percent,
+        trading_days=trading_days,
+        ret_3=ret_3,
+        ret_10=ret_10,
+        ret_21=ret_21,
+        ret_63=ret_63,
+        ret_126=ret_126,
+        ret_252=ret_252,
+    )
+
+
+def cal_ic(
+    df: pd.DataFrame,
+    factor_name: str,
+    method: Literal["pearson", "kendall", "spearman"] = "spearman",
+):
+    return df["daily_ret"].corr(df[factor_name], method=method)
+
+
+def cal_ic_stats(df: pd.DataFrame, factor_name) -> ICPerf:
+    group_ic_data = (
+        df.groupby("date", group_keys=False)
+        .apply(lambda x: cal_ic(x, factor_name))
+        .reset_index()
+    )
+    ic_data = group_ic_data.rename(columns={0: "g_ic"}).dropna()
+    ic_mean = np.nanmean(ic_data["g_ic"])
+    ir = np.nanmean(ic_data["g_ic"]) / np.nanstd(ic_data["g_ic"])
+    ic_3 = ic_data["g_ic"].tail(3).mean()
+    ic_10 = ic_data["g_ic"].tail(10).mean()
+    ic_21 = ic_data["g_ic"].tail(21).mean()
+    ic_63 = ic_data["g_ic"].tail(63).mean()
+    ic_126 = ic_data["g_ic"].tail(126).mean()
+    ic_252 = ic_data["g_ic"].tail(252).mean()
+    return ICPerf(
+        ic=ic_mean,  # type: ignore
+        ir=ir,  # type: ignore
+        ic_3=ic_3,
+        ic_10=ic_10,
+        ic_21=ic_21,
+        ic_63=ic_63,
+        ic_126=ic_126,
+        ic_252=ic_252,
+    )
+
+def cut(
+    df: pd.DataFrame,
+    factor_name: str,
+    group_num: int,
+) -> pd.DataFrame:
+    """
+    数据分组。
+
+    Args:
+        df (pd.DataFrame): 需要分组的数据。
+        factor_name (str): 需要分组的因子名称。
+        group_num (int): 分组的数量。
+
+    Returns:
+        pd.DataFrame: 经过分组后的数据，新增一列 "group" 表示每个数据所在的分组编号。
+    """
+    df = df.drop_duplicates(factor_name)
+    df.loc[:, "group"] = pd.qcut(
+        df[factor_name], q=group_num, labels=False, duplicates="drop"
+    )
+    df = df.dropna(subset=["group"], how="any")
+    df["group"] = df["group"].apply(int).apply(str)
+    return df
+
+def count_repeat(dfs: pd.DataFrame) -> int:
+    if dfs.name > 0:
+        return len(set(dfs["instrument"]) & set(dfs["instrument_lag"]))
+    else:
+        return 0
+
+
+
+
+def cal_turnover(df: pd.DataFrame):
+
+    df_ins = pd.DataFrame(
+        df.groupby("date").apply(lambda x: x.instrument.tolist()),
+        columns=["instrument"],
+    ).reset_index()
+    df_ins["instrument_lag"] = df_ins["instrument"].shift(1)
+    df_ins["instrument_count"] = df_ins["instrument"].apply(len)
+    df_ins["repeat_count"] = df_ins.apply(count_repeat, axis=1)
+    df_ins["turnover"] = (
+        1 - df_ins["repeat_count"] / df_ins["instrument_count"]
+    )
+    mean_turnover = np.nanmean(df_ins["turnover"])
+    return mean_turnover
+
+def get_bm_ret(start_date: str, end_date: str, benchmark: str) -> pd.DataFrame:
+    """
+    获取指定时间段内基准指数的日收益率数据。
+
+    Args:
+        start_date (str): 开始日期，格式为 'YYYY-MM-DD'。
+        end_date (str): 结束日期，格式为 'YYYY-MM-DD'。
+        benchmark (str): 基准指数的名称。
+
+    Returns:
+        pd.DataFrame: 包含日期、标的代码和基准指数日收益率的数据框。
+    """
+    # 构造SQL查询语句
+    sql = f"""
+    SELECT 
+        date, instrument,
+        (close - m_Lag(close,1)) / m_LAG(close, 1) as benchmark_ret
+    FROM cn_stock_index_bar1d
+    WHERE date BETWEEN DATE '{start_date}' - INTERVAL 10 DAY AND '{end_date}'
+    AND instrument = '{BM_DICT[benchmark]}'
+    """
+    bm_ret = dai.query(sql).df()
+    return bm_ret
 
 
 class FactorAnalyze:
-    def __init__(self, start_date: str, end_date: str) -> None:
+    def __init__(
+        self,
+        start_date: str,
+        end_date: str,
+        factor_name: str,
+        group_number: int,
+    ) -> None:
         self.start_date = start_date
         self.end_date = end_date
-        self.group_num = GROUP_NUM
+        self.factor_name = factor_name
+        self.benchmark = '中证1000'
+        self.group_num = group_number
 
-        # 中间产物（供绘图使用）
-        self.merged: pd.DataFrame = pd.DataFrame()
-        self.daily_ic: pd.Series = pd.Series(dtype=float)
-        self.group_cumret: pd.DataFrame = pd.DataFrame()
-        self.long_short_ret: pd.Series = pd.Series(dtype=float)
-
-    # ---------- 数据准备 ----------
-
-    def merge_return_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
-        """合并 T+1 日频收益率。
-
-        因子按文档为日频；下期收益取下一交易日的日收益（次日 close / 当日 close - 1）。
+    # @timing_decorator
+    def merge_related_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """
-        after_end_date = (
-            datetime.strptime(self.end_date, "%Y-%m-%d") + timedelta(days=15)
-        ).strftime("%Y-%m-%d")
-        instruments = factor_data["instrument"].unique().tolist()
+        合并因子分析需要的相关数据，包括每日收益数据，计算相关性的因子数据。
 
-        sql = """
-        WITH cte_status as (
-            SELECT date as trading_day, instrument
-            FROM cn_stock_status
-            WHERE price_limit_status = 2
-        ),
-        cte_bar1d as (
-            SELECT date as trading_day, instrument, close
-            FROM cn_stock_bar1d
-            WHERE volume > 0
+        Args:
+            factor_data (pd.DataFrame): 因子数据。
+
+        Returns:
+            pd.DataFrame: 合并后的因子数据。
+        """
+        daily_ret_data = get_daily_ret(self.start_date, self.end_date)
+        # correlation_factor = dai.DataSource("cal_correlation_factor").read()
+        # self.corr_factor_names = get_factor_names(correlation_factor)[0]
+        merge_data = pd.merge(
+            factor_data, daily_ret_data, on=["date", "instrument"], how="left"
         )
-        SELECT
-            trading_day,
-            instrument,
-            m_lead(close, 1) / close - 1 AS ret
-        FROM cte_bar1d
-        SEMI JOIN cte_status USING (trading_day, instrument)
-        ORDER BY trading_day, instrument
+        # merge_data = pd.merge(
+        #     merge_data,
+        #     correlation_factor,
+        #     on=["date", "instrument"],
+        #     how="left",
+        # )
+        merge_data.sort_values(["date", "instrument"], inplace=True)
+        return merge_data
+
+    # @timing_decorator
+    def get_group_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """
-        ret_df = dai.query(
-            sql,
-            filters={
-                "date": [f"{self.start_date} 00:00:00", f"{after_end_date} 23:59:59"],
-                "instrument": instruments,
-            },
-        ).df()
+        因子数据分组。
 
-        df = factor_data.copy()
-        df["date"] = pd.to_datetime(df["date"])
-        df["trading_day"] = pd.to_datetime(df["date"].dt.strftime("%Y-%m-%d"))
-        ret_df["trading_day"] = pd.to_datetime(ret_df["trading_day"])
+        Args:
+            factor_data (pd.DataFrame): 因子数据。
 
-        merged = pd.merge(
-            df[["trading_day", "instrument", "factor"]],
-            ret_df[["trading_day", "instrument", "ret"]],
-            how="left",
-            on=["trading_day", "instrument"],
+        Returns:
+            pd.DataFrame: 分组后的因子数据。
+        """
+
+        cut_func = partial(
+            cut, factor_name=self.factor_name, group_num=self.group_num
         )
-        merged = merged.dropna(subset=["factor"])
-        return merged
+        group_data = factor_data.groupby("date", group_keys=False).apply(
+            cut_func
+        )
+        return group_data
 
-    # ---------- IC ----------
-
-    def cpt_ic(self, merged: pd.DataFrame) -> pd.Series:
-        """每日截面 Rank IC（Spearman），用 Pearson(rank(factor), rank(ret)) 等价实现。"""
-        df = merged.dropna(subset=["factor", "ret"]).copy()
-        if df.empty:
-            return pd.Series(dtype=float)
-
-        def _rank_ic(g: pd.DataFrame) -> float:
-            if len(g) < 5:
-                return np.nan
-            return float(g["factor"].rank().corr(g["ret"].rank()))
-
-        ic = df.groupby("trading_day").apply(_rank_ic)
-        ic.index = pd.to_datetime(ic.index)
-        ic.name = "ic"
-        return ic.dropna()
-
-    @staticmethod
-    def cpt_ic_metrics(ic: pd.Series) -> tuple:
-        """返回 (IC_mean, IC_IR)。"""
-        if ic is None or ic.empty:
-            return np.nan, np.nan
-        ic_mean = float(ic.mean())
-        ic_std = float(ic.std(ddof=1))
-        ic_ir = ic_mean / ic_std * np.sqrt(252) if ic_std > 0 else np.nan
-        return ic_mean, ic_ir
-
-    # ---------- 分组 / 多空夏普 ----------
-
-    def cpt_group_returns(self, merged: pd.DataFrame) -> tuple:
+    # @timing_decorator
+    def get_group_cumret(
+        self, group_data: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        分组等权收益：将每日因子按 group_num 分组，组 0 为最低、组 group_num-1 为最高。
-        多空收益 = 高组 - 低组（T+1 实现，整体 shift 1 期）。
-        """
-        df = merged.dropna(subset=["factor", "ret"]).copy()
-        if df.empty:
-            return pd.DataFrame(), pd.Series(dtype=float)
+        计算因子分组收益率。
 
-        def _cut(g: pd.DataFrame) -> pd.DataFrame:
-            if g["factor"].nunique() < self.group_num:
-                return g.iloc[0:0]
-            g = g.copy()
-            g["group"] = pd.qcut(
-                g["factor"], q=self.group_num, labels=False, duplicates="drop"
+        Args:
+            group_data (pd.DataFrame): 因子分组数据。
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: 因子分组收益率与因子分组累计收益率。
+        """
+        # 基准收益率
+        bm_ret = get_bm_ret(self.start_date, self.end_date, self.benchmark)
+        bm_ret = bm_ret.set_index("date")
+        # 分组收益率
+        groupret_data = (
+            group_data[["date", "group", "daily_ret"]]
+            .groupby(["date", "group"], group_keys=False)
+            .apply(lambda x: np.nanmean(x))
+            .reset_index()
+        )
+        groupret_data.rename(columns={0: "g_ret"}, inplace=True)
+        groupret_pivotdata = groupret_data.pivot(
+            index="date", values="g_ret", columns="group"
+        )
+        groupret_pivotdata["ls"] = (
+            groupret_pivotdata[str(self.group_num - 1)]
+            - groupret_pivotdata["0"]
+        )
+        groupret_pivotdata["bm"] = bm_ret["benchmark_ret"]
+        groupret_pivotdata = groupret_pivotdata.shift(1)
+        # 分组累计收益率
+        groupcumret_pivotdata = groupret_pivotdata.cumsum()
+        # 返回分组收益率与分组累计收益率
+        return groupret_pivotdata, groupcumret_pivotdata
+
+    # @timing_decorator
+    def get_whole_perf(
+        self, group_data: pd.DataFrame, group_ret: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        计算因子分析整体绩效指标。
+
+        Args:
+            group_data (pd.DataFrame): 因子分组数据。
+            group_ret (pd.DataFrame): 因子分组收益率数据。
+
+        Returns:
+            pd.DataFrame: 因子分析整体绩效指标。
+        """
+
+        def get_basic_perf(
+            data_type: str, group_ret: pd.DataFrame
+        ) -> BasicPerf:
+            """_summary_
+
+            Args:
+                data_type (str): _description_
+                group_ret (pd.DataFrame): _description_
+
+            Returns:
+                BasicPerf: _description_
+            """
+            if data_type == DataType.LONG:
+                perf = cal_stats(
+                    group_ret[PortfolioCode.ll_pos],
+                    group_ret[PortfolioCode.bm_pos],
+                )
+            elif data_type == DataType.SHORT:
+                perf = cal_stats(
+                    group_ret[PortfolioCode.ss_pos],
+                    group_ret[PortfolioCode.bm_pos],
+                )
+            else:
+                perf = cal_stats(
+                    group_ret[PortfolioCode.ls_pos],
+                    group_ret[PortfolioCode.bm_pos],
+                )
+            return perf
+
+        def get_ic(data_type: str, group_data: pd.DataFrame) -> ICPerf:
+
+            if data_type == DataType.LONG:
+                ic = cal_ic_stats(
+                    group_data[group_data["group"] == PortfolioCode.ll_pos][
+                        ["date", "daily_ret", self.factor_name]
+                    ],
+                    self.factor_name,
+                )
+            elif data_type == DataType.SHORT:
+                ic = cal_ic_stats(
+                    group_data[group_data["group"] == PortfolioCode.ss_pos][
+                        ["date", "daily_ret", self.factor_name]
+                    ],
+                    self.factor_name,
+                )
+            else:
+                ic = cal_ic_stats(
+                    group_data[
+                        group_data["group"].isin(
+                            [PortfolioCode.ll_pos, PortfolioCode.ss_pos]
+                        )
+                    ][["date", "daily_ret", self.factor_name]],
+                    self.factor_name,
+                )
+            return ic
+
+        def get_turnover(
+            data_type: str, group_data: pd.DataFrame
+        ) -> TurnoverPerf:
+
+            if data_type == DataType.LONG:
+                turnover = cal_turnover(
+                    group_data[group_data["group"] == PortfolioCode.ll_pos]
+                )
+            elif data_type == DataType.SHORT:
+                turnover = cal_turnover(
+                    group_data[group_data["group"] == PortfolioCode.ss_pos]
+                )
+            else:
+                turnover = cal_turnover(
+                    group_data[group_data["group"] == PortfolioCode.ll_pos]
+                ) + cal_turnover(
+                    group_data[group_data["group"] == PortfolioCode.ss_pos]
+                )
+            return TurnoverPerf(turnover=turnover)  # type: ignore
+
+        # 三种绩效综合一下
+        summary_df = pd.DataFrame()
+        for data_type in DataType:
+            ic_perf = get_ic(data_type.value, group_data)
+            basic_perf = get_basic_perf(data_type.value, group_ret)
+            turnover_perf = get_turnover(data_type.value, group_data)
+            summary_perf = SummaryPerf(
+                portfolio=data_type.value,
+                basic_perf=basic_perf,
+                ic_perf=ic_perf,
+                turnover_perf=turnover_perf,
             )
-            return g.dropna(subset=["group"])
+            summary_df = pd.concat(
+                [summary_df, summary_perf.to_dataframe()], axis=0
+            )
+        summary_df.reset_index(drop=True, inplace=True)
+        return summary_df
 
-        cut_df = df.groupby("trading_day", group_keys=False).apply(_cut)
-        if cut_df.empty:
-            return pd.DataFrame(), pd.Series(dtype=float)
+    # @timing_decorator
+    def get_yearly_perf(
+        self, group_data: pd.DataFrame, group_ret: pd.DataFrame
+    ):
+        # 计算ic
 
-        cut_df["group"] = cut_df["group"].astype(int).astype(str)
-        group_ret = (
-            cut_df.groupby(["trading_day", "group"])["ret"].mean().unstack("group")
+        # 计算年度综合收益
+        year_df = group_ret.reset_index("date")
+        year_df["year"] = year_df["date"].apply(lambda x: x.year)
+        cal_Performance_func = partial(
+            cal_Performance,
+            ll_pos=PortfolioCode.ll_pos.value,
+            bm_pos=PortfolioCode.bm_pos.value,
         )
-        # 因子用 T 日截面、收益已经是 T+1 → 不需要再 shift
-        long_short = group_ret[str(self.group_num - 1)] - group_ret["0"]
-        long_short.name = "ls"
-        group_cum = (1 + group_ret.fillna(0)).cumprod()
-        group_cum["ls"] = (1 + long_short.fillna(0)).cumprod()
-        return group_cum, long_short
+        yearly_perf = year_df.groupby(["year"], group_keys=True).apply(
+            cal_Performance_func
+        )
+        yearly_perf = yearly_perf.droplevel(1)
+        # 计算年度IC
+        group_ic_data = (
+            (
+                group_data[group_data["group"] == PortfolioCode.ll_pos][
+                    ["date", "daily_ret", self.factor_name]
+                ]
+            )
+            .groupby("date", group_keys=False)
+            .apply(lambda x: cal_ic(x, self.factor_name))
+            .reset_index()
+        )
+        ic_data = group_ic_data.rename(columns={0: "g_ic"}).dropna()
+        ic_data["year"] = ic_data["date"].apply(lambda x: x.year)
+        yearly_ic = ic_data.groupby("year").apply(
+            lambda x: np.nanmean(x["g_ic"])
+        )
+        yearly_perf["ic"] = yearly_ic
+        yearly_perf = yearly_perf.reset_index()
+        yearly_perf["year"] = yearly_perf["year"].apply(str)
+        # 返回年度收益
+        return yearly_perf
 
-    @staticmethod
-    def cpt_sharpe(ret: pd.Series) -> float:
-        ret = pd.Series(ret).dropna()
-        if len(ret) < 3:
-            return np.nan
-        return float(empyrical.sharpe_ratio(ret.values, risk_free=RISK_FREE_DAILY))
+    # @timing_decorator
+    def get_all_ic(self, group_data: pd.DataFrame) -> pd.DataFrame:
+        group_ic_data = (
+            group_data[["date", "daily_ret", self.factor_name]]
+            .groupby("date", group_keys=False)
+            .apply(lambda x: pd.Series({
+                "g_ic": x[self.factor_name].corr(x["daily_ret"]),  # Pearson IC
+                "g_rank_ic": x[self.factor_name].rank().corr(x["daily_ret"].rank())  # Spearman Rank IC
+            }))
+            .reset_index()
+        )
+        group_ic_data.rename(columns={0: "g_ic"}, inplace=True)
+        group_ic_data = group_ic_data.shift(1)
+        group_ic_data["ic_cumsum"] = group_ic_data["g_ic"].cumsum()
+        group_ic_data["ic_roll_ma"] = group_ic_data["g_ic"].rolling(22).mean()
+        group_ic_data = group_ic_data.dropna()
+        return group_ic_data
 
-    # ---------- Stress ----------
-
-    def _benchmark_monthly_ret(self) -> pd.Series:
-        """中证 1000 的日收益率序列。"""
-        sql = f"""
-        SELECT date as trading_day, close
-        FROM cn_stock_index_bar1d
-        WHERE instrument = '{BENCHMARK_CODE}'
-        ORDER BY trading_day
+    def validate(self, factor_data: pd.DataFrame):
         """
-        bench = dai.query(
-            sql,
-            filters={"date": [f"{self.start_date} 00:00:00", f"{self.end_date} 23:59:59"]},
-        ).df()
-        if bench.empty:
-            return pd.Series(dtype=float)
-        bench["trading_day"] = pd.to_datetime(bench["trading_day"])
-        bench = bench.sort_values("trading_day").set_index("trading_day")
-        bench["ret"] = bench["close"].pct_change()
-        return bench["ret"].dropna()
-
-    def cpt_stress_ic_ir(self, ic: pd.Series) -> float:
-        """Stress IC_IR：基准月度收益最低 20% 月份内的 IC_IR。"""
-        if ic is None or ic.empty:
-            return np.nan
-        bench_ret = self._benchmark_monthly_ret()
-        if bench_ret.empty:
-            return np.nan
-
-        bench_monthly = (1 + bench_ret).resample("M").prod() - 1
-        if bench_monthly.empty:
-            return np.nan
-
-        threshold = bench_monthly.quantile(STRESS_QUANTILE)
-        stress_months = set(
-            bench_monthly[bench_monthly <= threshold].index.to_period("M")
-        )
-        if not stress_months:
-            return np.nan
-
-        ic_periods = ic.index.to_period("M")
-        mask = pd.Series([p in stress_months for p in ic_periods], index=ic.index)
-        stress_ic = ic[mask]
-        if len(stress_ic) < 5:
-            return np.nan
-        std = stress_ic.std(ddof=1)
-        return float(stress_ic.mean() / std * np.sqrt(252)) if std > 0 else np.nan
-
-    # ---------- 入口 ----------
-
-    def validate(self, factor_data: pd.DataFrame, factor_name: str = "factor") -> dict:
-        """计算 A 项四个原始指标。"""
-        t0 = datetime.now()
-        merged = self.merge_return_data(factor_data.rename(columns={factor_name: "factor"}))
-        self.merged = merged
-        t1 = datetime.now()
-        logger.info(f"[A项] 合并下期收益, 耗时: {round((t1 - t0).total_seconds(), 4)} 秒")
-
-        ic = self.cpt_ic(merged)
-        self.daily_ic = ic
-        ic_mean, ic_ir = self.cpt_ic_metrics(ic)
-        t2 = datetime.now()
-        logger.info(f"[A项] IC: mean={ic_mean:.4f}, IR={ic_ir:.4f}, 耗时: {round((t2 - t1).total_seconds(), 4)} 秒")
-
-        group_cum, long_short = self.cpt_group_returns(merged)
-        self.group_cumret = group_cum
-        self.long_short_ret = long_short
-        ls_sharpe = self.cpt_sharpe(long_short)
-        t3 = datetime.now()
-        logger.info(f"[A项] 多空 SR={ls_sharpe:.4f}, 耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
-
-        stress_ir = self.cpt_stress_ic_ir(ic)
-        t4 = datetime.now()
-        logger.info(f"[A项] Stress IC_IR={stress_ir:.4f}, 耗时: {round((t4 - t3).total_seconds(), 4)} 秒")
-
-        return {
-            "ic_mean": float(ic_mean) if pd.notna(ic_mean) else np.nan,
-            "ic_ir": float(ic_ir) if pd.notna(ic_ir) else np.nan,
-            "ls_sharpe": float(ls_sharpe) if pd.notna(ls_sharpe) else np.nan,
-            "stress_ic_ir": float(stress_ir) if pd.notna(stress_ir) else np.nan,
-        }
+        执行所有因子分析流程。
+        """
+        merge_data = self.merge_related_data(factor_data)
+        group_data = self.get_group_data(merge_data)
+        group_ret, group_cumret = self.get_group_cumret(group_data)
+        whole_perf = self.get_whole_perf(group_data, group_ret)
+        yearly_perf = self.get_yearly_perf(group_data, group_ret)
+        ic_perf = self.get_all_ic(group_data)
+        # corr_perf = self.get_correlation(group_data)
+        return whole_perf, yearly_perf, ic_perf, group_cumret

@@ -1,11 +1,3 @@
-"""数据预处理
-
-按 docs/因子挖掘_介绍_20260525.md "数据校验与预处理" 章节实现：
-- 去极值：截面 3 倍标准差
-- 标准化：截面 z-score
-- 风格剔除：与 BARRA 风险因子（含行业哑变量）回归，取残差作为新因子
-"""
-
 import dai
 import numpy as np
 import pandas as pd
