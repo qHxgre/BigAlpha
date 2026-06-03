@@ -117,22 +117,21 @@ def plot_stress_ic(
     stress_periods: List[Tuple[str, str, str]],
     factor_name: str = "factor",
 ) -> str:
-    """各压力时段 IC / IR 条形图，返回 base64。"""
-    names, ic_vals, ir_vals = [], [], []
+    """各压力时段 IC 条形图，并用横线标注综合 stress_ic_ir，返回 base64。"""
+    names, ic_vals = [], []
     for label, _, _ in stress_periods:
         names.append(label)
         ic_vals.append(stress.get(f"{label}_ic", np.nan))
-        ir_vals.append(stress.get(f"{label}_ir", np.nan))
 
     fig, ax = plt.subplots(figsize=(10, 5))
     idx = np.arange(len(names))
-    width = 0.4
-    ax.bar(idx - width / 2, ic_vals, width, color="#4ECDC4", label="IC")
-    ax.bar(idx + width / 2, ir_vals, width, color="#FF6B6B", label="IR")
+    ax.bar(idx, ic_vals, 0.6, color="#4ECDC4", label="IC")
     ax.axhline(0, color="grey", linewidth=0.8)
     ax.set_xticks(idx)
     ax.set_xticklabels(names, rotation=20, ha="right")
-    ax.set_title(f"Stress-Period IC / IR - {factor_name}")
+    stress_ir = stress.get("stress_ic_ir", np.nan)
+    title_ir = f"{stress_ir:.4f}" if isinstance(stress_ir, (int, float)) and not np.isnan(stress_ir) else "nan"
+    ax.set_title(f"Stress-Period IC - {factor_name} (pooled IC IR = {title_ir})")
     ax.grid(True, alpha=0.3, axis="y")
     ax.legend()
     fig.tight_layout()
@@ -167,8 +166,7 @@ def render_report(
 
     stress_rows = "".join(
         f"<tr><td>{label}</td><td>{s} ~ {e}</td>"
-        f"<td>{_fmt(stress.get(f'{label}_ic'))}</td>"
-        f"<td>{_fmt(stress.get(f'{label}_ir'))}</td></tr>"
+        f"<td>{_fmt(stress.get(f'{label}_ic'))}</td></tr>"
         for label, s, e in stress_periods
     )
 
@@ -195,9 +193,9 @@ def render_report(
         <img src="data:image/png;base64,{c3}" alt="long short">
         <br>
 
-        <h2>压力时段 IC / IR</h2>
+        <h2>压力时段 IC</h2>
         <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">
-            <tr><th>时段</th><th>区间</th><th>IC</th><th>IR</th></tr>
+            <tr><th>时段</th><th>区间</th><th>IC</th></tr>
             {stress_rows}
         </table>
         <br>
