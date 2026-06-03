@@ -1,12 +1,28 @@
-import dai
-import pandas as pd
 from functools import partial
-from typing import Tuple
+from typing import Tuple, List, Literal, Optional, Dict
 from dataclasses import dataclass, fields, asdict
 from enum import Enum
+
+import dai
 import numpy as np
+import pandas as pd
 import empyrical
-from typing import List, Literal
+
+try:
+    from . import render
+except ImportError:
+    import render  # type: ignore
+
+
+@dataclass
+class FactorScore:
+    ic_mean: float
+    ic_ir: float
+    sharpe_ratio: float
+    stress_ic_ir: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 @dataclass
@@ -18,6 +34,13 @@ BM_DICT = {
     "中证1000": "000852.SH",
     "沪深300": "000300.SH",
 }
+
+STRESS_PERIODS: List[Tuple[str, str, str]] = [
+    ("covid_2020",        "2020-02-03", "2020-03-31"),
+    ("micro_cap_2024",    "2024-01-15", "2024-02-08"),
+    ("policy_rally_2024", "2024-09-24", "2024-10-08"),
+    ("tariff_2025",       "2025-04-07", "2025-04-30"),
+]
 
 class DataType(str, Enum):
     LONG = "long"
@@ -342,19 +365,28 @@ class FactorAnalyze:
         self,
         start_date: str,
         end_date: str,
-        factor_name: str,
-        group_number: int,
+        factor_name: str='factor',
+        benchmark: str='中证1000',
+        group_number: int=10,
     ) -> None:
         self.start_date = start_date
         self.end_date = end_date
         self.factor_name = factor_name
-        self.benchmark = '中证1000'
+        self.benchmark = benchmark
         self.group_num = group_number
+
+        self.merge_data = pd.DataFrame()
+        self.group_data = pd.DataFrame()
+        self.group_ret = pd.DataFrame()
+        self.group_cumret = pd.DataFrame()
+        self.whole_perf = pd.DataFrame()
+        self.yearly_perf = pd.DataFrame()
+        self.ic_perf = pd.DataFrame()
 
     # @timing_decorator
     def merge_related_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """
-        合并因子分析需要的相关数据，包括每日收益数据，计算相关性的因子数据。
+        合并因子分析需要的相关数据，包括每日收益数据。
 
         Args:
             factor_data (pd.DataFrame): 因子数据。
@@ -363,17 +395,9 @@ class FactorAnalyze:
             pd.DataFrame: 合并后的因子数据。
         """
         daily_ret_data = get_daily_ret(self.start_date, self.end_date)
-        # correlation_factor = dai.DataSource("cal_correlation_factor").read()
-        # self.corr_factor_names = get_factor_names(correlation_factor)[0]
         merge_data = pd.merge(
             factor_data, daily_ret_data, on=["date", "instrument"], how="left"
         )
-        # merge_data = pd.merge(
-        #     merge_data,
-        #     correlation_factor,
-        #     on=["date", "instrument"],
-        #     how="left",
-        # )
         merge_data.sort_values(["date", "instrument"], inplace=True)
         return merge_data
 
@@ -602,15 +626,111 @@ class FactorAnalyze:
         group_ic_data = group_ic_data.dropna()
         return group_ic_data
 
-    def validate(self, factor_data: pd.DataFrame):
+    def stress_ic(self) -> Dict[str, float]:
+        """计算压力时段的 IC / IR。
+
+        特殊压力时间段：
+        1. 2020-02-03 ~ 2020-03-31：新冠疫情爆发，节后开盘千股跌停 + 全球流动性危机；考验因子在系统性下跌中的稳健性。
+        2. 2024-01-15 ~ 2024-02-08：小微盘流动性危机（雪球敲入 + DMA 去杠杆）。
+        3. 2024-09-24 ~ 2024-10-08：政策"组合拳"驱动的暴力反转行情。
+        4. 2025-04-07 ~ 2025-04-30：特朗普对等关税冲击，外生事件冲击。
+
+        Returns:
+            Dict[str, float]: 各压力时段的 ic / ir，加上一个综合 stress_ic_ir。
         """
-        执行所有因子分析流程。
+        if not hasattr(self, "daily_ic") or self.daily_ic.empty:
+            return {"stress_ic_ir": np.nan}
+
+        ic = self.daily_ic
+        result: Dict[str, float] = {}
+        pooled = []
+        for name, s, e in STRESS_PERIODS:
+            window = ic.loc[(ic.index >= pd.Timestamp(s)) & (ic.index <= pd.Timestamp(e))]
+            if window.empty:
+                result[f"{name}_ic"] = np.nan
+                result[f"{name}_ir"] = np.nan
+                continue
+            mean = float(window.mean())
+            std = float(window.std())
+            result[f"{name}_ic"] = mean
+            result[f"{name}_ir"] = mean / std if std and not np.isnan(std) else np.nan
+            pooled.append(window)
+
+        if pooled:
+            pooled_ic = pd.concat(pooled)
+            mean = float(pooled_ic.mean())
+            std = float(pooled_ic.std())
+            result["stress_ic_ir"] = mean / std if std and not np.isnan(std) else np.nan
+        else:
+            result["stress_ic_ir"] = np.nan
+        return result
+
+    def plot(self, score: Optional["FactorScore"] = None) -> None:
+        """在 notebook 中渲染含四张图与核心指标的 HTML 报告。
+
+        需要先调用 ``score`` 准备好 ``daily_ic`` / ``group_cumret`` 等中间数据。
         """
-        merge_data = self.merge_related_data(factor_data)
-        group_data = self.get_group_data(merge_data)
-        group_ret, group_cumret = self.get_group_cumret(group_data)
-        whole_perf = self.get_whole_perf(group_data, group_ret)
-        yearly_perf = self.get_yearly_perf(group_data, group_ret)
-        ic_perf = self.get_all_ic(group_data)
-        # corr_perf = self.get_correlation(group_data)
-        return whole_perf, yearly_perf, ic_perf, group_cumret
+        if not hasattr(self, "daily_ic") or not hasattr(self, "group_cumret"):
+            raise RuntimeError("请先调用 score(factor_data) 计算中间结果，再调用 plot()。")
+        score_dict = score.to_dict() if score is not None else getattr(self, "_score_dict", {})
+        render.render_report(
+            group_cumret=self.group_cumret,
+            daily_ic=self.daily_ic,
+            stress=self.stress_ic(),
+            stress_periods=STRESS_PERIODS,
+            group_num=self.group_num,
+            factor_name=self.factor_name,
+            score=score_dict,
+        )
+
+    def score(
+        self,
+        factor_data: pd.DataFrame,
+        plot: bool = True,
+    ) -> FactorScore:
+        """计算单因子 A 项核心得分所需的四个指标，并可选 inline 渲染 HTML 报告。
+
+        Args:
+            factor_data: 因子数据。
+            plot: 是否在 notebook 中渲染 HTML 报告，默认 True。
+
+        Returns:
+            FactorScore: ic_mean / ic_ir / sharpe_ratio / stress_ic_ir。
+        """
+        self.merge_data = self.merge_related_data(factor_data)
+        self.group_data = self.get_group_data(self.merge_data)
+        self.group_ret, self.group_cumret = self.get_group_cumret(self.group_data)
+
+        daily_ic = (
+            self.group_data.groupby("date", group_keys=False)
+            .apply(lambda x: cal_ic(x, self.factor_name, method="spearman"))
+            .rename("ic")
+            .dropna()
+        )
+        daily_ic.index = pd.to_datetime(daily_ic.index)
+        self.daily_ic = daily_ic
+
+        ic_mean = float(daily_ic.mean())
+        ic_std = float(daily_ic.std())
+        ic_ir = ic_mean / ic_std if ic_std and not np.isnan(ic_std) else np.nan
+
+        ls_ret = self.group_ret[PortfolioCode.ls_pos].dropna()
+        sharpe_ratio = float(empyrical.sharpe_ratio(ls_ret, 0.035 / 242))  # type: ignore
+
+        stress = self.stress_ic()
+        stress_ic_ir = stress.get("stress_ic_ir", np.nan)
+
+        result = FactorScore(
+            ic_mean=ic_mean,
+            ic_ir=ic_ir,
+            sharpe_ratio=sharpe_ratio,
+            stress_ic_ir=stress_ic_ir,
+        )
+        self._score_dict = result.to_dict()
+
+        if plot:
+            self.plot(result)
+
+        return result
+
+
