@@ -3,6 +3,9 @@ from typing import List, Optional
 
 import dai
 import pandas as pd
+import structlog
+
+logger = structlog.get_logger()
 
 
 def get_next_day_return(
@@ -52,5 +55,21 @@ def get_next_day_return(
         filters["instrument"] = instruments
 
     df = dai.query(sql, filters=filters).df()
+    if df is None or df.empty:
+        logger.warning(
+            "T+1 收益数据为空",
+            start_date=start_date,
+            end_date=end_date,
+            instrument_count=len(instruments) if instruments else None,
+        )
+        df = pd.DataFrame(columns=["date", "instrument", "daily_ret"])
+    else:
+        logger.info(
+            "加载 T+1 收益数据完成",
+            rows=len(df),
+            start_date=start_date,
+            end_date=end_date,
+            instrument_count=len(instruments) if instruments else None,
+        )
     df["date"] = pd.to_datetime(df["date"])
     return df[["date", "instrument", "daily_ret"]]

@@ -1,11 +1,15 @@
+from datetime import datetime
 from functools import partial
 from typing import Dict, Optional, Tuple
 
 import empyrical
 import numpy as np
 import pandas as pd
+import structlog
 
 from . import render
+
+logger = structlog.get_logger()
 from .constants import STRESS_PERIODS, DataType, PortfolioCode
 from .data import get_bm_ret, get_daily_ret
 from .metrics import (
@@ -63,6 +67,18 @@ class FactorAnalyze:
             factor_data, daily_ret_data, on=["date", "instrument"], how="left"
         )
         merge_data.sort_values(["date", "instrument"], inplace=True)
+        miss = int(merge_data["daily_ret"].isna().sum())
+        if miss:
+            logger.warning(
+                "合并因子与每日收益后存在缺失",
+                missing_rows=miss,
+                total_rows=len(merge_data),
+            )
+        logger.info(
+            "因子数据与每日收益合并完成",
+            factor_rows=len(factor_data),
+            merged_rows=len(merge_data),
+        )
         return merge_data
 
     def get_group_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
@@ -79,6 +95,12 @@ class FactorAnalyze:
             cut, factor_name=self.factor_name, group_num=self.group_num
         )
         group_data = factor_data.groupby("date", group_keys=False).apply(cut_func)
+        logger.info(
+            "因子分组完成",
+            group_num=self.group_num,
+            input_rows=len(factor_data),
+            output_rows=len(group_data),
+        )
         return group_data
 
     def get_group_cumret(
@@ -112,6 +134,11 @@ class FactorAnalyze:
         groupret_pivotdata["bm"] = bm_ret["benchmark_ret"]
         groupret_pivotdata = groupret_pivotdata.shift(1)
         groupcumret_pivotdata = groupret_pivotdata.cumsum()
+        logger.info(
+            "分组累计收益计算完成",
+            trading_days=len(groupret_pivotdata),
+            benchmark=self.benchmark,
+        )
         return groupret_pivotdata, groupcumret_pivotdata
 
     def get_whole_perf(
@@ -303,6 +330,7 @@ class FactorAnalyze:
         if not hasattr(self, "daily_ic") or not hasattr(self, "group_cumret"):
             raise RuntimeError("请先调用 score(factor_data) 计算中间结果，再调用 plot()。")
         score_dict = score.to_dict() if score is not None else getattr(self, "_score_dict", {})
+        t0 = datetime.now()
         render.render_report(
             group_cumret=self.group_cumret,
             daily_ic=self.daily_ic,
@@ -311,6 +339,10 @@ class FactorAnalyze:
             group_num=self.group_num,
             factor_name=self.factor_name,
             score=score_dict,
+        )
+        logger.info(
+            f"HTML 报告渲染完成, 耗时: {round((datetime.now() - t0).total_seconds(), 4)} 秒",
+            factor_name=self.factor_name,
         )
 
     def score(
@@ -327,9 +359,28 @@ class FactorAnalyze:
         Returns:
             FactorScore: ic_mean / ic_ir / sharpe_ratio / stress_ic_ir。
         """
+        logger.info(
+            "开始单因子分析",
+            factor_name=self.factor_name,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            group_num=self.group_num,
+            benchmark=self.benchmark,
+            input_rows=len(factor_data),
+        )
+
+        t0 = datetime.now()
         self.merge_data = self.merge_related_data(factor_data)
+        t1 = datetime.now()
+        logger.info(f"合并相关数据, 耗时: {round((t1 - t0).total_seconds(), 4)} 秒")
+
         self.group_data = self.get_group_data(self.merge_data)
+        t2 = datetime.now()
+        logger.info(f"因子分组, 耗时: {round((t2 - t1).total_seconds(), 4)} 秒")
+
         self.group_ret, self.group_cumret = self.get_group_cumret(self.group_data)
+        t3 = datetime.now()
+        logger.info(f"分组收益与累计收益, 耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
 
         daily_ic = (
             self.group_data.groupby("date", group_keys=False)
@@ -339,6 +390,11 @@ class FactorAnalyze:
         )
         daily_ic.index = pd.to_datetime(daily_ic.index)
         self.daily_ic = daily_ic
+        t4 = datetime.now()
+        logger.info(
+            f"日 IC 序列计算, 耗时: {round((t4 - t3).total_seconds(), 4)} 秒",
+            ic_days=len(daily_ic),
+        )
 
         ic_mean = float(daily_ic.mean())
         ic_std = float(daily_ic.std())
@@ -349,6 +405,8 @@ class FactorAnalyze:
 
         stress = self.stress_ic()
         stress_ic_ir = stress.get("stress_ic_ir", np.nan)
+        t5 = datetime.now()
+        logger.info(f"核心指标聚合(IC/Sharpe/压力期), 耗时: {round((t5 - t4).total_seconds(), 4)} 秒")
 
         result = FactorScore(
             ic_mean=ic_mean,
@@ -357,6 +415,16 @@ class FactorAnalyze:
             stress_ic_ir=stress_ic_ir,
         )
         self._score_dict = result.to_dict()
+
+        logger.info(
+            "单因子分析完成",
+            factor_name=self.factor_name,
+            ic_mean=round(ic_mean, 6),
+            ic_ir=round(ic_ir, 6) if np.isfinite(ic_ir) else None,
+            sharpe_ratio=round(sharpe_ratio, 6) if np.isfinite(sharpe_ratio) else None,
+            stress_ic_ir=round(stress_ic_ir, 6) if np.isfinite(stress_ic_ir) else None,
+            total_seconds=round((t5 - t0).total_seconds(), 4),
+        )
 
         if plot:
             self.plot(result)

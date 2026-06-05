@@ -1,7 +1,10 @@
 import dai
 import pandas as pd
+import structlog
 
 from .constants import BM_DICT
+
+logger = structlog.get_logger()
 
 
 def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
@@ -25,6 +28,15 @@ def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
         ORDER BY date, instrument
     """
     daily_ret_data = dai.query(sql).df()
+    if daily_ret_data is None or daily_ret_data.empty:
+        logger.warning("每日收益数据为空", start_date=start_date, end_date=end_date)
+    else:
+        logger.info(
+            "加载每日收益数据完成",
+            rows=len(daily_ret_data),
+            start_date=start_date,
+            end_date=end_date,
+        )
     return daily_ret_data
 
 
@@ -49,4 +61,19 @@ def get_bm_ret(start_date: str, end_date: str, benchmark: str) -> pd.DataFrame:
     AND instrument = '{BM_DICT[benchmark]}'
     """
     bm_ret = dai.query(sql).df()
+    if bm_ret is None or bm_ret.empty:
+        logger.warning(
+            "基准指数收益数据为空",
+            benchmark=benchmark,
+            instrument=BM_DICT.get(benchmark),
+            start_date=start_date,
+            end_date=end_date,
+        )
+    else:
+        logger.info(
+            "加载基准指数收益数据完成",
+            benchmark=benchmark,
+            instrument=BM_DICT.get(benchmark),
+            rows=len(bm_ret),
+        )
     return bm_ret
