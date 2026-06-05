@@ -17,6 +17,7 @@ USER_CODE_PLACEHOLDER = "__USER_CODE__"
 
 
 def _write_file(path: str, content: bytes | str) -> None:
+    """根据 content 类型自动选择二进制/文本模式写文件。"""
     mode = "wb" if isinstance(content, bytes) else "w"
     with open(path, mode=mode) as writer:
         writer.write(content)
@@ -31,6 +32,11 @@ class AlphathonAPI:
     """比赛 API 客户端，认证用 cptjudge.jwt。"""
 
     def __init__(self) -> None:
+        """初始化 API 基址、超时和鉴权 token。
+
+        token 优先从 `RUNNER_BASE_DIR/cptjudge.jwt` 读取，缺失时回退到
+        环境变量 `ALPHATHON_API_TOKEN`。
+        """
         self.base_url = os.getenv(
             "ALPHATHON_API_BASE_URL",
             "http://alphathonapiserver.bigquant.svc.cluster.local:8000/bigapis/alphathon/v1",
@@ -53,6 +59,7 @@ class AlphathonAPI:
         headers: Optional[dict[str, str]] = None,
         timeout: Optional[float] = None,
     ) -> httpx.Response:
+        """统一的 HTTP 请求入口，自动注入 bigjwt Cookie 并对非 2xx 抛异常。"""
         request_headers: dict[str, str] = {"accept": "application/json"}
         if self.api_token:
             request_headers["Cookie"] = f"bigjwt={self.api_token}"
@@ -66,6 +73,7 @@ class AlphathonAPI:
             return response
 
     def get_competition_by_id(self, competition_id: str | uuid.UUID) -> Optional[dict[str, Any]]:
+        """按 ID 拉取比赛元信息，找不到时返回 None。"""
         data = self._request("GET", f"/competitions/{competition_id}").json()
         return (data or {}).get("data") if isinstance(data, dict) else None
 
@@ -77,6 +85,7 @@ class AlphathonAPI:
         page_size: int = 5000,
         max_pages: int = 10000,
     ) -> list[dict[str, Any]]:
+        """按 constraints 分页拉取某比赛的全部提交，按创建时间倒序合并返回。"""
         results: list[dict[str, Any]] = []
         page = 1
         while page <= max_pages:
@@ -104,6 +113,7 @@ class AlphathonAPI:
         to_str: bool = False,
         save_to: Optional[str] = None,
     ) -> bytes | str:
+        """读取一个 submission 的唯一文件内容；要求 submission 恰好包含 1 个文件，否则抛错。"""
         files = submission["data"]["files"]
         if len(files) != 1:
             raise ValueError(f"submission {submission['id']} has {len(files)} files, expected 1")
@@ -119,6 +129,12 @@ class AlphathonAPI:
         to_str: bool = False,
         save_to: Optional[str] = None,
     ) -> bytes | str:
+        """下载指定 submission 的指定文件。
+
+        - `ipynb_to_py`: 当文件为 .ipynb 时仅抽取 code cell 拼成 .py 文本
+        - `to_str`: 把 bytes 解成 utf-8 字符串
+        - `save_to`: 同时落盘到该路径
+        """
         response = self._request("GET", f"/submissions/files/{submission_id}/{file_id}")
         raw_content: bytes | str = response.content
 
@@ -133,11 +149,13 @@ class AlphathonAPI:
         return raw_content
 
     def update_submission_score(self, submission_id: str | uuid.UUID, **json_data) -> dict[str, Any]:
+        """回写 submission 的分数及相关字段（如 public_score / public_score_data）。"""
         response = self._request("POST", f"/submissions/{submission_id}", json_data=json_data)
         return response.json()
 
 
 def _extract_code_from_ipynb(raw: bytes) -> str:
+    """从 .ipynb 字节流中抽出所有 code cell 拼成纯 Python 源码。"""
     notebook_data = json.loads(raw.decode("utf-8"))
     code_cells: list[str] = []
     for cell in notebook_data.get("cells", []):
@@ -157,6 +175,13 @@ def _extract_code_from_ipynb(raw: bytes) -> str:
 
 
 class UserCodeRunner:
+    """选手代码执行器抽象基类。
+
+    子类需实现 `_run_code` 来定义具体执行方式（本地子进程、容器等）。
+    `run()` 会先把 `files` 写入 `RUNNER_BASE_DIR/<submission_id>/` 工作目录，
+    再调用 `_run_code`。
+    """
+
     def __init__(self, submission_id: str, files: dict[str, bytes | str], cmd: list[str]) -> None:
         self.submission_id = submission_id
         self.runner_dir = os.path.join(RUNNER_BASE_DIR, str(submission_id))
@@ -164,11 +189,13 @@ class UserCodeRunner:
         self.cmd = cmd
 
     def _pre_run(self) -> None:
+        """创建工作目录并把所有依赖文件落盘。"""
         os.makedirs(self.runner_dir, exist_ok=True)
         for name, content in self.files.items():
             _write_file(os.path.join(self.runner_dir, name), content)
 
     def run(self, _raise: bool = False) -> bool:
+        """执行选手代码；成功返回 True，失败时按 `_raise` 决定吞异常或抛出。"""
         try:
             self._pre_run()
             self._run_code()
@@ -189,6 +216,8 @@ class LocalProcessUserRunner(UserCodeRunner):
     DEFAULT_TIMEOUT = 3 * 60 * 60
 
     def _run_code(self) -> int:
+        """以子进程方式跑选手代码，stdout/stderr 实时落盘到 `runner_dir/stdout`，
+        超过 `DEFAULT_TIMEOUT` 即被 kill。"""
         process = subprocess.Popen(
             self.cmd,
             cwd=self.runner_dir,
@@ -251,6 +280,8 @@ class JudgeBase:
     completed_ids_file: Optional[str] = None
 
     def __init__(self) -> None:
+        """校验子类配置（competition_id / runner_code 占位符 / score_kind），
+        建立 API 客户端并加载持久化的已完成 ID 集合。"""
         if not self.competition_id:
             raise ValueError(f"{type(self).__name__}.competition_id is required")
         if USER_CODE_PLACEHOLDER not in self.runner_code:
@@ -290,6 +321,7 @@ class JudgeBase:
     # -- 持久化 ----------------------------------------------------------
 
     def _load_completed_ids(self) -> set[str]:
+        """从 `completed_ids_file` 恢复断点续跑用的已完成 submission_id 集合。"""
         path = self.completed_ids_file
         if not path or not os.path.exists(path):
             return set()
@@ -300,6 +332,7 @@ class JudgeBase:
             return set()
 
     def _save_completed_ids(self) -> None:
+        """把已完成 submission_id 集合落盘，供下次启动续跑。"""
         path = self.completed_ids_file
         if not path:
             return
@@ -310,6 +343,8 @@ class JudgeBase:
     # -- 单个 submission 处理 --------------------------------------------
 
     def _build_runner(self, submission: dict) -> LocalProcessUserRunner:
+        """拉取选手代码、应用 `patch_user_code` 钩子，再注入 `runner_code` 模板，
+        构造可执行的 `LocalProcessUserRunner`。"""
         user_code = self.api.get_file_content_of_submission(submission, ipynb_to_py=True, to_str=True)
         if isinstance(user_code, bytes):
             user_code = user_code.decode("utf-8")
@@ -321,6 +356,7 @@ class JudgeBase:
         )
 
     def _read_score_data(self, runner: LocalProcessUserRunner) -> dict:
+        """读取 runner 输出的 `output.data`（DataSource ID），通过 dai 取回首行作为 raw_result。"""
         import dai  # 延迟导入：仅 judge 环境需要
 
         with open(os.path.join(runner.runner_dir, "output.data")) as reader:
@@ -328,6 +364,11 @@ class JudgeBase:
         return {"raw_result": dai.DataSource(datasource_id).read().iloc[0].to_dict()}
 
     def on_submission(self, submission: dict) -> None:
+        """单个 submission 的完整评测流程：跑代码 → 读结果 → 回写分数。
+
+        - 成功时分数先写 -1 占位，后续由 `recompute_ranks` 重排得到真实分
+        - 失败时分数写 -2，并在 score_data 中带上错误提示
+        """
         submission_id = submission["id"]
         logger.info("submission.start", submission_id=submission_id)
         try:
@@ -351,6 +392,7 @@ class JudgeBase:
     # -- 排名重算 --------------------------------------------------------
 
     def _has_custom_score(self) -> bool:
+        """判断子类是否覆盖了 `score()`，未覆盖则跳过排名重算。"""
         return type(self).score is not JudgeBase.score
 
     def recompute_ranks(self) -> None:
@@ -395,6 +437,7 @@ class JudgeBase:
     # -- 主循环 ----------------------------------------------------------
 
     def _fetch_pending(self, submitted_ids: set[str]) -> list[dict]:
+        """拉取尚未提交执行、且不在持久化已完成集合中的 submission 列表。"""
         new_submissions = self.api.query_submissions(
             competition_id=self.competition_id,
             constraints=self.query_constraints(),
@@ -409,6 +452,8 @@ class JudgeBase:
         return pending
 
     def run(self) -> None:
+        """评测主循环：每 `tick_interval` 秒拉一次新提交，丢进线程池并发评测，
+        每轮回收已完成 future、触发排名重算并持久化进度。线程池在退出时取消未完成任务。"""
         submitted_ids: set[str] = set()
         futures_by_id: dict[str, Future] = {}
         completed_total = 0
