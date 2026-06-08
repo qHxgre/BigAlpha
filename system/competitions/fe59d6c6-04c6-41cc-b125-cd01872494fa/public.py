@@ -1,6 +1,5 @@
-import _bootstrap  # noqa: F401
+from alphathonapiserver.judge.judgebase import JudgeBase
 
-from judgebase import JudgeBase
 
 
 JUDGE_RUNNER_CODE = '''
