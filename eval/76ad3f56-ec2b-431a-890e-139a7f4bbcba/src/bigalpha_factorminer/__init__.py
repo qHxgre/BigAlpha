@@ -61,28 +61,31 @@ def run(
 
     sd = merge_df['date'].min().strftime("%Y-%m-%d")
     ed = merge_df['date'].max().strftime("%Y-%m-%d")
+    logger.info(f'将单因子和因子池合并后的时间范围: {sd} 至 {ed}')
 
     from .dataprocess.datachecker import DataCheck
     logger.info('========== 数据检查 ==========')
     dc = DataCheck(sd, ed)
     dc.validate(merge_df)
 
-
     from .dataprocess.dataprocess import DataProcess
     logger.info('========== 数据预处理 ==========')
     dp = DataProcess(sd, ed)
-    pdf = dp.validate(factor_data)
+    pdf = dp.validate(merge_df)
 
-    logger.info('========== 单因子分析 ==========')
     from .factoranalyze import FactorAnalyze
+    logger.info('========== 单因子分析 ==========')
     fa = FactorAnalyze(sd, ed)
-    fa_res = fa.score(pdf, plot=show)
+    fa_res = fa.score(pdf[['date', 'instrument', 'factor']], plot=show)
+
+    from .regmodel import ElasticNetRegress
+    logger.info('========== 因子池回归 ==========')
+    reg = ElasticNetRegress(sd, ed)
+    reg_res = reg.score(pdf, plot=show)
 
     return {
-        'ic_mean': fa_res.ic_mean,
-        'ic_ir': fa_res.ic_ir,
-        'sharpe_ratio': fa_res.sharpe_ratio,
-        'stress_ic_ir': fa_res.stress_ic_ir
+        'factor_analyze': fa_res.to_dict(),
+        'factor_pool_regression': reg_res.to_dict(),
     }
 
 

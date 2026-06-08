@@ -66,16 +66,20 @@ class DataCheck:
             raise DataValidationError(f"{msg}；详情={fields}")
         raise DataValidationError(msg)
 
-    def check_columns_exactly_three(self, df: pd.DataFrame) -> None:
-        """列检查：必须且仅包含 date/instrument/factor 三列。"""
-        required = {"date", "instrument", "factor"}
+    @staticmethod
+    def _factor_cols(df: pd.DataFrame) -> list:
+        """date/instrument 之外的列均视为待校验的因子列。"""
+        return [c for c in df.columns if c not in {"date", "instrument"}]
+
+    def check_required_columns(self, df: pd.DataFrame) -> None:
+        """列检查：必须包含 date/instrument，且至少存在 1 个因子列。"""
+        required = {"date", "instrument"}
         cols = set(df.columns)
-        if cols != required:
-            self._fail(
-                "列检查失败：必须且仅包含 date/instrument/factor",
-                missing=sorted(required - cols),
-                extra=sorted(cols - required),
-            )
+        missing = required - cols
+        if missing:
+            self._fail("列检查失败：缺少必需列", missing=sorted(missing))
+        if not self._factor_cols(df):
+            self._fail("列检查失败：未发现任何因子列（date/instrument 之外）")
 
     def check_instrument_format(self, df: pd.DataFrame) -> None:
         """格式检查：instrument 必须形如 6 位数字 + .SZ/.SH。"""
@@ -88,15 +92,17 @@ class DataCheck:
             )
 
     def check_factor_finite(self, df: pd.DataFrame) -> None:
-        """有限值检查：factor 须可数值化且不允许出现 inf/-inf（NaN 由覆盖度规则约束）。"""
-        x = pd.to_numeric(df["factor"], errors="coerce").to_numpy(dtype=float)
-        inf_mask = np.isinf(x)
-        if inf_mask.any():
-            bad = df.loc[inf_mask, ["date", "instrument", "factor"]].head(50)
-            self._fail(
-                "factor 不允许出现 inf/-inf",
-                sample=bad.to_dict(orient="records"),
-            )
+        """有限值检查：所有因子列须可数值化且不允许出现 inf/-inf（NaN 由覆盖度规则约束）。"""
+        for col in self._factor_cols(df):
+            x = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float)
+            inf_mask = np.isinf(x)
+            if inf_mask.any():
+                bad = df.loc[inf_mask, ["date", "instrument", col]].head(50)
+                self._fail(
+                    f"因子列 {col} 不允许出现 inf/-inf",
+                    factor=col,
+                    sample=bad.to_dict(orient="records"),
+                )
 
     def check_time_period(self, df: pd.DataFrame) -> None:
         """时间范围：date 须落在 [start_date, end_date] 之内。"""
@@ -131,7 +137,8 @@ class DataCheck:
         """唯一性：同一 (date, instrument) 组合不允许出现多条记录。"""
         dup_mask = df.duplicated(subset=["date", "instrument"], keep=False)
         if dup_mask.any():
-            sample = df.loc[dup_mask, ["date", "instrument", "factor"]].head(50)
+            cols = ["date", "instrument"] + self._factor_cols(df)
+            sample = df.loc[dup_mask, cols].head(50)
             self._fail(
                 "唯一性检查失败：存在重复 (date, instrument)",
                 sample=sample.to_dict(orient="records"),
@@ -154,19 +161,25 @@ class DataCheck:
             )
 
     def check_factor_coverage(self, df: pd.DataFrame) -> None:
-        """覆盖度：每交易日 factor 缺失率（按股票池口径，未提交视为缺失）须 <= MAX_MISSING_RATE。"""
-        factor_min = df[["date", "instrument", "factor"]]
-        full = self.pool_pairs.merge(factor_min, on=["date", "instrument"], how="left")
-        miss_rate = full["factor"].isna().groupby(full["date"]).mean()
-        high_miss = miss_rate[miss_rate > MAX_MISSING_RATE]
-        if not high_miss.empty:
-            top = high_miss.sort_values(ascending=False).head(50)
-            details = {d.strftime("%Y-%m-%d"): float(r) for d, r in top.items()}
-            self._fail(
-                f"覆盖度检查失败：单日因子缺失率 > {MAX_MISSING_RATE:.0%}",
-                sample=details,
-                total_days=len(high_miss),
-            )
+        """覆盖度：每交易日各因子列缺失率（按股票池口径，未提交视为缺失）须 <= MAX_MISSING_RATE。"""
+        factor_cols = self._factor_cols(df)
+        full = self.pool_pairs.merge(
+            df[["date", "instrument"] + factor_cols],
+            on=["date", "instrument"],
+            how="left",
+        )
+        for col in factor_cols:
+            miss_rate = full[col].isna().groupby(full["date"]).mean()
+            high_miss = miss_rate[miss_rate > MAX_MISSING_RATE]
+            if not high_miss.empty:
+                top = high_miss.sort_values(ascending=False).head(50)
+                details = {d.strftime("%Y-%m-%d"): float(r) for d, r in top.items()}
+                self._fail(
+                    f"覆盖度检查失败：因子 {col} 单日缺失率 > {MAX_MISSING_RATE:.0%}",
+                    factor=col,
+                    sample=details,
+                    total_days=len(high_miss),
+                )
 
     def check_data_breach(self, factor_data: pd.DataFrame, check_data: pd.DataFrame) -> None:
         """数据泄露：与 check_data 在 (date, instrument) 上对齐比对，超阈值样本占比过高视为存在未来函数。"""
@@ -199,8 +212,8 @@ class DataCheck:
 
         df = factor_data.copy()
 
-        self.check_columns_exactly_three(df)
-        logger.info("通过：列名检查（必须且仅三列）")
+        self.check_required_columns(df)
+        logger.info("通过：列名检查（date/instrument + 至少 1 个因子列）", factor_cols=self._factor_cols(df))
 
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         if df["date"].isna().any():
