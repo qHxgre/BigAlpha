@@ -31,7 +31,7 @@ cacheable = True
 
 def run(
     factor_data: I.port("因子数据: 包含列 (date, instrument, factor) 的DataFrame"),
-    factor_pool: I.port("因子池，包含因子池的的DataFrame，不能包含 factor 列"),
+    factor_pool: I.port("因子池，包含因子池的的DataFrame，不能包含 factor 列；为 None 时只进行单因子分析") = None,
     show: I.bool("画出绩效图") = True,
 )->[
     I.port("输出数据", "data")
@@ -49,19 +49,27 @@ def run(
     if candidate_cols[0] != 'factor':
         factor_data = factor_data.rename(columns={candidate_cols[0]: 'factor'})
         logger.info('因子列名不为 factor, 自动重命名')
-    
-    candidate_cols = [col for col in factor_pool.columns if col not in {'date', 'instrument'}]
-    if len(candidate_cols) < 2:
-        raise ValueError("因子池数量不能少于2个")
-    if 'factor' in factor_pool.columns:
-        raise ValueError(f"因子池中不能包含列名为factor的因子！请检查： {candidate_cols}")
 
-    # 合并因子数据
-    merge_df = pd.merge(factor_data, factor_pool, how='inner', on=['date', 'instrument'])
+    has_pool = factor_pool is not None
+    if has_pool:
+        pool_cols = [col for col in factor_pool.columns if col not in {'date', 'instrument'}]
+        if len(pool_cols) < 2:
+            raise ValueError("因子池数量不能少于2个")
+        if 'factor' in factor_pool.columns:
+            raise ValueError(f"因子池中不能包含列名为factor的因子！请检查： {pool_cols}")
+
+        # 合并因子数据
+        merge_df = pd.merge(factor_data, factor_pool, how='inner', on=['date', 'instrument'])
+    else:
+        logger.info('未提供因子池，只进行单因子分析')
+        merge_df = factor_data
 
     sd = merge_df['date'].min().strftime("%Y-%m-%d")
     ed = merge_df['date'].max().strftime("%Y-%m-%d")
-    logger.info(f'将单因子和因子池合并后的时间范围: {sd} 至 {ed}')
+    if has_pool:
+        logger.info(f'将单因子和因子池合并后的时间范围: {sd} 至 {ed}')
+    else:
+        logger.info(f'单因子时间范围: {sd} 至 {ed}')
 
     from .dataprocess.datachecker import DataCheck
     logger.info('========== 数据检查 ==========')
@@ -78,15 +86,18 @@ def run(
     fa = FactorAnalyze(sd, ed)
     fa_res = fa.score(pdf[['date', 'instrument', 'factor']], plot=show)
 
-    from .regmodel import ElasticNetRegress
-    logger.info('========== 因子池回归 ==========')
-    reg = ElasticNetRegress(sd, ed)
-    reg_res = reg.score(pdf, plot=show)
-
-    return {
+    result = {
         'factor_analyze': fa_res.to_dict(),
-        'factor_pool_regression': reg_res.to_dict(),
     }
+
+    if has_pool:
+        from .regmodel import ElasticNetRegress
+        logger.info('========== 因子池回归 ==========')
+        reg = ElasticNetRegress(sd, ed)
+        reg_res = reg.score(pdf, plot=show)
+        result['factor_pool_regression'] = reg_res.to_dict()
+
+    return result
 
 
 def post_run(outputs):
