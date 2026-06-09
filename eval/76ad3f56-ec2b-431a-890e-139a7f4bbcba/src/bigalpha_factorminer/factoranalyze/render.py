@@ -243,19 +243,6 @@ def _fmt(v) -> str:
         return str(v)
 
 
-def _signal(value: float, good_thresh: float, ok_thresh: float, higher_is_better: bool = True) -> str:
-    """根据阈值返回颜色信号灯 HTML 标签。"""
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        return ""
-    if higher_is_better:
-        color = "#22C55E" if v >= good_thresh else ("#F59E0B" if v >= ok_thresh else "#EF4444")
-    else:
-        color = "#22C55E" if v <= good_thresh else ("#F59E0B" if v <= ok_thresh else "#EF4444")
-    return f'<span style="color:{color};font-size:16px;line-height:1;">●</span>'
-
-
 _METRIC_CSS = """
 <style>
 .fa-report { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a1a2e; }
@@ -275,7 +262,6 @@ _METRIC_CSS = """
     border-bottom: 1px dashed #94a3b8;
 }
 .metric-card .value { font-size: 1.4em; font-weight: 600; color: #1e293b; }
-.metric-card .signal { display: inline-block; margin-left: 6px; }
 .fa-table { border-collapse: collapse; font-size: 0.88em; }
 .fa-table th {
     background: #f1f5f9; color: #475569;
@@ -315,11 +301,11 @@ def render_report(
     sharpe = score.get("sharpe_ratio")
     stress_ir = score.get("stress_ic_ir")
 
-    def _card(label: str, value: float, tip: str, sig_html: str) -> str:
+    def _card(label: str, value: float, tip: str) -> str:
         return (
             f'<div class="metric-card">'
             f'  <div class="label"><span class="tip" title="{tip}">{label}</span></div>'
-            f'  <div class="value">{_fmt(value)}<span class="signal">{sig_html}</span></div>'
+            f'  <div class="value">{_fmt(value)}</div>'
             f'</div>'
         )
 
@@ -327,22 +313,18 @@ def render_report(
         _card(
             "IC Mean", ic_mean,
             "因子值与下期收益的 Spearman 相关系数均值。|IC| > 0.03 表示因子有效，> 0.05 较强。",
-            _signal(ic_mean, 0.05, 0.03) if ic_mean is not None else "",
         ),
         _card(
             "IC IR（信息比率）", ic_ir,
             "IC Mean / IC Std，衡量 IC 的稳定性。|IC IR| > 0.5 为合格，> 1.0 为优秀。",
-            _signal(ic_ir, 1.0, 0.5) if ic_ir is not None else "",
         ),
         _card(
             "多空 Sharpe", sharpe,
             "多头组 - 空头组的日收益序列年化 Sharpe 比率。> 1.0 为合格，> 2.0 为优秀。",
-            _signal(sharpe, 2.0, 1.0) if sharpe is not None else "",
         ),
         _card(
             "压力期 IC IR", stress_ir,
             "仅在预设压力时段（市场极端行情）内计算的汇总 IC IR，反映因子的抗压能力。> 0.3 为合格。",
-            _signal(stress_ir, 0.5, 0.3) if stress_ir is not None else "",
         ),
     ])
 
@@ -388,11 +370,7 @@ def render_report(
     <div class="fa-report">
         <h1>单因子分析 &nbsp;·&nbsp; {factor_name}</h1>
 
-        <h2>核心指标
-          <span style="font-size:0.75em;font-weight:400;color:#64748b;margin-left:8px;">
-            ● 优秀 &nbsp; ● 合格 &nbsp; ● 待改进（信号灯以绝对值判断）
-          </span>
-        </h2>
+        <h2>核心指标</h2>
         <div class="metric-grid">
           {metric_cards}
         </div>

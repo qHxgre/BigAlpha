@@ -122,19 +122,6 @@ def _fmt(v) -> str:
         return str(v)
 
 
-def _signal(value: float, good_thresh: float, ok_thresh: float, higher_is_better: bool = True) -> str:
-    """根据阈值返回颜色信号灯 HTML span。"""
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        return ""
-    if higher_is_better:
-        color = "#22C55E" if v >= good_thresh else ("#F59E0B" if v >= ok_thresh else "#EF4444")
-    else:
-        color = "#22C55E" if v <= good_thresh else ("#F59E0B" if v <= ok_thresh else "#EF4444")
-    return f'<span style="color:{color};font-size:14px;line-height:1;margin-left:4px;">●</span>'
-
-
 _REPORT_CSS = """
 <style>
 .reg-report { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a1a2e; }
@@ -185,12 +172,10 @@ def render_report(
         f"<tr>"
         f"<td>{i+1}</td>"
         f"<td>{row['factor']}</td>"
-        f"<td>{_fmt(row['model_score'])}"
-        f"  {_signal(row['model_score'], 2.0, 1.0)}</td>"
+        f"<td>{_fmt(row['model_score'])}</td>"
         f"<td>{_fmt(row['abs_weight_mean'])}</td>"
         f"<td>{_fmt(row['abs_weight_std'])}</td>"
-        f"<td>{_fmt(row['selection_rate'])}"
-        f"  {_signal(row['selection_rate'], 0.6, 0.3)}</td>"
+        f"<td>{_fmt(row['selection_rate'])}</td>"
         f"</tr>"
         for i, (_, row) in enumerate(top_scores.iterrows())
     )
@@ -229,10 +214,10 @@ def render_report(
             <tr>
                 <th>#</th>
                 <th>因子名</th>
-                <th><span class="tip-th" title="mean(|w|) / (std(|w|) + ε)，值越高越好；● ≥2.0 优秀，● ≥1.0 合格">ModelScore</span></th>
+                <th><span class="tip-th" title="mean(|w|) / (std(|w|) + ε)，值越高越好">ModelScore</span></th>
                 <th><span class="tip-th" title="跨窗口绝对权重均值，反映因子在模型中的平均贡献大小">mean(|w|)</span></th>
                 <th><span class="tip-th" title="跨窗口绝对权重标准差，值越小说明权重越稳定">std(|w|)</span></th>
-                <th><span class="tip-th" title="被 Elastic Net 选中（权重非零）的窗口比例；值越高说明因子越持续有效；● ≥0.6 优秀，● ≥0.3 合格">入选率</span></th>
+                <th><span class="tip-th" title="被 Elastic Net 选中（权重非零）的窗口比例；值越高说明因子越持续有效">入选率</span></th>
             </tr>
             {score_rows}
         </table>
