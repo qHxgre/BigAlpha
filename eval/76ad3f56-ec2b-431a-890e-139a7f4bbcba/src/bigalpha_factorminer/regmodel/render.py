@@ -207,6 +207,8 @@ def render_report(
           ModelScore = mean(|w|) / (std(|w|) + ε)，综合衡量因子在多个滚动窗口中权重的
           <strong>大小</strong>（均值越高越好）和<strong>稳定性</strong>（标准差越小越好）。
           数值越高代表因子在模型中贡献更持续、更可靠。
+          <strong>入选率</strong>为因子被 Elastic Net 选中（权重非零）的窗口比例，
+          越高说明因子在不同时间段中越持续有效。
         </p>
         <img src="data:image/png;base64,{c_bar}" alt="model score bar" style="max-width:100%"><br><br>
 
