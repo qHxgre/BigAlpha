@@ -122,6 +122,39 @@ def _fmt(v) -> str:
         return str(v)
 
 
+def _signal(value: float, good_thresh: float, ok_thresh: float, higher_is_better: bool = True) -> str:
+    """根据阈值返回颜色信号灯 HTML span。"""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if higher_is_better:
+        color = "#22C55E" if v >= good_thresh else ("#F59E0B" if v >= ok_thresh else "#EF4444")
+    else:
+        color = "#22C55E" if v <= good_thresh else ("#F59E0B" if v <= ok_thresh else "#EF4444")
+    return f'<span style="color:{color};font-size:14px;line-height:1;margin-left:4px;">●</span>'
+
+
+_REPORT_CSS = """
+<style>
+.reg-report { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a1a2e; }
+.reg-report h1 { font-size: 1.5em; margin: 0 0 6px 0; color: #1a1a2e; border-left: 4px solid #4C78A8; padding-left: 10px; }
+.reg-report h2 { font-size: 1.15em; margin: 18px 0 8px 0; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+.reg-report p.desc { font-size: 0.85em; color: #64748b; margin: 0 0 8px 0; }
+.reg-table { border-collapse: collapse; font-size: 0.88em; }
+.reg-table th {
+    background: #f1f5f9; color: #475569;
+    padding: 7px 12px; border: 1px solid #e2e8f0;
+    font-weight: 600; white-space: nowrap;
+}
+.reg-table td { padding: 6px 12px; border: 1px solid #e2e8f0; text-align: right; }
+.reg-table td:first-child { text-align: left; }
+.reg-table tr:nth-child(even) td { background: #f8fafc; }
+.tip-th { cursor: help; border-bottom: 1px dashed #94a3b8; }
+</style>
+"""
+
+
 def render_report(
     per_factor_scores: pd.DataFrame,
     weights_history: pd.DataFrame,
@@ -147,45 +180,76 @@ def render_report(
     c_box = plot_abs_weight_distribution(weights_history, top_factors, title_suffix=suffix)
     c_corr = plot_factor_corr_heatmap(factor_panel, top_factors, title_suffix=suffix)
 
+    # ── 因子得分明细表 ────────────────────────────────────────────────────────
     score_rows = "".join(
-        f"<tr><td>{row['factor']}</td>"
-        f"<td>{_fmt(row['model_score'])}</td>"
+        f"<tr>"
+        f"<td>{i+1}</td>"
+        f"<td>{row['factor']}</td>"
+        f"<td>{_fmt(row['model_score'])}"
+        f"  {_signal(row['model_score'], 2.0, 1.0)}</td>"
         f"<td>{_fmt(row['abs_weight_mean'])}</td>"
         f"<td>{_fmt(row['abs_weight_std'])}</td>"
-        f"<td>{_fmt(row['selection_rate'])}</td></tr>"
-        for _, row in top_scores.iterrows()
+        f"<td>{_fmt(row['selection_rate'])}"
+        f"  {_signal(row['selection_rate'], 0.6, 0.3)}</td>"
+        f"</tr>"
+        for i, (_, row) in enumerate(top_scores.iterrows())
     )
 
     corr_block = (
-        f'<h2>因子相关性{suffix}</h2><img src="data:image/png;base64,{c_corr}" alt="corr heatmap"><br>'
+        f"""
+        <h2>因子相关性{suffix}</h2>
+        <p class="desc">
+          热力图展示因子两两之间的 Pearson 相关系数（蓝=正相关，红=负相关）。
+          高度相关的因子（|r| > 0.8）提供冗余信息，可考虑合并或删减。
+        </p>
+        <img src="data:image/png;base64,{c_corr}" alt="corr heatmap" style="max-width:100%"><br>
+        """
         if c_corr is not None
         else ""
     )
 
     html_content = f"""
-    <div style="font-family: Arial, sans-serif;">
+    {_REPORT_CSS}
+    <div class="reg-report">
         <h1>Elastic Net 滚动回归</h1>
-        <p style="color:#666;">共 {total} 个因子参与回归，仅展示 ModelScore 排名前 {len(top_factors)} 的结果。</p>
+        <p class="desc">
+          共 {total} 个因子参与回归（滚动窗口 60 日，步长 20 日），
+          仅展示 ModelScore 排名前 {len(top_factors)} 的结果。
+        </p>
 
         <h2>单因子 ModelScore{suffix}</h2>
-        <img src="data:image/png;base64,{c_bar}" alt="model score bar"><br>
-        <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">
+        <p class="desc">
+          ModelScore = mean(|w|) / (std(|w|) + ε)，综合衡量因子在多个滚动窗口中权重的
+          <strong>大小</strong>（均值越高越好）和<strong>稳定性</strong>（标准差越小越好）。
+          数值越高代表因子在模型中贡献更持续、更可靠。
+        </p>
+        <img src="data:image/png;base64,{c_bar}" alt="model score bar" style="max-width:100%"><br><br>
+
+        <table class="reg-table" style="margin-bottom:16px;">
             <tr>
-                <th>factor</th>
-                <th>ModelScore</th>
-                <th>mean(|w|)</th>
-                <th>std(|w|)</th>
-                <th>selection_rate</th>
+                <th>#</th>
+                <th>因子名</th>
+                <th><span class="tip-th" title="mean(|w|) / (std(|w|) + ε)，值越高越好；● ≥2.0 优秀，● ≥1.0 合格">ModelScore</span></th>
+                <th><span class="tip-th" title="跨窗口绝对权重均值，反映因子在模型中的平均贡献大小">mean(|w|)</span></th>
+                <th><span class="tip-th" title="跨窗口绝对权重标准差，值越小说明权重越稳定">std(|w|)</span></th>
+                <th><span class="tip-th" title="被 Elastic Net 选中（权重非零）的窗口比例；值越高说明因子越持续有效；● ≥0.6 优秀，● ≥0.3 合格">入选率</span></th>
             </tr>
             {score_rows}
         </table>
-        <br>
 
         <h2>滚动权重曲线{suffix}</h2>
-        <img src="data:image/png;base64,{c_w}" alt="weights history"><br>
+        <p class="desc">
+          每个滚动窗口结束时，各因子被 Elastic Net 分配的权重随时间的变化。
+          权重稳定且持续非零的因子具有更强的可靠性。
+        </p>
+        <img src="data:image/png;base64,{c_w}" alt="weights history" style="max-width:100%"><br><br>
 
         <h2>|w| 跨窗口分布{suffix}</h2>
-        <img src="data:image/png;base64,{c_box}" alt="abs weight distribution"><br>
+        <p class="desc">
+          箱线图展示各因子绝对权重在所有窗口中的分布（中位数、四分位距、异常值）。
+          箱体越高且位置越靠上，说明因子贡献越大；箱体越窄说明权重越稳定。
+        </p>
+        <img src="data:image/png;base64,{c_box}" alt="abs weight distribution" style="max-width:100%"><br><br>
 
         {corr_block}
     </div>
