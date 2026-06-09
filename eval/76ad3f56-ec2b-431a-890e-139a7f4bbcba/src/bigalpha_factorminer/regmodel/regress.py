@@ -100,6 +100,8 @@ class ElasticNetRegress:
         # merge_data 已按 date 排序，用 searchsorted 一次性算出每个 window 的连续切片
         # 避免每窗都做 O(N) 的 isin 扫描
         date_arr = merge_data["date"].to_numpy()
+        date_arr = pd.to_datetime(date_arr)
+        all_days = pd.to_datetime(all_days)
         day_lo = np.searchsorted(date_arr, all_days, side="left")
         day_hi = np.searchsorted(date_arr, all_days, side="right")
 
