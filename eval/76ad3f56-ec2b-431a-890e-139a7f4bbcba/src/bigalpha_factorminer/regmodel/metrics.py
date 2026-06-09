@@ -32,8 +32,11 @@ def fit_elastic_net(
         alpha=alpha,
         l1_ratio=l1_ratio,
         fit_intercept=False,
-        max_iter=5000,
+        max_iter=2000,
         tol=1e-4,
+        precompute=True,
+        selection="random",
+        random_state=0,
     )
     model.fit(X, y)
     return np.asarray(model.coef_, dtype=float)

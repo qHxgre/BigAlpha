@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 import structlog
+from joblib import Parallel, delayed
 
 from . import render
 from .constants import (
@@ -88,7 +89,7 @@ class ElasticNetRegress:
         self, merge_data: pd.DataFrame, factor_cols: List[str]
     ) -> pd.DataFrame:
         """滚动窗口拟合 Elastic Net，返回每个窗口的权重。"""
-        all_days = sorted(merge_data["date"].unique())
+        all_days = np.array(sorted(merge_data["date"].unique()))
         if len(all_days) < self.window:
             logger.warning(
                 "可用交易日不足以填满一个窗口",
@@ -96,32 +97,52 @@ class ElasticNetRegress:
                 window=self.window,
             )
 
-        records = []
+        # merge_data 已按 date 排序，用 searchsorted 一次性算出每个 window 的连续切片
+        # 避免每窗都做 O(N) 的 isin 扫描
+        date_arr = merge_data["date"].to_numpy()
+        day_lo = np.searchsorted(date_arr, all_days, side="left")
+        day_hi = np.searchsorted(date_arr, all_days, side="right")
+
+        X_all = merge_data[factor_cols].to_numpy(dtype=float)
+        y_all = merge_data["daily_ret"].to_numpy(dtype=float)
+
+        min_samples = max(
+            MIN_WINDOW_SAMPLES, len(factor_cols) * MIN_SAMPLES_PER_FACTOR
+        )
+
+        tasks = []
         end_idx = max(1, len(all_days) - self.window + 1)
         for start_idx in range(0, end_idx, self.step):
             window_days = all_days[start_idx:start_idx + self.window]
             if len(window_days) < self.window:
                 break
-            window_end = window_days[-1]
-
-            mask = merge_data["date"].isin(window_days)
-            sub = merge_data.loc[mask, factor_cols + ["daily_ret"]]
-            min_samples = max(
-                MIN_WINDOW_SAMPLES, len(factor_cols) * MIN_SAMPLES_PER_FACTOR
-            )
-            if len(sub) < min_samples:
-                logger.warning("窗口样本过少，跳过", window_end=str(window_end))
+            lo = int(day_lo[start_idx])
+            hi = int(day_hi[start_idx + self.window - 1])
+            if hi - lo < min_samples:
+                logger.warning("窗口样本过少，跳过", window_end=str(window_days[-1]))
                 continue
+            tasks.append((window_days[-1], lo, hi))
 
-            X = sub[factor_cols].to_numpy(dtype=float)
-            y = sub["daily_ret"].to_numpy(dtype=float)
+        alpha = self.alpha
+        l1_ratio = self.l1_ratio
 
+        def _fit_one(lo: int, hi: int):
             try:
-                w = fit_elastic_net(X, y, alpha=self.alpha, l1_ratio=self.l1_ratio)
+                return fit_elastic_net(
+                    X_all[lo:hi], y_all[lo:hi], alpha=alpha, l1_ratio=l1_ratio
+                )
             except Exception:
+                return None
+
+        weights = Parallel(n_jobs=-1, backend="loky", verbose=0)(
+            delayed(_fit_one)(lo, hi) for _, lo, hi in tasks
+        )
+
+        records = []
+        for (window_end, _, _), w in zip(tasks, weights):
+            if w is None:
                 logger.warning("Elastic Net 拟合失败", window_end=str(window_end))
                 continue
-
             records.append({"window_end": window_end, **dict(zip(factor_cols, w))})
 
         if not records:
