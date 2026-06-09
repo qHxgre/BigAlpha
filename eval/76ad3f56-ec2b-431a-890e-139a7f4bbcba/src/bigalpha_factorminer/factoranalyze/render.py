@@ -53,8 +53,15 @@ def plot_group_cumret(
     return _fig_to_base64(fig)
 
 
-def plot_ic_series(daily_ic: pd.Series, factor_name: str = "factor") -> str:
-    """日 IC 柱状 + 22 日滚动均值 + 累计 IC（双轴），返回 base64。"""
+def plot_ic_series(
+    daily_ic: pd.Series,
+    factor_name: str = "factor",
+    stress_periods: List[Tuple[str, str, str]] = None,
+) -> str:
+    """日 IC 柱状 + 22 日滚动均值 + 累计 IC（双轴），返回 base64。
+
+    若提供 stress_periods，会在背景用 axvspan 高亮各压力时段。
+    """
     ic = daily_ic.copy()
     ic.index = pd.to_datetime(ic.index)
     ic = ic.sort_index()
@@ -62,6 +69,22 @@ def plot_ic_series(daily_ic: pd.Series, factor_name: str = "factor") -> str:
     roll_ic = ic.rolling(22).mean()
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    if stress_periods:
+        ic_start, ic_end = ic.index.min(), ic.index.max()
+        for label, s, e in stress_periods:
+            ps = max(pd.Timestamp(s), ic_start)
+            pe = min(pd.Timestamp(e), ic_end)
+            if pe < ps:
+                continue
+            ax1.axvspan(ps, pe, color="grey", alpha=0.18, zorder=0)
+            ax1.text(
+                ps, 0,
+                label, fontsize=8, color="#555",
+                ha="left", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.7),
+            )
+
     ax1.bar(ic.index, ic.values, color="#9CC3E6", width=1.0, label="Daily IC")
     ax1.plot(roll_ic.index, roll_ic.values, color="#1F4E79", linewidth=1.4, label="Rolling IC (22d)")
     ax1.axhline(0, color="grey", linewidth=0.8)
@@ -138,6 +161,55 @@ def plot_stress_ic(
     return _fig_to_base64(fig)
 
 
+def plot_stress_long_short(
+    group_cumret: pd.DataFrame,
+    stress_periods: List[Tuple[str, str, str]],
+    group_num: int,
+    factor_name: str = "factor",
+) -> str:
+    """每个压力期单独画一张多头/基准/多空累计收益子图（窗口内归零起步），返回 base64。"""
+    df_ret = group_cumret.copy()
+    df_ret.index = pd.to_datetime(df_ret.index)
+    df_ret = df_ret.sort_index().diff().fillna(0.0)
+
+    top_col = str(group_num - 1)
+    n = len(stress_periods)
+    if n == 0:
+        return ""
+    ncols = 2 if n > 1 else 1
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6.5 * ncols, 4 * nrows), squeeze=False)
+
+    for i, (label, s, e) in enumerate(stress_periods):
+        ax = axes[i // ncols][i % ncols]
+        ps, pe = pd.Timestamp(s), pd.Timestamp(e)
+        window = df_ret.loc[(df_ret.index >= ps) & (df_ret.index <= pe)]
+        if window.empty:
+            ax.set_title(f"{label} (no data)")
+            ax.axis("off")
+            continue
+        cum = window.cumsum()
+        x = cum.index
+        if top_col in cum.columns:
+            ax.plot(x, cum[top_col].values, color="#FF6B6B", linewidth=1.6, label="Long (top)")
+        if "bm" in cum.columns:
+            ax.plot(x, cum["bm"].values, color="#4ECDC4", linewidth=1.4, label="Benchmark")
+        if "ls" in cum.columns:
+            ax.plot(x, cum["ls"].values, color="#FFD166", linewidth=1.6, linestyle="--", label="Long-Short")
+        ax.axhline(0, color="grey", linewidth=0.6)
+        ax.set_title(f"{label}  ({len(window)}d)")
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis="x", rotation=30, labelsize=8)
+        ax.legend(loc="best", fontsize=8)
+
+    for j in range(n, nrows * ncols):
+        axes[j // ncols][j % ncols].axis("off")
+
+    fig.suptitle(f"Stress-Period Cumulative Return - {factor_name}", fontsize=12)
+    fig.tight_layout()
+    return _fig_to_base64(fig)
+
+
 def _fmt(v) -> str:
     try:
         if v is None or (isinstance(v, float) and np.isnan(v)):
@@ -160,24 +232,28 @@ def render_report(
     from IPython.display import HTML, display
 
     c1 = plot_group_cumret(group_cumret, group_num, factor_name)
-    c2 = plot_ic_series(daily_ic, factor_name)
+    c2 = plot_ic_series(daily_ic, factor_name, stress_periods=stress_periods)
     c3 = plot_long_short(group_cumret, group_num, factor_name)
 
     if stress_periods:
         c4 = plot_stress_ic(stress, stress_periods, factor_name)
+        c5 = plot_stress_long_short(group_cumret, stress_periods, group_num, factor_name)
         stress_rows = "".join(
-            f"<tr><td>{label}</td><td>{s} ~ {e}</td>"
+            f"<tr><td>{label}</td>"
             f"<td>{_fmt(stress.get(f'{label}_ic'))}</td></tr>"
-            for label, s, e in stress_periods
+            for label, _s, _e in stress_periods
         )
         stress_section = f"""
         <h2>压力时段 IC</h2>
         <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">
-            <tr><th>时段</th><th>区间</th><th>IC</th></tr>
+            <tr><th>时段</th><th>IC</th></tr>
             {stress_rows}
         </table>
         <br>
         <img src="data:image/png;base64,{c4}" alt="stress ic">
+        <br>
+        <h2>压力时段多空累计收益</h2>
+        <img src="data:image/png;base64,{c5}" alt="stress long-short">
         <br>
         """
     else:
