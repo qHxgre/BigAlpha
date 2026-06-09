@@ -162,13 +162,29 @@ def render_report(
     c1 = plot_group_cumret(group_cumret, group_num, factor_name)
     c2 = plot_ic_series(daily_ic, factor_name)
     c3 = plot_long_short(group_cumret, group_num, factor_name)
-    c4 = plot_stress_ic(stress, stress_periods, factor_name)
 
-    stress_rows = "".join(
-        f"<tr><td>{label}</td><td>{s} ~ {e}</td>"
-        f"<td>{_fmt(stress.get(f'{label}_ic'))}</td></tr>"
-        for label, s, e in stress_periods
-    )
+    if stress_periods:
+        c4 = plot_stress_ic(stress, stress_periods, factor_name)
+        stress_rows = "".join(
+            f"<tr><td>{label}</td><td>{s} ~ {e}</td>"
+            f"<td>{_fmt(stress.get(f'{label}_ic'))}</td></tr>"
+            for label, s, e in stress_periods
+        )
+        stress_section = f"""
+        <h2>压力时段 IC</h2>
+        <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">
+            <tr><th>时段</th><th>区间</th><th>IC</th></tr>
+            {stress_rows}
+        </table>
+        <br>
+        <img src="data:image/png;base64,{c4}" alt="stress ic">
+        <br>
+        """
+    else:
+        stress_section = """
+        <h2>压力时段 IC</h2>
+        <p style="color: #B7791F;">⚠ 因子数据时间范围与所有预设压力时段均无交集，已跳过本节。</p>
+        """
 
     html_content = f"""
     <div style="font-family: Arial, sans-serif;">
@@ -193,14 +209,7 @@ def render_report(
         <img src="data:image/png;base64,{c3}" alt="long short">
         <br>
 
-        <h2>压力时段 IC</h2>
-        <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">
-            <tr><th>时段</th><th>区间</th><th>IC</th></tr>
-            {stress_rows}
-        </table>
-        <br>
-        <img src="data:image/png;base64,{c4}" alt="stress ic">
-        <br>
+        {stress_section}
     </div>
     """
     display(HTML(html_content))

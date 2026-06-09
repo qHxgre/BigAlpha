@@ -159,9 +159,7 @@ class DataProcess:
 
     def validate(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """完整预处理流程。对 date/instrument 之外的所有因子列同步处理。"""
-        factor_cols = self._factor_cols(factor_data)
-        logger.info("启动因子预处理", factor_cols=factor_cols, rows=len(factor_data))
-
+   
         t0 = datetime.now()
         factor_data = self.drop_inf(factor_data)
         t1 = datetime.now()

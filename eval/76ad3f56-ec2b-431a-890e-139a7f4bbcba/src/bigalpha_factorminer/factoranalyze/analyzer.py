@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import partial
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import empyrical
 import numpy as np
@@ -286,6 +286,20 @@ class FactorAnalyze:
         group_ic_data = group_ic_data.dropna()
         return group_ic_data
 
+    def _active_stress_periods(self) -> List[Tuple[str, str, str]]:
+        """筛选与 daily_ic 实际时间范围有交集的压力时段。"""
+        if not hasattr(self, "daily_ic") or self.daily_ic.empty:
+            return []
+        ic_start = self.daily_ic.index.min()
+        ic_end = self.daily_ic.index.max()
+        active: List[Tuple[str, str, str]] = []
+        for name, s, e in STRESS_PERIODS:
+            ps, pe = pd.Timestamp(s), pd.Timestamp(e)
+            if pe < ic_start or ps > ic_end:
+                continue
+            active.append((name, s, e))
+        return active
+
     def stress_ic(self) -> Dict[str, float]:
         """计算压力时段的 IC / IR。
 
@@ -294,6 +308,8 @@ class FactorAnalyze:
         2. 2024-01-15 ~ 2024-02-08：小微盘流动性危机（雪球敲入 + DMA 去杠杆）。
         3. 2024-09-24 ~ 2024-10-08：政策"组合拳"驱动的暴力反转行情。
         4. 2025-04-07 ~ 2025-04-30：特朗普对等关税冲击，外生事件冲击。
+
+        仅计算与因子数据时间范围有交集的压力时段。
 
         Returns:
             Dict[str, float]: 各压力时段的 ic 均值，外加一个综合 stress_ic_ir
@@ -305,7 +321,7 @@ class FactorAnalyze:
         ic = self.daily_ic
         result: Dict[str, float] = {}
         pooled = []
-        for name, s, e in STRESS_PERIODS:
+        for name, s, e in self._active_stress_periods():
             window = ic.loc[(ic.index >= pd.Timestamp(s)) & (ic.index <= pd.Timestamp(e))]
             if window.empty:
                 result[f"{name}_ic"] = np.nan
@@ -330,12 +346,20 @@ class FactorAnalyze:
         if not hasattr(self, "daily_ic") or not hasattr(self, "group_cumret"):
             raise RuntimeError("请先调用 score(factor_data) 计算中间结果，再调用 plot()。")
         score_dict = score.to_dict() if score is not None else getattr(self, "_score_dict", {})
+        active_periods = self._active_stress_periods()
+        if not active_periods:
+            logger.warning(
+                "因子数据时间范围与所有压力时段均无交集，将跳过压力期 IC 图与表格",
+                factor_name=self.factor_name,
+                ic_start=str(self.daily_ic.index.min()) if not self.daily_ic.empty else None,
+                ic_end=str(self.daily_ic.index.max()) if not self.daily_ic.empty else None,
+            )
         t0 = datetime.now()
         render.render_report(
             group_cumret=self.group_cumret,
             daily_ic=self.daily_ic,
             stress=self.stress_ic(),
-            stress_periods=STRESS_PERIODS,
+            stress_periods=active_periods,
             group_num=self.group_num,
             factor_name=self.factor_name,
             score=score_dict,
