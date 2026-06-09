@@ -30,13 +30,6 @@ def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
     daily_ret_data = dai.query(sql).df()
     if daily_ret_data is None or daily_ret_data.empty:
         logger.warning("每日收益数据为空", start_date=start_date, end_date=end_date)
-    else:
-        logger.info(
-            "加载每日收益数据完成",
-            rows=len(daily_ret_data),
-            start_date=start_date,
-            end_date=end_date,
-        )
     return daily_ret_data
 
 
@@ -68,12 +61,5 @@ def get_bm_ret(start_date: str, end_date: str, benchmark: str) -> pd.DataFrame:
             instrument=BM_DICT.get(benchmark),
             start_date=start_date,
             end_date=end_date,
-        )
-    else:
-        logger.info(
-            "加载基准指数收益数据完成",
-            benchmark=benchmark,
-            instrument=BM_DICT.get(benchmark),
-            rows=len(bm_ret),
         )
     return bm_ret

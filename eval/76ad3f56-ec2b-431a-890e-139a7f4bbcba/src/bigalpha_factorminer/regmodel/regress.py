@@ -191,10 +191,6 @@ class ElasticNetRegress:
             factor_panel=self.merge_data,
             factor_cols=self.factor_cols,
         )
-        logger.info(
-            f"HTML 报告渲染完成, 耗时: {round((datetime.now() - t0).total_seconds(), 4)} 秒",
-            factor_count=len(self.factor_cols),
-        )
 
     def score(
         self,
