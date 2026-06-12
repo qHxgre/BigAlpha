@@ -52,6 +52,8 @@ def run(
 )->[
     I.port("输出数据", "data")
 ]:
+    result = {}
+
     factor_data = _normalize_date(factor_data)
 
     # 确定因子列名
@@ -63,6 +65,8 @@ def run(
     if candidate_cols[0] != 'factor':
         factor_data = factor_data.rename(columns={candidate_cols[0]: 'factor'})
         logger.info('因子列名不为 factor, 自动重命名')
+
+    result['raw_factor'] = factor_data.copy()
 
     has_pool = factor_pool is not None
     if has_pool:
@@ -100,13 +104,13 @@ def run(
         # 没有因子池时只需预处理单因子
         pdf = dp.validate(factor_data)
 
+    result['process_factor'] = pdf[['date', 'instrument', 'factor']]
+
     from .factoranalyze import FactorAnalyze
     logger.info('========== 单因子分析 ==========')
     fa_res = FactorAnalyze(sd, ed).score(pdf[['date', 'instrument', 'factor']], plot=show)
 
-    result = {
-        'factor_analyze': fa_res.to_dict(),
-    }
+    result['factor_analyze'] = fa_res.to_dict()
 
     if has_pool:
         from .regmodel import ElasticNetRegress
