@@ -16,7 +16,6 @@ class Bigalpha2026Bar1dSchema(BaseSchema):
     high: np.double = Field(description="最高价（后复权）", default=np.nan)
     low: np.double = Field(description="最低价（后复权）", default=np.nan)
     volume: np.int64 = Field(description="成交量", default=0)
-    deal_number: np.int32 = Field(description="成交笔数", default=0)
     amount: np.double = Field(description="成交金额", default=np.nan)
     change_ratio: np.double = Field(description="涨跌幅（后复权）", default=0)
     turn: np.double = Field(description="换手率", default=0)

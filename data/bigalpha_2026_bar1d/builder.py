@@ -7,6 +7,7 @@ from bigalpha_2026_bar1d.schema import Bigalpha2026Bar1dSchema
 
 
 class Bigalpha2026Bar1dBuilder(BaseBuilder):
+    """包括指数和个股"""
     datasource_id = "bigalpha_2026_bar1d"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
@@ -40,8 +41,16 @@ class Bigalpha2026Bar1dBuilder(BaseBuilder):
         """该数据主要是算收益率，因此要成分股全时段的数据"""
         # 获取股票池
         instruments = dai.query("SELECT date, member_code FROM cn_stock_index_component WHERE instrument = '000852.SH'").df()['member_code'].unique().tolist()
-        # 获取后复权价格
-        df = dai.query('SELECT * FROM cn_stock_bar1d', filters={"date": [start_date, end_date], instruments: instruments}).df()
+        # 获取个股后复权价格
+        stk_df = dai.query('SELECT * FROM cn_stock_bar1d', filters={"date": [start_date, end_date], instruments: instruments}).df()
+
+        # 获取指数价格
+        index_df = dai.query('SELECT * FROM cn_stock_index_bar1d', filters={
+            "date": [start_date, end_date],
+            instruments: ["000905.SH", "000852.SH", "000300.SH"]
+        }).df()
+
+        df = pd.concat([stk_df, index_df], axis=0)
         return df
 
     def build(self) -> pd.DataFrame:
