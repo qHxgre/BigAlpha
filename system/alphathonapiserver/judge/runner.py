@@ -1,20 +1,23 @@
 import os
 import subprocess
-import sys
+import threading
 import time
 
 import structlog
 
 from _io import write_file
-from paths import RUNNER_BASE_DIR
+from paths import FILE_DIR
 
 logger = structlog.get_logger()
 
 
 class UserCodeRunner:
-    def __init__(self, submission_id, files: dict, cmd: list) -> None:
+    def __init__(self, submission_id, files: dict, cmd: list, runner_dir: str = None) -> None:
         self.submission_id = submission_id
-        self.runner_dir = os.path.join(RUNNER_BASE_DIR, str(self.submission_id))
+        # 运行目录可由外部指定（默认回退到 FILE_DIR/{submission_id}）。
+        # judge 会把它指向 FILE_DIR/{competition_id}/submissions/{sid}，
+        # 让该提交的原始文件、注入代码、stdout 日志、产物全部收在同一个文件夹下。
+        self.runner_dir = runner_dir or os.path.join(FILE_DIR, str(self.submission_id))
         self.files = files
         self.cmd = cmd
 
@@ -40,6 +43,8 @@ class UserCodeRunner:
 
 class LocalProcessUserRunner(UserCodeRunner):
     def _run_code(self) -> int:
+        # 用户任务的运行日志只落盘到 {runner_dir}/stdout，绝不写到终端，
+        # 终端永远只保留 judge 评估系统自身的日志。
         process = subprocess.Popen(
             self.cmd,
             cwd=self.runner_dir,
@@ -52,18 +57,39 @@ class LocalProcessUserRunner(UserCodeRunner):
         )
         timeout = 3 * 60 * 60
         start = time.time()
-        with open(f"{self.runner_dir}/stdout", "w") as writer:
-            while process.poll() is None:
-                if time.time() - start > timeout:
-                    print(f"任务超时，提交id: {self.submission_id}，运行时长：{time.time() - start}")
-                    process.kill()
-                    break
-                time.sleep(5)
-            for line in process.stdout:
-                sys.stdout.write(line)
-                writer.write(line)
+        log_path = os.path.join(self.runner_dir, "stdout")
+
+        # 在独立线程里实时把子进程输出抽干并写入日志文件。
+        # 边跑边读，避免 stdout 管道缓冲被写满导致用户进程阻塞（之前是跑完才读，存在死锁风险）。
+        def _drain() -> None:
+            with open(log_path, "w", encoding="utf-8") as writer:
+                for line in process.stdout:
+                    writer.write(line)
+                    writer.flush()
+
+        drain_thread = threading.Thread(target=_drain, daemon=True)
+        drain_thread.start()
+
+        while process.poll() is None:
+            if time.time() - start > timeout:
+                logger.warning(
+                    "runner.timeout",
+                    submission_id=self.submission_id,
+                    elapsed=round(time.time() - start, 1),
+                )
+                process.kill()
+                break
+            time.sleep(5)
 
         process.wait()
+        drain_thread.join(timeout=30)
+        logger.info(
+            "runner.finished",
+            submission_id=self.submission_id,
+            returncode=process.returncode,
+            elapsed=round(time.time() - start, 1),
+            log_file=log_path,
+        )
         return process.returncode
 
 
