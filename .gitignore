@@ -14,3 +14,5 @@ __pycache__/
 
 # 忽略 MinerU 代码目录
 mineru/
+
+.claude/
