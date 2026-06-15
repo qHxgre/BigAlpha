@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
 from pydantic import Field
-from warehouse.builder.base import BaseSchema
-
+from base import BaseSchema
 
 class Bigalpha2026FactorlibSchema(BaseSchema):
     """精选因子库 Schema
@@ -63,3 +62,6 @@ class Bigalpha2026FactorlibSchema(BaseSchema):
     # ---- 风险/基本信息 (2) ----
     beta_000300SH_22: np.double = Field(description='沪深300指数的22日BETA系数, SQL 算子: m_regr_slope(个股收益率, 指数收益率, N), 因为该算子涉及窗口函数，所以前N天无法算出该因子', default=0, group='指数相关', free=True)
     list_days: np.int64 = Field(description='已上市天数 (按自然日), SQL 算子: day(date - cn_stock_basic_info.list_date)', default=0, group='基本信息', free=True)
+
+    class Config:
+        arbitrary_types_allowed = True
