@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from utils import write_file
-from paths import ALPHATHON_API_BASE_URL, JWT_FILE
+from .utils import write_file
+from .paths import ALPHATHON_API_BASE_URL, JWT_FILE
 
 
 class AlphathonAPI:

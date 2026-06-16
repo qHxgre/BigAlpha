@@ -5,8 +5,8 @@ import time
 
 import structlog
 
-from _io import write_file
-from paths import FILE_DIR
+from .utils import write_file
+from .paths import FILE_DIR
 
 logger = structlog.get_logger()
 

@@ -1,6 +1,6 @@
 import structlog
 
-from judgebase import AlphathonAPI
+from .judgebase import AlphathonAPI
 
 
 logger = structlog.get_logger()

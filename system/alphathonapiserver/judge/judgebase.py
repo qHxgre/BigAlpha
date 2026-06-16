@@ -10,9 +10,9 @@ import dai
 import pandas as pd
 import structlog
 
-from api import AlphathonAPI
-from paths import FILE_DIR
-from runner import K8SPodUserRunner, LocalProcessUserRunner, UserCodeRunner
+from .api import AlphathonAPI
+from .paths import FILE_DIR
+from .runner import K8SPodUserRunner, LocalProcessUserRunner, UserCodeRunner
 
 logger = structlog.get_logger()
 
