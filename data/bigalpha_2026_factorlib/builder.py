@@ -1,4 +1,5 @@
 import dai
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -95,7 +96,6 @@ class Bigalpha2026FactorlibBuilder(BaseBuilder):
 
     def process_data(self, df: pd.DataFrame):
         """对因子值进行预处理"""
-
         def _build_normalize_sql(col: str, group_by: str = "date") -> str:
             avg_expr  = f"c_avg({col}, pb:={group_by})"
             std_expr  = f"c_std({col}, pb:={group_by})"
@@ -128,9 +128,11 @@ class Bigalpha2026FactorlibBuilder(BaseBuilder):
             "net_active_buy_amount_main", "beta_000300SH_22", "list_days",
         ]
 
-        # 修复：用 join 收集所有列，而不是反复覆盖 sql 变量
-        factor_sql = ",\n".join(_build_normalize_sql(col) for col in NORMALIZE_COLS)
+        for col in NORMALIZE_COLS:
+            # 替换 inf 为 nan，再填充或丢弃
+            df[col] = df[col].replace([np.inf, -np.inf], np.nan)
 
+        factor_sql = ",\n".join(_build_normalize_sql(col) for col in NORMALIZE_COLS)
         sql = f"""
         SELECT 
             date, instrument,
