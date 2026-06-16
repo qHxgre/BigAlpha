@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 
 
 def _fit_one_window(X: np.ndarray, y: np.ndarray, alpha: float, l1_ratio: float):
-    """单窗口 Elastic Net 拟合，定义在模块级以便 loky 可以 pickle。"""
+    """单窗口 Elastic Net 拟合，定义在模块级保持稳定的可调用引用。"""
     try:
         return fit_elastic_net(X, y, alpha=alpha, l1_ratio=l1_ratio)
     except Exception:
@@ -136,7 +136,7 @@ class ElasticNetRegress:
         alpha = self.alpha
         l1_ratio = self.l1_ratio
 
-        weights = Parallel(n_jobs=-1, backend="loky", verbose=0)(
+        weights = Parallel(n_jobs=-1, backend="threading", verbose=0)(
             delayed(_fit_one_window)(X_all[lo:hi], y_all[lo:hi], alpha, l1_ratio)
             for _, lo, hi in tasks
         )
