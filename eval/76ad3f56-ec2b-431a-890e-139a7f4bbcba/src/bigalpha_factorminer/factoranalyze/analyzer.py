@@ -62,8 +62,8 @@ class FactorAnalyze:
         Returns:
             pd.DataFrame: 合并后的因子数据。
         """
-        bsd = datetime.strptime(self.start_date, '%Y-%m-%d') - timedelta(days=30)
-        aed = datetime.strptime(self.end_date, '%Y-%m-%d') - timedelta(days=30)
+        bsd = (datetime.strptime(self.start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+        aed = (datetime.strptime(self.end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
         instruments = factor_data['instrument'].unique().tolist()
         daily_ret_data = get_daily_ret(bsd, aed, instruments)
         merge_data = pd.merge(
