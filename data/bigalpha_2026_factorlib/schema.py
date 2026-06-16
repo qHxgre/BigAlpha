@@ -17,7 +17,7 @@ class Bigalpha2026FactorlibSchema(BaseSchema):
 
     # ---- 量价因子 (9) ----
     close: np.double = Field(description='收盘价（后复权）, SQL 算子: cn_stock_bar1d.close', default=0, group='量价因子', free=True)
-    volume: np.int32 = Field(description='成交量, SQL 算子: cn_stock_bar1d.volume', default=0, group='量价因子', free=True)
+    volume: np.double = Field(description='成交量, SQL 算子: cn_stock_bar1d.volume', default=0, group='量价因子', free=True)
     amount: np.double = Field(description='成交金额, SQL 算子: cn_stock_bar1d.amount', default=0, group='量价因子', free=True)
     turn: np.double = Field(description='换手率, SQL 算子: cn_stock_bar1d.turn', default=0, group='量价因子', free=True)
     change_ratio: np.double = Field(description='涨跌幅（后复权）, SQL 算子: cn_stock_bar1d.change_ratio', default=0, group='量价因子', free=True)
@@ -61,7 +61,7 @@ class Bigalpha2026FactorlibSchema(BaseSchema):
 
     # ---- 风险/基本信息 (2) ----
     beta_000300SH_22: np.double = Field(description='沪深300指数的22日BETA系数, SQL 算子: m_regr_slope(个股收益率, 指数收益率, N), 因为该算子涉及窗口函数，所以前N天无法算出该因子', default=0, group='指数相关', free=True)
-    list_days: np.int64 = Field(description='已上市天数 (按自然日), SQL 算子: day(date - cn_stock_basic_info.list_date)', default=0, group='基本信息', free=True)
+    list_days: np.double = Field(description='已上市天数 (按自然日), SQL 算子: day(date - cn_stock_basic_info.list_date)', default=0, group='基本信息', free=True)
 
     class Config:
         arbitrary_types_allowed = True
