@@ -11,7 +11,7 @@ from bigshared2.db.sql.models import (
     UUIDPrimaryKeyMixin,
 )
 
-from ..constants import UserStatus
+from constants import UserStatus
 
 
 class Competition(UUIDPrimaryKeyMixin, CreatedAtMixin, UpdatedAtMixin, SpaceIDAndIndexMixin, CreatorAndIndexMixin, Model):
