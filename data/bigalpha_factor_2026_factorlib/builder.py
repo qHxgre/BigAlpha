@@ -4,11 +4,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from base import BaseBuilder
-from bigalpha_2026_factorlib.schema import Bigalpha2026FactorlibSchema
+from bigalpha_factor_2026_factorlib.schema import Bigalpha2026FactorlibSchema
 
 
-class Bigalpha2026FactorlibBuilder(BaseBuilder):
-    datasource_id = "bigalpha_2026_factorlib"
+class BigalphaFactor2026FactorlibBuilder(BaseBuilder):
+    datasource_id = "bigalpha_factor_2026_factorlib"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
