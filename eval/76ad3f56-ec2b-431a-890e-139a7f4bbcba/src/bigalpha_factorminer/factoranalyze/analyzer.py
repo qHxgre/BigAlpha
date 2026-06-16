@@ -64,7 +64,8 @@ class FactorAnalyze:
         """
         bsd = datetime.strptime(self.start_date, '%Y-%m-%d') - timedelta(days=30)
         aed = datetime.strptime(self.end_date, '%Y-%m-%d') - timedelta(days=30)
-        daily_ret_data = get_daily_ret(bsd, aed)
+        instruments = factor_data['instrument'].unique().tolist()
+        daily_ret_data = get_daily_ret(bsd, aed, instruments)
         merge_data = pd.merge(
             factor_data, daily_ret_data, on=["date", "instrument"], how="left"
         )
