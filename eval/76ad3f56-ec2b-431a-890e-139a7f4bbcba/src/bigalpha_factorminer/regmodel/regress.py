@@ -45,8 +45,8 @@ class ElasticNetRegress:
     """
 
     def __init__(self, start_date: str, end_date: str) -> None:
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = start_date if isinstance(start_date, str) else start_date.strftime('%Y-%m-%d')
+        self.end_date = end_date if isinstance(end_date, str) else end_date.strftime('%Y-%m-%d')
 
         self.alpha = DEFAULT_ALPHA
         self.l1_ratio = DEFAULT_L1_RATIO

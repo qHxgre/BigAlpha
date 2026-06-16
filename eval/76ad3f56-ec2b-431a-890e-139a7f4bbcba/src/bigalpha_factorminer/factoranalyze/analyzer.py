@@ -38,8 +38,8 @@ class FactorAnalyze:
         benchmark: str = '中证1000',
         group_number: int = 10,
     ) -> None:
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = start_date if isinstance(start_date, str) else start_date.strftime('%Y-%m-%d')
+        self.end_date = end_date if isinstance(end_date, str) else end_date.strftime('%Y-%m-%d')
         self.factor_name = factor_name
         self.benchmark = benchmark
         self.group_num = group_number
