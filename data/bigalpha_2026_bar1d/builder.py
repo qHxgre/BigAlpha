@@ -40,28 +40,32 @@ class Bigalpha2026Bar1dBuilder(BaseBuilder):
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
         """该数据主要是算收益率，因此要成分股全时段的数据"""
         # 获取股票池
-        instruments = dai.query("SELECT date, member_code FROM cn_stock_index_component WHERE instrument = '000852.SH'").df()['member_code'].unique().tolist()
+        instruments = dai.query("SELECT date, member_code FROM cn_stock_index_component", filters={
+            'date': [start_date, end_date],
+            'instrument': ['000852.SH']
+        }).df()['member_code'].unique().tolist()
         # 获取个股后复权价格
         sql = """
         SELECT
             date, instrument, name, adjust_factor,
             pre_close, high, open, low, close,
-            volume, amount, change_ratio, turn
+            volume, amount, change_ratio, turn,
+            
         FROM cn_stock_bar1d
         """
-        stk_df = dai.query(sql, filters={"date": [start_date, end_date], instruments: instruments}).df()
+        stk_df = dai.query(sql, filters={"date": [start_date, end_date], 'instrument': instruments}).df()
 
         # 获取指数价格
         sql = """
         SELECT
-            date, instrument, name, adjust_factor,
+            date, instrument, name,
             pre_close, high, open, low, close,
             volume, amount, change_ratio, turn
         FROM cn_stock_index_bar1d
         """
         index_df = dai.query(sql, filters={
             "date": [start_date, end_date],
-            instruments: ["000905.SH", "000852.SH", "000300.SH"]
+            'instrument': ["000905.SH", "000852.SH", "000300.SH"]
         }).df()
 
         df = pd.concat([stk_df, index_df], axis=0)
