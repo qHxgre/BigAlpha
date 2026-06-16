@@ -55,6 +55,7 @@ def run(
     result = {}
 
     factor_data = _normalize_date(factor_data)
+    factor_data['instrument'] = factor_data['instrument'].astype(str)
 
     # 确定因子列名
     candidate_cols = _non_key_columns(factor_data)
@@ -86,11 +87,11 @@ def run(
     ed = merge_df['date'].max().strftime("%Y-%m-%d")
     logger.info(f'{"合并后" if has_pool else "单因子"}时间范围: {sd} 至 {ed}')
 
-    from .dataprocess.datachecker import DataCheck
+    from .datachecker import DataCheck
     logger.info('========== 数据检查 ==========')
     DataCheck(sd, ed).validate(merge_df)
 
-    from .dataprocess.dataprocess import DataProcess
+    from .dataprocess import DataProcess
     logger.info('========== 数据预处理 ==========')
     dp = DataProcess(sd, ed)
     if process_pools:
