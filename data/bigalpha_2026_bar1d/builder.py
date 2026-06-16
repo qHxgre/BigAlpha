@@ -42,10 +42,24 @@ class Bigalpha2026Bar1dBuilder(BaseBuilder):
         # 获取股票池
         instruments = dai.query("SELECT date, member_code FROM cn_stock_index_component WHERE instrument = '000852.SH'").df()['member_code'].unique().tolist()
         # 获取个股后复权价格
-        stk_df = dai.query('SELECT * FROM cn_stock_bar1d', filters={"date": [start_date, end_date], instruments: instruments}).df()
+        sql = """
+        SELECT
+            date, instrument, name, adjust_factor,
+            pre_close, high, open, low, close,
+            volume, amount, change_ratio, turn
+        FROM cn_stock_bar1d
+        """
+        stk_df = dai.query(sql, filters={"date": [start_date, end_date], instruments: instruments}).df()
 
         # 获取指数价格
-        index_df = dai.query('SELECT * FROM cn_stock_index_bar1d', filters={
+        sql = """
+        SELECT
+            date, instrument, name, adjust_factor,
+            pre_close, high, open, low, close,
+            volume, amount, change_ratio, turn
+        FROM cn_stock_index_bar1d
+        """
+        index_df = dai.query(sql, filters={
             "date": [start_date, end_date],
             instruments: ["000905.SH", "000852.SH", "000300.SH"]
         }).df()

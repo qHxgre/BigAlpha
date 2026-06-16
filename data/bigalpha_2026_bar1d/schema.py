@@ -19,8 +19,6 @@ class Bigalpha2026Bar1dSchema(BaseSchema):
     amount: np.double = Field(description="成交金额", default=np.nan)
     change_ratio: np.double = Field(description="涨跌幅（后复权）", default=0)
     turn: np.double = Field(description="换手率", default=0)
-    upper_limit: np.double = Field(description="涨停价", default=np.nan)
-    lower_limit: np.double = Field(description="跌停价", default=np.nan)
 
     class Config:
         arbitrary_types_allowed = True
