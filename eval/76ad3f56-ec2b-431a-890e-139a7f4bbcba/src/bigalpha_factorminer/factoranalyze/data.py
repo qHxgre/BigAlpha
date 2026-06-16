@@ -7,7 +7,7 @@ from .constants import BM_DICT
 logger = structlog.get_logger()
 
 
-def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
+def get_daily_ret(start_date: str, end_date: str, instruments: list) -> pd.DataFrame:
     """
     计算A股每日收益。
 
@@ -23,11 +23,13 @@ def get_daily_ret(start_date: str, end_date: str) -> pd.DataFrame:
             date,
             instrument,
             (m_lead(open, 2)/ m_lead(open, 1) - 1) AS daily_ret
-        FROM cn_stock_bar1d
+        FROM bigalpha_2026_bar1d
         WHERE date BETWEEN DATE '{start_date}' - INTERVAL 10 DAY AND '{end_date}'
         ORDER BY date, instrument
     """
-    daily_ret_data = dai.query(sql).df()
+    daily_ret_data = dai.query(sql, filters={
+        'instrument': instruments
+    }).df()
     if daily_ret_data is None or daily_ret_data.empty:
         logger.warning("每日收益数据为空", start_date=start_date, end_date=end_date)
     return daily_ret_data
@@ -49,7 +51,7 @@ def get_bm_ret(start_date: str, end_date: str, benchmark: str) -> pd.DataFrame:
     SELECT
         date, instrument,
         (close - m_Lag(close,1)) / m_LAG(close, 1) as benchmark_ret
-    FROM cn_stock_index_bar1d
+    FROM bigalpha_2026_bar1d
     WHERE date BETWEEN DATE '{start_date}' - INTERVAL 10 DAY AND '{end_date}'
     AND instrument = '{BM_DICT[benchmark]}'
     """
