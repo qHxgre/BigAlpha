@@ -2,7 +2,7 @@
 
 import httpx
 
-from ..settings import NOTIFICATION_HOST
+from settings import NOTIFICATION_HOST
 
 
 async def create_notice(user_id: str, space_id: str, title: str, content: str, channel: str):

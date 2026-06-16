@@ -8,7 +8,7 @@ import httpx
 import structlog
 from pydantic import BaseModel, Field
 
-from .. import settings
+import settings
 
 log = structlog.get_logger(__name__)
 

@@ -9,8 +9,10 @@ from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
-from .. import constants, models, schemas
-from ..utils import create_notice, send_wechat_message
+import constants
+import models
+import schemas
+from utils import create_notice, send_wechat_message
 
 router = APIRouter()
 

@@ -1,6 +1,10 @@
 import os
-
-from alphathonapiserver.judge.judgebase import JudgeBase
+import sys
+paths = ['/home/aiuser/work/workspace/BigAlpha/system/alphathonapiserver']
+for path in paths:
+    if path not in sys.path:
+        sys.path.append(path)
+from judge.judgebase import JudgeBase
 
 
 # bigalpha_factorminer 源码目录：M.factorlens._latest 即该 bigmodule，
