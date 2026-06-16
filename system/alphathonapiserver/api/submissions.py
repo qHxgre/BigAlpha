@@ -10,7 +10,7 @@ from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
-import constants, models, schemas, settings
+from .. import constants, models, schemas, settings
 
 router = APIRouter()
 

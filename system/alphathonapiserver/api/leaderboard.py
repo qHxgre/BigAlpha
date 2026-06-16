@@ -8,8 +8,8 @@ from bigshared2.auth import Credential, anonymous_authenticator, authenticator
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, ResponseModel
 
-import models
-from constants import UserStatus
+from .. import models
+from ..constants import UserStatus
 
 router = APIRouter()
 

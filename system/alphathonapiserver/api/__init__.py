@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from api import code, competitions, leaderboard, submissions, teams, users
+from . import code, competitions, leaderboard, submissions, teams, users
 
 router = APIRouter()
 

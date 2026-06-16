@@ -16,4 +16,4 @@ class UserStatus(str, Enum):
 # BigAuth 定义的 Privileges
 class Privileges(PrivilegeSet):
     # 优惠券模版权限
-    competition_manage = Privilege("/alphathon/competition/manage", [Roles.super_admin, Roles.operation_manager], "管理比赛")
+    competition_manage = Privilege("/alphathon/competition/manage", [Roles.competition_admin, Roles.super_admin, Roles.operation_manager], "管理比赛")

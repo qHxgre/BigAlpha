@@ -5,7 +5,7 @@ from typing import Any, TypeVar
 from pydantic import BaseModel, Field, validator
 from tortoise.contrib.pydantic.creator import pydantic_model_creator
 
-import models
+from .. import models
 
 # Competition schemas
 Competition = pydantic_model_creator(models.Competition, name="Competition")

@@ -8,8 +8,8 @@ from bigshared2.auth.schemas import BIGQUANT_SPACE_ID
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import ResponseModel
 
-import constants, models, schemas
-from utils import create_notice, send_wechat_message
+from .. import constants, models, schemas
+from ..utils import create_notice, send_wechat_message
 
 router = APIRouter()
 
