@@ -106,7 +106,7 @@ class Judge(JudgeBase):
     @property
     def factor_pool_path(self) -> str:
         """因子池 parquet 的绝对路径（注入到 JUDGE_REG 模板里供子进程读取）。"""
-        return os.path.join(self.compeition_dir, "factor_pool.parquet")
+        return os.path.join(self.leaderboard_dir, "factor_pool.parquet")
 
     # ---- 运行用户/注入代码 -------------------------------------------------
 
