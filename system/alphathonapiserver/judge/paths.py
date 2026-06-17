@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # 文件根目录
-FILE_DIR: str = '/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/system/files'
+FILE_DIR: str = '/home/aiuser/work/workspace/BigAlpha/system/files'
 
 
 # JWT 文件路径，AlphathonAPI 用它给请求带上 cookie。

@@ -247,10 +247,6 @@ class JudgeBase:
             self.save_submission_files(submission)
             runner = self.run_user_code(submission)
             raw_result = self.extract_result(submission, runner)
-            if raw_result is None:
-                # 本场不产出榜单分数，只要代码跑通即可
-                self.log.info("submission.ok", submission_id=sid)
-                return
             # 单条提交跑通时先占位 -1，最终分数等 rank_score 横向排序后再写入
             score = -1
             score_data = {"raw_result": raw_result}
