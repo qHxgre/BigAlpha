@@ -79,10 +79,12 @@ class AlphathonAPI:
         return results
 
     def get_file_content_of_submission(self, submission: dict, ipynb_to_py: bool = False, to_str: bool = False, save_to: Optional[str] = None) -> bytes | str:
-        if len(submission["data"]["files"]) != 1:
-            raise Exception(f"submission {submission['id']} has {len(submission['data']['files'])} files, while only 1 is expected")
+        files = submission["data"]["files"]
+        notebooks = [(fid, finfo) for fid, finfo in files.items() if finfo["name"].endswith(".ipynb")]
+        if len(notebooks) != 1:
+            raise Exception(f"submission {submission['id']} has {len(notebooks)} notebooks, while exactly 1 is expected")
 
-        file_id, file_info = list(submission["data"]["files"].items())[0]
+        file_id, file_info = notebooks[0]
         return self.get_submission_file(submission["id"], file_id, file_info, ipynb_to_py=ipynb_to_py, to_str=to_str, save_to=save_to)
 
     def get_submission_file(
