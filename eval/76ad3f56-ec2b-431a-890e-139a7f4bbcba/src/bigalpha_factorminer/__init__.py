@@ -140,7 +140,7 @@ def run(
         from .regmodel import ElasticNetRegress
         logger.info('========== 因子池回归 ==========')
         reg_res = ElasticNetRegress(sd, ed).score(pdf, plot=show)
-        result['factor_pool_regression'] = reg_res.to_dict()
+        result['factor_regression'] = reg_res.to_dict()
     else:
         logger.warning('未传入因子池，跳过因子池回归检验')
 
