@@ -148,7 +148,7 @@ class JudgeBase:
         setup_judge_logging(self.judge_log_file)
 
         self.alphathon_api = AlphathonAPI()
-        self.log = logger.bind(mode=self.mode)
+        self.log = logger.bind()
         self.log.info("judge.init", tick_interval=self.tick_interval, log_file=self.judge_log_file)
 
     # ---- 字段 / 路径 ------------------------------------------------------
