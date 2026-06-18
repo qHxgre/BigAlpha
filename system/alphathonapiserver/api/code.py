@@ -9,9 +9,7 @@ from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
-import constants
-import models
-import schemas
+from .. import constants, models, schemas
 
 router = APIRouter()
 
@@ -30,7 +28,9 @@ async def create(
     if not competition:
         raise HTTPException(Errors.NOT_FOUND.with_message("比赛不存在"))
 
-    user = await models.User.filter(competition_id=code_in.competition_id, user_id=credential.user_id, status=constants.UserStatus.APPROVED).first()
+    user = await models.User.filter(
+        competition_id=code_in.competition_id, user_id=credential.user_id, status__in=[constants.UserStatus.APPROVED, constants.UserStatus.APPROVED_JOIN_SPACE]
+    ).first()
     if not user:
         raise HTTPException(Errors.FORBIDDEN.with_message("用户未加入比赛"))
 

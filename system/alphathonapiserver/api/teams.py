@@ -2,16 +2,16 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Request
+from tortoise.transactions import in_transaction
 
 from bigshared2.auth import Credential, authenticator
 from bigshared2.auth.schemas import BIGQUANT_SPACE_ID
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import ResponseModel
 
-import constants
-import models
-import schemas
-from utils import create_notice, send_wechat_message
+from .. import constants, models, schemas
+from ..constants import TeamApplyStatus
+from ..utils import create_notice, send_wechat_message
 
 router = APIRouter()
 
@@ -73,7 +73,7 @@ async def create(
     if not user_registration:
         raise HTTPException(Errors.FORBIDDEN.with_message("请先报名参加比赛"))
 
-    if user_registration.status != constants.UserStatus.APPROVED:
+    if user_registration.status not in (constants.UserStatus.APPROVED, constants.UserStatus.APPROVED_JOIN_SPACE):
         raise HTTPException(Errors.FORBIDDEN.with_message("用户报名尚未审批通过，无法创建团队"))
 
     # 检查用户是否已在其他团队中
@@ -151,7 +151,7 @@ async def apply_to_join(
     if not user_registration:
         raise HTTPException(Errors.FORBIDDEN.with_message("请先报名参加比赛"))
 
-    if user_registration.status != constants.UserStatus.APPROVED:
+    if user_registration.status not in (constants.UserStatus.APPROVED, constants.UserStatus.APPROVED_JOIN_SPACE):
         raise HTTPException(Errors.FORBIDDEN.with_message("用户报名尚未审批通过，无法申请加入团队"))
 
     # 检查用户是否已在其他团队中
@@ -159,12 +159,23 @@ async def apply_to_join(
     if existing_team:
         raise HTTPException(Errors.BAD_REQUEST.with_message(f"用户已在团队「{existing_team.name}」中，无法申请加入新团队"))
 
-    pending_users = team.pending_users or []
+    # 检查是否已有待审批的申请
+    existing_application = await models.TeamApply.filter(team_id=team_id, user_id=credential.user_id, status=TeamApplyStatus.PENDING).first()
+    if existing_application:
+        raise HTTPException(Errors.BAD_REQUEST.with_message("您已申请加入该团队，请等待审批"))
 
-    # 添加到待审批列表
-    pending_users.append(str(credential.user_id))
-    team.pending_users = pending_users
-    await team.save()
+    # 创建申请记录，并更新团队的待审批用户列表
+    user_id_str = str(credential.user_id)
+
+    # 使用事务处理，保证 team 和 team_apply 的数据一致性
+    async with in_transaction(connection_name="primary"):
+        pending_users = team.pending_users or []
+        if user_id_str not in pending_users:
+            pending_users.append(user_id_str)
+            team.pending_users = pending_users
+            await team.save()
+
+        await models.TeamApply.create(team_id=team_id, user_id=credential.user_id, competition_id=team.competition_id, status=TeamApplyStatus.PENDING)
 
     return ResponseModel(data=schemas.Team.model_validate(team))
 
@@ -176,6 +187,7 @@ async def approve_application(
     team_id: uuid.UUID = Path(),
     user_id: uuid.UUID = Path(),
     approve: bool = Body(embed=True, description="true为通过，false为拒绝"),
+    rejection_reason: str | None = Body(None, description="拒绝理由"),
 ) -> ResponseModel:
     """队长审批加入申请"""
     request.state.log_data["approved"] = approve
@@ -194,37 +206,53 @@ async def approve_application(
     if team.creator != credential.user_id:
         raise HTTPException(Errors.FORBIDDEN.with_message(f"只有团队「{team.name}」的队长可以审批加入申请"))
 
-    # 检查用户是否在待审批列表中
-    pending_users = team.pending_users or []
-    if str(user_id) not in pending_users:
-        raise HTTPException(Errors.BAD_REQUEST.with_message(f"用户不在团队「{team.name}」的待审批列表中"))
+    # 使用事务处理，保证 team 和 team_apply 的数据一致性
+    async with in_transaction(connection_name="primary"):
+        if approve:
+            # 再次检查用户是否在其他团队中（防止并发问题）
+            existing_team = await get_user_team(team.competition_id, user_id)
+            if existing_team and existing_team.id != team.id:
+                raise HTTPException(Errors.BAD_REQUEST.with_message(f"用户已在团队「{existing_team.name}」中，无法加入团队「{team.name}」"))
 
-    # 从待审批列表中移除
-    pending_users.remove(str(user_id))
-    team.pending_users = pending_users
+            # 通过：添加到成员列表，从待审批列表中移除
+            user_id_str = str(user_id)
+            members = team.members or []
+            if user_id_str not in members:
+                members.append(user_id_str)
+                team.members = members
 
-    if approve:
-        # 再次检查用户是否在其他团队中（防止并发问题）
-        existing_team = await get_user_team(team.competition_id, user_id)
-        if existing_team and existing_team.id != team.id:
-            raise HTTPException(Errors.BAD_REQUEST.with_message(f"用户已在团队「{existing_team.name}」中，无法加入团队「{team.name}」"))
+            # 从待审批列表中移除
+            pending_users = team.pending_users or []
+            if user_id_str in pending_users:
+                pending_users.remove(user_id_str)
+                team.pending_users = pending_users
 
-        # 通过：添加到成员列表
-        members = team.members or []
-        if str(user_id) not in members:
-            members.append(str(user_id))
-            team.members = members
+            content = (
+                f"【{competition.name}】恭喜！您申请加入【{team.name}】的审核已通过。[快去看看吧>>](https://bigquant.com/square/competition/{competition.id})"
+            )
+        else:
+            # 拒绝：从待审批列表中移除
+            user_id_str = str(user_id)
+            pending_users = team.pending_users or []
+            if user_id_str in pending_users:
+                pending_users.remove(user_id_str)
+                team.pending_users = pending_users
 
-        content = f"【{competition.name}】恭喜！您申请加入【{team.name}】的审核已通过。[快去看看吧>>](https://bigquant.com/square/competition/{competition.id})"
-    else:
-        content = f"【{competition.name}】很抱歉！您申请加入【{team.name}】的审核未通过。[去看看别的团队吧>>](https://bigquant.com/square/competition/{competition.id})"
+            content = f"【{competition.name}】很抱歉！您申请加入【{team.name}】的审核未通过。[去看看别的团队吧>>](https://bigquant.com/square/competition/{competition.id})"
+
+        # 检查申请是否存在
+        team_apply = await models.TeamApply.filter(team_id=team_id, user_id=user_id, status=TeamApplyStatus.PENDING).order_by("-created_at").first()
+        if team_apply:
+            team_apply.status = TeamApplyStatus.APPROVED if approve else TeamApplyStatus.REJECTED
+            if team_apply.status == TeamApplyStatus.REJECTED:
+                team_apply.rejection_reason = rejection_reason
+            await team_apply.save()
+        await team.save()
     try:
         await create_notice(user_id=str(user_id), space_id=BIGQUANT_SPACE_ID, title="【比赛团队审核通知】", content=content, channel="system")
         await send_wechat_message(title="比赛团队审核通知", user_id=user_id)
     except Exception as e:
         request.state.log_data["notice_exception"] = str(e)
-
-    await team.save()
 
     return ResponseModel(data=schemas.Team.model_validate(team))
 
@@ -254,9 +282,20 @@ async def remove_member(
     # 从成员列表中移除
     members = team.members or []
     if str(user_id) in members:
-        members.remove(str(user_id))
-        team.members = members
-        await team.save()
+        # 使用事务处理，保证 team 和 team_apply 的数据一致性
+        async with in_transaction(connection_name="primary"):
+            members.remove(str(user_id))
+            team.members = members
+
+            # Create or update TeamApply record with REMOVED status
+            team_apply = await models.TeamApply.filter(team_id=team_id, user_id=user_id, status=TeamApplyStatus.APPROVED).order_by("-created_at").first()
+            if team_apply:
+                team_apply.status = TeamApplyStatus.REMOVED
+                await team_apply.save()
+            else:
+                await models.TeamApply.create(team_id=team_id, user_id=user_id, status=TeamApplyStatus.REMOVED)
+
+            await team.save()
 
         content = f"【{competition.name}】很抱歉！您已被移出{team.name}，[去看看别的团队吧>>](https://bigquant.com/square/competition/{competition.id})"
         try:
@@ -291,22 +330,35 @@ async def delete_team(
     if team.creator != credential.user_id:
         raise HTTPException(Errors.FORBIDDEN.with_message(f"只有团队「{team.name}」的队长可以解散团队"))
 
-    # 检查是否还有成员或待审批用户
-    members = team.members or []
-    pending_users = team.pending_users or []
-    if members or pending_users:
-        member_count = len(members)
-        pending_count = len(pending_users)
-        msg_parts = []
-        if member_count > 0:
-            msg_parts.append(f"{member_count}名成员")
-        if pending_count > 0:
-            msg_parts.append(f"{pending_count}名待审批用户")
-        raise HTTPException(Errors.BAD_REQUEST.with_message(f"团队「{team.name}」还有{' 和 '.join(msg_parts)}，需要先清空才能解散团队"))
+    if team.members:
+        raise HTTPException(Errors.BAD_REQUEST.with_message(f"团队「{team.name}」有成员，请先移除所有成员"))
 
-    await team.delete()
+    # 检查是否还有成员或待审批申请
+    team_applies = await models.TeamApply.filter(team_id=team_id, status__in=(TeamApplyStatus.PENDING, TeamApplyStatus.APPROVED)).all()
+
+    # Get all members to notify
+    pending_users = team.pending_users or []
+
+    # 使用事务处理，保证 team 和 team_apply 的数据一致性
+    async with in_transaction(connection_name="primary"):
+        # Update all TeamApply records to TEAM_DELETED status instead of deleting them
+        for team_apply in team_applies:
+            team_apply.status = TeamApplyStatus.TEAM_DELETED
+            await team_apply.save()
+        # 删除团队
+        await team.delete()
 
     request.state.log_data["team.id"] = team.id
+
+    # Send notifications to all members
+    content = f"【{competition.name}】您所在的团队【{team.name}】已被解散，[去看看别的团队吧>>](https://bigquant.com/square/competition/{competition.id})"
+    for pending_user_id in pending_users:
+        try:
+            await create_notice(user_id=pending_user_id, space_id=BIGQUANT_SPACE_ID, title="【比赛团队解散通知】", content=content, channel="system")
+            await send_wechat_message(title="比赛团队解散通知", user_id=pending_user_id)
+        except Exception as e:
+            request.state.log_data["notice_exception"] = str(e)
+
     return ResponseModel()
 
 
@@ -322,28 +374,37 @@ async def get_my_team(
     if not competition:
         raise HTTPException(Errors.NOT_FOUND.with_message("比赛不存在"))
 
+    user_id = str(credential.user_id)
     # 查找用户所在的团队
-    user_team = await get_user_team(competition_id, credential.user_id)
+    user_team = await get_user_team(competition_id, user_id)
     if not user_team:
-        # 没有找到任何团队
+        # 没有找到任何团队，检查是否有待审批的申请
+        # 直接查询当前比赛的待审批申请
+        last_team_apply = await models.TeamApply.filter(user_id=user_id, competition_id=competition_id).order_by("-created_at").first()
+
+        if last_team_apply:
+            team = await models.Team.filter(id=last_team_apply.team_id, competition_id=last_team_apply.competition_id).get_or_none()
+            if team:
+                # 找到属于当前比赛的待审批申请
+                team_data = schemas.Team.model_validate(team).model_dump()
+                team_data["pending_users"] = len(team.pending_users or [])
+                return ResponseModel(data={"team": team_data, "status": last_team_apply.status, "role": None})
+
+        # 没有找到任何团队或申请
         return ResponseModel(data=None)
+    else:
+        status = "approved"
+        if user_id in user_team.pending_users:
+            status = "pending"
 
-    # 判断用户在团队中的身份
-    user_id_str = str(credential.user_id)
-
-    # 如果是队长或成员，返回完整信息
-    if user_team.creator == credential.user_id or user_id_str in (user_team.members or []):
-        return ResponseModel(data={"team": schemas.Team.model_validate(user_team), "status": "member"})
-
-    # 如果在待审批列表中，返回简化信息
-    if user_id_str in (user_team.pending_users or []):
-        team_data = schemas.Team.model_validate(user_team).model_dump()
-        # 隐藏待审批用户详细信息，只返回数量
-        team_data["pending_users"] = len(user_team.pending_users or [])
-        return ResponseModel(data={"team": team_data, "status": "pending"})
-
-    # 理论上不会到达这里
-    return ResponseModel(data=None)
+        # 如果是团队创建者，则返回团队创建者角色
+        return ResponseModel(
+            data={
+                "team": schemas.Team.model_validate(user_team),
+                "status": status,
+                "role": "creator" if user_team.creator == credential.user_id else "member" if status == "approved" else None,
+            }
+        )
 
 
 @router.delete("/{team_id}/leave")
@@ -366,31 +427,33 @@ async def leave_team(
 
     user_id_str = str(credential.user_id)
 
-    # 检查用户是否在该团队中（成员或待审批）
+    # 检查用户是否在该团队中（成员）
     members = team.members or []
     pending_users = team.pending_users or []
+
+    # 检查是否有该团队的申请记录
+    team_apply = await models.TeamApply.filter(team_id=team_id, user_id=credential.user_id).order_by("-created_at").first()
 
     if user_id_str not in members and user_id_str not in pending_users:
         raise HTTPException(Errors.BAD_REQUEST.with_message(f"用户不在团队「{team.name}」中"))
 
-    # 如果在成员列表中，从成员中移除
-    if user_id_str in members:
-        members.remove(user_id_str)
-        team.members = members
+    # 使用事务处理，保证 team 和 team_apply 的数据一致性
+    async with in_transaction(connection_name="primary"):
+        team.members = list(filter(lambda uid: uid != user_id_str, members))
+        team.pending_users = list(filter(lambda uid: uid != user_id_str, pending_users))
         await team.save()
-        request.state.log_data["action"] = "left_team"
-        return ResponseModel(data={"message": f"已退出团队「{team.name}」"})
 
-    # 如果在待审批列表中，从待审批中移除
-    if user_id_str in pending_users:
-        pending_users.remove(user_id_str)
-        team.pending_users = pending_users
-        await team.save()
-        request.state.log_data["action"] = "cancelled_application"
-        return ResponseModel(data={"message": f"已取消加入团队「{team.name}」的申请"})
+        # 如果存在对应的 TeamApply 记录，更新为 LEAVE 状态
+        if team_apply:
+            team_apply.status = TeamApplyStatus.LEAVE
+            await team_apply.save()
+        else:
+            # 如果没有 TeamApply 记录，创建一条 LEAVE 状态的记录
+            await models.TeamApply.create(team_id=team_id, user_id=credential.user_id, status=TeamApplyStatus.LEAVE)
 
-    # 理论上不会到达这里
-    raise HTTPException(Errors.BAD_REQUEST.with_message("用户状态异常"))
+    request.state.log_data["action"] = "leave_team"
+
+    return ResponseModel()
 
 
 # @router.get("")

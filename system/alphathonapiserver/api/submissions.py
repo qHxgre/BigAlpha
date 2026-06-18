@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from pathlib import Path as PathLib
 
 from fastapi import APIRouter, Body, Depends, File, Path, Query, Request, UploadFile
@@ -10,10 +11,7 @@ from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
-import constants
-import models
-import schemas
-import settings
+from .. import constants, models, schemas, settings
 
 router = APIRouter()
 
@@ -38,7 +36,7 @@ async def create(
     if not user_registration:
         raise HTTPException(Errors.FORBIDDEN.with_message("请先报名参加比赛"))
 
-    if user_registration.status != constants.UserStatus.APPROVED:
+    if user_registration.status not in (constants.UserStatus.APPROVED, constants.UserStatus.APPROVED_JOIN_SPACE):
         raise HTTPException(Errors.FORBIDDEN.with_message("用户报名尚未审批通过，无法提交作品"))
 
     # TODO: 支持直接从 AIStudio 上传文件(mount & copy)
@@ -72,12 +70,13 @@ async def reads(
         base_constraints["competition_id"] = competition_id
 
         try:
-            # 管理员才能查看所有提交
-            await authorizer.requires(
-                request,
-                ANY_SPACE_ID,
-                [constants.Privileges.competition_manage],
-            )
+            # 创建者和管理员才能查看所有提交
+            if competition.creator != credential.user_id:
+                await authorizer.requires(
+                    request,
+                    ANY_SPACE_ID,
+                    [constants.Privileges.competition_manage],
+                )
         except Exception:
             # 非管理员，只能查看自己的提交
             base_constraints["user_id"] = credential.user_id
@@ -163,6 +162,11 @@ async def update(
             ANY_SPACE_ID,
             [constants.Privileges.competition_manage],
         )
+    else:
+        pull_deadline = competition.summary.get("pull_deadline")
+        pull_deadline = datetime.fromisoformat(pull_deadline.replace("Z", "+00:00")).date() if pull_deadline else datetime.now().date()
+        if datetime.now().date() > pull_deadline:
+            raise HTTPException(Errors.FORBIDDEN.with_message("更新已截止"))
 
     await submission.update_from_dict(data).save()
 
@@ -212,7 +216,7 @@ async def upload_file(
     if not user_registration:
         raise HTTPException(Errors.FORBIDDEN.with_message("请先报名参加比赛"))
 
-    if user_registration.status != constants.UserStatus.APPROVED:
+    if user_registration.status not in (constants.UserStatus.APPROVED, constants.UserStatus.APPROVED_JOIN_SPACE):
         raise HTTPException(Errors.FORBIDDEN.with_message("用户报名尚未审批通过，无法上传文件"))
 
     # 创建文件保存目录

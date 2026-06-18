@@ -8,8 +8,8 @@ from bigshared2.auth import Credential, anonymous_authenticator, authenticator
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, ResponseModel
 
-import models
-from constants import UserStatus
+from .. import models
+from ..constants import UserStatus
 
 router = APIRouter()
 
@@ -45,7 +45,7 @@ async def get_competition_summary(
     # 重新计算统计数据
     # 统计参赛用户数（状态为approved）
     users = await models.User.filter(competition_id=competition_id).all()
-    approved_users_count = sum(1 for user in users if user.status == UserStatus.APPROVED)
+    approved_users_count = sum(1 for user in users if user.status in (UserStatus.APPROVED, UserStatus.APPROVED_JOIN_SPACE))
 
     # 统计提交数
     submissions_count = await models.Submission.filter(competition_id=competition_id).count()
@@ -241,7 +241,7 @@ async def _get_user_max_scores(competition_id: uuid.UUID, rank_order: str = "des
         WHERE competition_id = %s
         GROUP BY user_id
     ) s ON u.user_id = s.user_id
-    WHERE u.competition_id = %s and u.status = 'approved'
+    WHERE u.competition_id = %s and u.status in ('approved', 'approved_join_space')
     """
 
     results = await conn.execute_query(query, [str(competition_id), str(competition_id)])

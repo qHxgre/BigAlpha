@@ -9,10 +9,8 @@ from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
 from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
-import constants
-import models
-import schemas
-from utils import create_notice, send_wechat_message
+from .. import constants, models, schemas
+from ..utils import create_notice, join_space, send_wechat_message
 
 router = APIRouter()
 
@@ -54,7 +52,11 @@ async def create(
         return ResponseModel(data=schemas.User.model_validate(existing_user))
     status = constants.UserStatus.PENDING
     if competition.summary.get("approve_disabled", False):
-        status = constants.UserStatus.APPROVED
+        if competition.summary.get("registration_scope", 0) == 1:
+            status = constants.UserStatus.APPROVED_JOIN_SPACE
+            await join_space(credential.user_id, competition.space_id)
+        else:
+            status = constants.UserStatus.APPROVED
 
     user = await models.User.create(user_id=credential.user_id, status=status, **data)
     request.state.log_data["user.id"] = user.id
@@ -174,8 +176,10 @@ async def update(
         try:
             title = "【比赛报名审核通知】"
             content = None
-            if data["status"] == constants.UserStatus.APPROVED.value:
+            if data["status"] in (constants.UserStatus.APPROVED.value, constants.UserStatus.APPROVED_JOIN_SPACE.value):
                 content = f"【{competition.name}】恭喜！您申请的比赛报名审核已通过。[快去看看吧>>](https://bigquant.com/square/competition/{competition.id})"
+                if data["status"] == constants.UserStatus.APPROVED_JOIN_SPACE.value:
+                    await join_space(user.user_id, competition.space_id)
             elif data["status"] == constants.UserStatus.REJECTED.value:
                 reject_reason = data.get("reject_reason")
                 if reject_reason:
