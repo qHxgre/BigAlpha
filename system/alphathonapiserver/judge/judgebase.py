@@ -1,4 +1,5 @@
 import concurrent.futures
+import contextlib
 import logging
 import os
 import threading
@@ -15,6 +16,30 @@ from .paths import FILE_DIR
 from .runner import K8SPodUserRunner, LocalProcessUserRunner, UserCodeRunner
 
 logger = structlog.get_logger()
+
+
+@contextlib.contextmanager
+def log_context(**fields):
+    """临时把 fields 绑定到 structlog 的 contextvars，使作用域内每行日志都自动带上这些字段。
+
+    退出时只清掉自己绑定的 key（不会误删外层已有的上下文），所以可安全嵌套。
+    典型用法：with log_context(submission_id=sid): ...，作用域内的 self.log 都会自动带 submission_id。
+    """
+    tokens = structlog.contextvars.bind_contextvars(**fields)
+    try:
+        yield
+    finally:
+        structlog.contextvars.reset_contextvars(**tokens)
+
+
+@contextlib.contextmanager
+def log_timer():
+    """计时上下文：with log_timer() as t: ...，结束后 t() 返回耗时毫秒（int）。
+
+    用于给完成类日志补一个 elapsed_ms 字段，方便观察各阶段耗时。
+    """
+    start = time.perf_counter()
+    yield lambda: round((time.perf_counter() - start) * 1000)
 
 __all__ = [
     "AlphathonAPI",
@@ -222,7 +247,7 @@ class JudgeBase:
             self.alphathon_api.get_submission_file(
                 sid, file_id, file_info, save_to=os.path.join(dst_dir, file_name)
             )
-        self.log.info("[submission] 下载文件", submission_id=sid, count=len(files))
+        self.log.info("submission.files_saved", count=len(files), msg="下载并保存提交原始文件")
         return dst_dir
 
     def run_user_code(self, submission: dict) -> LocalProcessUserRunner:
@@ -241,33 +266,36 @@ class JudgeBase:
             # 运行目录与原始文件同目录，所有产物（含 stdout 日志）都收在该提交的文件夹下
             runner_dir=self.submission_path(submission),
         )
-        runner.run(_raise=True)
-        self.log.info("[submission] 代码运行成功", submission_id=sid)
+        with log_timer() as elapsed:
+            runner.run(_raise=True)
+        self.log.info("submission.code_done", elapsed_ms=elapsed(), msg="用户代码运行成功")
         return runner
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
-        self.log.info("[submission] 开始处理文件", submission_id=sid)
-        try:
-            # 先把用户提交的所有原始文件落盘留档
-            self.save_submission_files(submission)
-            runner = self.run_user_code(submission)
-            raw_result = self.extract_result(submission, runner)
-            # 单条提交跑通时先占位 -1，最终分数等 rank_score 横向排序后再写入
-            score = -1
-            score_data = {"raw_result": raw_result}
-        except Exception as e:
-            # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里
-            score = -2
-            score_data = {"err_msg": "run error: check your code / get code templates in [code] tab"}
-            self.log.error("[submission] 代码运行失败", submission_id=sid, error=str(e))
+        # 绑定一次 submission_id，作用域内所有 self.log 自动带上，无需逐行手写
+        with log_context(submission_id=sid):
+            self.log.info("submission.start", msg="开始处理提交")
+            try:
+                # 先把用户提交的所有原始文件落盘留档
+                self.save_submission_files(submission)
+                runner = self.run_user_code(submission)
+                raw_result = self.extract_result(submission, runner)
+                # 单条提交跑通时先占位 -1，最终分数等 rank_score 横向排序后再写入
+                score = -1
+                score_data = {"raw_result": raw_result}
+            except Exception as e:
+                # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里
+                score = -2
+                score_data = {"err_msg": "run error: check your code / get code templates in [code] tab"}
+                self.log.error("submission.failed", error=str(e), msg="用户代码运行失败")
 
-        self.alphathon_api.update_submission_score(
-            submission_id=sid,
-            **{self.score_field: score, self.score_data_field: score_data},
-        )
-        # 单条跑完立即触发一次全量重排，这样榜单可以增量刷新
-        self.rank_score()
+            self.alphathon_api.update_submission_score(
+                submission_id=sid,
+                **{self.score_field: score, self.score_data_field: score_data},
+            )
+            # 单条跑完立即触发一次全量重排，这样榜单可以增量刷新
+            self.rank_score()
 
     def rank_score(self) -> None:
         # 拉取本场比赛的所有提交，按 raw_result 横向计算名次/分数
@@ -285,13 +313,14 @@ class JudgeBase:
             raw_results.append(raw_result)
 
         if not raw_results:
-            self.log.warning("[rank] 没有分数数据")
+            self.log.warning("rank.empty", msg="没有可参与排名的分数数据")
             return
 
         df = pd.DataFrame(raw_results)
         # compute_score 由子类实现，必须返回带 score 列的 DataFrame
         df = self.compute_score(df)
         df.to_csv(self.leaderboard_csv, index=False)
+        self.log.info("rank.done", count=len(df), msg="榜单重排完成")
 
         for _, row in df.iterrows():
             score = row.score

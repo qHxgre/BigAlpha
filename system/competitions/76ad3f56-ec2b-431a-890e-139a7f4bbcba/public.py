@@ -8,7 +8,7 @@ for path in paths:
 import json
 import pandas as pd
 
-from judge.judgebase import JudgeBase, LocalProcessUserRunner
+from judge.judgebase import JudgeBase, LocalProcessUserRunner, log_context, log_timer
 
 RAW_FACTOR_FILE = "raw_factor.parquet"
 PROCESS_FACTOR_FILE = "process_factor.parquet"
@@ -142,48 +142,53 @@ class Judge(JudgeBase):
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
-        self.log.info("[submission] 开始处理提交文件", submission_id=sid)
+        # 绑定一次 submission_id，作用域内所有 self.log 自动带上
+        with log_context(submission_id=sid):
+            self.log.info("submission.start", msg="开始处理提交")
 
-        # 第一步：落盘原始文件 + 跑单因子分析。跑不通直接记 -2 并返回。
-        try:
-            self.save_submission_files(submission)
-            self.run_user_code(submission, self.JUDGE_SFA)
-            self.log.info("[submission] 代码运行成功", submission_id=sid)
-        except Exception as e:
-            # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里。
-            # 这类失败（缺 ipynb、用户代码报错等）属于预期常见情况，用 error 只记一行，
-            # 不打完整 Traceback，避免日志刷屏。
-            self.log.error("[submission] 代码运行失败", submission_id=sid, error=str(e))
-            self.alphathon_api.update_submission_score(
-                submission_id=sid,
-                **{
-                    self.score_field: -2,
-                    self.score_data_field: {"err_msg": "run error: check your code / get code templates in [code] tab"},
-                },
-            )
-            return
+            # 第一步：落盘原始文件 + 跑单因子分析。跑不通直接记 -2 并返回。
+            try:
+                with log_timer() as elapsed:
+                    self.save_submission_files(submission)
+                    self.run_user_code(submission, self.JUDGE_SFA)
+                self.log.info("submission.sfa_done", elapsed_ms=elapsed(), msg="单因子分析完成")
+            except Exception as e:
+                # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里。
+                # 这类失败（缺 ipynb、用户代码报错等）属于预期常见情况，用 error 只记一行，
+                # 不打完整 Traceback，避免日志刷屏。
+                self.log.error("submission.sfa_failed", error=str(e), msg="单因子分析运行失败")
+                self.alphathon_api.update_submission_score(
+                    submission_id=sid,
+                    **{
+                        self.score_field: -2,
+                        self.score_data_field: {"err_msg": "run error: check your code / get code templates in [code] tab"},
+                    },
+                )
+                return
 
-        # 第二步：单因子横向排名，刷新公榜
-        try:
-            self.score_sfa()
-        except Exception as e:
-            self.log.error("[sfa] 计算得分失败", submission_id=sid, error=str(e))
+            # 第二步：单因子横向排名，刷新公榜
+            try:
+                self.score_sfa()
+            except Exception as e:
+                self.log.error("sfa.failed", error=str(e), msg="单因子排名失败")
 
-        # 第三步：用排名靠前的因子拼出因子池，并对该提交跑因子池回归（产物落盘，供后续分析）。
-        try:
-            self.save_factor_pool()
-            if os.path.exists(self.factor_pool_path):
-                self.run_user_code(submission, self.JUDGE_REG)
-        except Exception as e:
-            self.log.error("factor_pool_regression.failed", submission_id=sid, error=str(e))
+            # 第三步：用排名靠前的因子拼出因子池，并对该提交跑因子池回归（产物落盘，供后续分析）。
+            try:
+                self.save_factor_pool()
+                if os.path.exists(self.factor_pool_path):
+                    with log_timer() as elapsed:
+                        self.run_user_code(submission, self.JUDGE_REG)
+                    self.log.info("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
+            except Exception as e:
+                self.log.error("regression.failed", error=str(e), msg="因子池回归失败")
 
     def on_tick(self) -> None:
         """每个 tick 重排一次单因子公榜（增量刷新）。"""
         try:
             self.score_sfa()
-            self.log.info("[on_tick] 刷新榜单")
+            self.log.info("tick.refreshed", msg="刷新单因子榜单")
         except Exception as e:
-            self.log.error("[on_tick] 刷新榜单失败", error=str(e))
+            self.log.error("tick.failed", error=str(e), msg="刷新榜单失败")
 
     # ---- 单因子排名 -------------------------------------------------------
 
@@ -210,14 +215,14 @@ class Judge(JudgeBase):
                     with open(fa_path, encoding="utf-8") as reader:
                         fa = json.load(reader)
                 except Exception as e:
-                    self.log.error("[sfa] 无法读取 sfa 分数结果", submission_id=sid, error=str(e))
+                    self.log.error("sfa.read_failed", submission_id=sid, error=str(e), msg="无法读取单因子分数结果")
                     continue
                 fa = dict(fa)
                 fa["id"] = sid
                 rows.append(fa)
 
         if not rows:
-            self.log.warning("[sfa] 没有任何 sfa 分数结果")
+            self.log.warning("sfa.empty", msg="没有任何单因子分数结果")
             return
 
         df = pd.DataFrame(rows)
@@ -229,7 +234,7 @@ class Judge(JudgeBase):
 
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.leaderboard_sfa_csv, index=False)
-        self.log.info("[sfa] 单因子分数截面排名成功", count=len(df))
+        self.log.info("sfa.ranked", count=len(df), msg="单因子分数截面排名完成")
 
         for _, row in df.iterrows():
             score = row["score"]
@@ -287,7 +292,7 @@ class Judge(JudgeBase):
                 })
 
         if not records:
-            self.log.warning("[regression] 没有任何因子数据")
+            self.log.warning("pool.empty", msg="没有任何因子数据")
             return
 
         meta = pd.DataFrame(records)
@@ -303,7 +308,7 @@ class Judge(JudgeBase):
             try:
                 fdf = pd.read_parquet(r["path"])
             except Exception as e:
-                self.log.error("[regression] 无法读取因子数据", submission_id=r["sid"], error=str(e))
+                self.log.error("pool.read_failed", submission_id=r["sid"], error=str(e), msg="无法读取因子数据")
                 continue
             if not {"date", "instrument", "factor"}.issubset(fdf.columns):
                 continue
@@ -317,12 +322,12 @@ class Judge(JudgeBase):
         factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
-            self.log.warning("[regression] 因子池数量太少，无法进行回归", count=len(factor_cols))
+            self.log.warning("pool.too_few", count=len(factor_cols), msg="因子池数量太少，无法进行回归")
             return
 
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
         pool.to_parquet(self.factor_pool_path)
-        self.log.info("[regression] 保存因子池数据", factors=len(factor_cols))
+        self.log.info("pool.saved", factors=len(factor_cols), msg="保存因子池数据")
 
     # ---- 辅助 -------------------------------------------------------------
 
