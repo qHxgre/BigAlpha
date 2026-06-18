@@ -13,7 +13,7 @@ from judge.judgebase import JudgeBase, LocalProcessUserRunner
 RAW_FACTOR_FILE = "raw_factor.parquet"
 PROCESS_FACTOR_FILE = "process_factor.parquet"
 FACTOR_ANALYZE_FILE = "factor_analyze.json"
-FACTOR_REGRESSION_FILE = "factor_regression.json"
+FACTOR_REGRESSION_SCORE = "factor_regression_score.parquet"
 
 # 评测分两步：先对每个提交跑「单因子分析」，再用入选的优质因子拼成「因子池」做回归。
 # 占位符（__USER_CODE__ / __XXX_FILE__）在注入时被替换成真实内容/路径。
@@ -71,19 +71,12 @@ def judge_runner_main():
         show=True,
     )
 
-    # factor_regression 里是 DataFrame（per_factor_scores / weights_history），
-    # 先转成可 JSON 序列化的 records 再落盘
-    reg = result["factor_regression"]
-    reg_json = {
-        k: (v.to_dict(orient="records") if isinstance(v, pd.DataFrame) else v)
-        for k, v in reg.items()
-    }
-    with open("__FACTOR_REGRESSION_FILE__", "w", encoding="utf-8") as writer:
-        json.dump(reg_json, writer, ensure_ascii=False, default=str)
+    # 将 per_factor_scores 数据落盘，
+    result['factor_regression']['per_factor_scores'].to_parquet("__FACTOR_REGRESSION_SCORE__")
 '''
 JUDGE_REG = (
     JUDGE_RUNNER_CODE_2
-    .replace("__FACTOR_REGRESSION_FILE__", FACTOR_REGRESSION_FILE)
+    .replace("__FACTOR_REGRESSION_SCORE__", FACTOR_REGRESSION_SCORE)
 )
 
 
@@ -149,15 +142,16 @@ class Judge(JudgeBase):
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
-        self.log.info("submission.start", submission_id=sid)
+        self.log.info("[submission] 开始处理提交文件", submission_id=sid)
 
         # 第一步：落盘原始文件 + 跑单因子分析。跑不通直接记 -2 并返回。
         try:
             self.save_submission_files(submission)
             self.run_user_code(submission, self.JUDGE_SFA)
+            self.log.info("[submission] 代码运行成功", submission_id=sid)
         except Exception as e:
             # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里
-            self.log.exception("submission.failed", submission_id=sid, error=str(e))
+            self.log.exception("[submission] 代码运行失败", submission_id=sid, error=str(e))
             self.alphathon_api.update_submission_score(
                 submission_id=sid,
                 **{
@@ -171,10 +165,9 @@ class Judge(JudgeBase):
         try:
             self.score_sfa()
         except Exception as e:
-            self.log.exception("score_sfa.failed", submission_id=sid, error=str(e))
+            self.log.exception("[sfa] 计算得分失败", submission_id=sid, error=str(e))
 
         # 第三步：用排名靠前的因子拼出因子池，并对该提交跑因子池回归（产物落盘，供后续分析）。
-        # 这一步是附加分析，失败不影响已经写好的单因子公榜分数。
         try:
             self.save_factor_pool()
             if os.path.exists(self.factor_pool_path):
@@ -186,8 +179,9 @@ class Judge(JudgeBase):
         """每个 tick 重排一次单因子公榜（增量刷新）。"""
         try:
             self.score_sfa()
+            self.log.exception("[on_tick] 刷新榜单", error=str(e))
         except Exception as e:
-            self.log.exception("on_tick.failed", error=str(e))
+            self.log.exception("[on_tick] 刷新榜单失败", error=str(e))
 
     # ---- 单因子排名 -------------------------------------------------------
 
@@ -214,14 +208,14 @@ class Judge(JudgeBase):
                     with open(fa_path, encoding="utf-8") as reader:
                         fa = json.load(reader)
                 except Exception:
-                    self.log.exception("score_sfa.cannt read sfa result", submission_id=sid)
+                    self.log.exception("[sfa] 无法读取 sfa 分数结果", submission_id=sid)
                     continue
                 fa = dict(fa)
                 fa["id"] = sid
                 rows.append(fa)
 
         if not rows:
-            self.log.info("score_sfa.no sfa result")
+            self.log.exception("[sfa] 没有任何 sfa 分数结果")
             return
 
         df = pd.DataFrame(rows)
@@ -233,7 +227,7 @@ class Judge(JudgeBase):
 
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.leaderboard_sfa_csv, index=False)
-        self.log.info("score_sfa.ranked to score", count=len(df), csv=self.leaderboard_sfa_csv)
+        self.log.info("[sfa] 单因子分数截面排名成功", count=len(df))
 
         for _, row in df.iterrows():
             score = row["score"]
@@ -285,13 +279,13 @@ class Judge(JudgeBase):
                 records.append({
                     "sid": sid,
                     "group": self._group_key(submission),
-                    "factor_name": self._factor_name(submission),
+                    "factor_name": sid,
                     "score": sfa_scores.get(sid, float("nan")),
                     "path": pf_path,
                 })
 
         if not records:
-            self.log.info("regression.empty records")
+            self.log.exception("[regression] 没有任何因子数据")
             return
 
         meta = pd.DataFrame(records)
@@ -307,12 +301,12 @@ class Judge(JudgeBase):
             try:
                 fdf = pd.read_parquet(r["path"])
             except Exception:
-                self.log.exception("regression.cant read factor data", submission_id=r["sid"])
+                self.log.exception("[regression] 无法读取因子数据", submission_id=r["sid"])
                 continue
             if not {"date", "instrument", "factor"}.issubset(fdf.columns):
                 continue
 
-            name = self._safe_factor_name(r["factor_name"], r["sid"], used_names)
+            name = r["factor_name"]
             used_names.add(name)
 
             fdf = fdf[["date", "instrument", "factor"]].rename(columns={"factor": name})
@@ -321,39 +315,20 @@ class Judge(JudgeBase):
         factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
-            self.log.info("regression.too few factors", count=len(factor_cols))
+            self.log.exception("[regression] 因子池数量太少，无法进行回归", count=len(factor_cols))
             return
 
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
         pool.to_parquet(self.factor_pool_path)
-        self.log.info("regression.save result", factors=len(factor_cols))
+        self.log.info("[regression] 保存因子池数据", factors=len(factor_cols))
 
     # ---- 辅助 -------------------------------------------------------------
 
     def _group_key(self, submission: dict) -> str:
-        """队伍分组键。当前 API 未暴露队伍列表，按 user_id 分组（一个用户视作一个队伍）。"""
+        """队伍分组键。当前 API 未暴露队伍列表，按 user_id 分组（一个用户视作一个队伍）
+        TODO: 这里有问题，需要解决
+        """
         return str(submission.get("user_id") or submission.get("id"))
-
-    def _factor_name(self, submission: dict) -> str:
-        """因子名取提交里 ipynb 文件名（去扩展名），缺失时回退到提交 id。"""
-        files = (submission.get("data") or {}).get("files") or {}
-        for finfo in files.values():
-            name = (finfo or {}).get("name") or ""
-            if name.endswith(".ipynb"):
-                return os.path.splitext(os.path.basename(name))[0]
-        return str(submission.get("id"))
-
-    @staticmethod
-    def _safe_factor_name(name: str, sid: str, used: set) -> str:
-        """保证因子列名合法且唯一：不能叫 factor / date / instrument，且不与已有列重名。"""
-        name = (str(name).strip() or sid)
-        if name in {"factor", "date", "instrument"}:
-            name = f"{name}_{sid[:8]}"
-        base, i = name, 1
-        while name in used:
-            name = f"{base}_{i}"
-            i += 1
-        return name
 
 
 if __name__ == "__main__":

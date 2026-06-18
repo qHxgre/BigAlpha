@@ -222,7 +222,7 @@ class JudgeBase:
             self.alphathon_api.get_submission_file(
                 sid, file_id, file_info, save_to=os.path.join(dst_dir, file_name)
             )
-        self.log.info("submission.save_files", submission_id=sid, count=len(files))
+        self.log.info("[submission] 下载提交文件", submission_id=sid, count=len(files))
         return dst_dir
 
     def run_user_code(self, submission: dict) -> LocalProcessUserRunner:
@@ -246,7 +246,7 @@ class JudgeBase:
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
-        self.log.info("submission.start", submission_id=sid)
+        self.log.info("[submission] 开始处理提交文件", submission_id=sid)
         try:
             # 先把用户提交的所有原始文件落盘留档
             self.save_submission_files(submission)
@@ -255,12 +255,12 @@ class JudgeBase:
             # 单条提交跑通时先占位 -1，最终分数等 rank_score 横向排序后再写入
             score = -1
             score_data = {"raw_result": raw_result}
-            self.log.info("submission.scored", submission_id=sid, score=score)
+            self.log.info("[submission] 代码运行成功", submission_id=sid, score=score)
         except Exception as e:
             # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里
             score = -2
             score_data = {"err_msg": "run error: check your code / get code templates in [code] tab"}
-            self.log.exception("submission.failed", submission_id=sid, error=str(e))
+            self.log.exception("[submission] 代码运行失败", submission_id=sid, error=str(e))
 
         self.alphathon_api.update_submission_score(
             submission_id=sid,
@@ -285,7 +285,7 @@ class JudgeBase:
             raw_results.append(raw_result)
 
         if not raw_results:
-            self.log.info("rank.empty")
+            self.log.exception("[rank] 没有分数数据")
             return
 
         df = pd.DataFrame(raw_results)
