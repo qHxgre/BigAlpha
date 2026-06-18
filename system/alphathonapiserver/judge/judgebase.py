@@ -93,6 +93,11 @@ def setup_judge_logging(log_file: str) -> None:
     root_logger.addHandler(file_handler)
     root_logger.setLevel(logging.INFO)
 
+    # 第三方 HTTP 库默认会在 INFO 级别打印每一次正常请求（200 OK），噪音很大。
+    # 抬到 WARNING，只有请求失败（4xx/5xx/超时）时才输出。
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 
 class JudgeBase:
@@ -143,7 +148,7 @@ class JudgeBase:
         setup_judge_logging(self.judge_log_file)
 
         self.alphathon_api = AlphathonAPI()
-        self.log = logger.bind(competition_id=self.competition_id, mode=self.mode)
+        self.log = logger.bind(mode=self.mode)
         self.log.info("judge.init", tick_interval=self.tick_interval, log_file=self.judge_log_file)
 
     # ---- 字段 / 路径 ------------------------------------------------------
