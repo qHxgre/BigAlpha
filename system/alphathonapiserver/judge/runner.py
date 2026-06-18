@@ -86,9 +86,8 @@ class LocalProcessUserRunner(UserCodeRunner):
         logger.info(
             "runner.finished",
             submission_id=self.submission_id,
-            returncode=process.returncode,
+            return_code=process.returncode,
             elapsed=round(time.time() - start, 1),
-            log_file=log_path,
         )
         return process.returncode
 

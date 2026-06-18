@@ -214,14 +214,14 @@ class Judge(JudgeBase):
                     with open(fa_path, encoding="utf-8") as reader:
                         fa = json.load(reader)
                 except Exception:
-                    self.log.exception("score_sfa.read_failed", submission_id=sid)
+                    self.log.exception("score_sfa.cannt read sfa result", submission_id=sid)
                     continue
                 fa = dict(fa)
                 fa["id"] = sid
                 rows.append(fa)
 
         if not rows:
-            self.log.info("score_sfa.empty")
+            self.log.info("score_sfa.no sfa result")
             return
 
         df = pd.DataFrame(rows)
@@ -233,7 +233,7 @@ class Judge(JudgeBase):
 
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.leaderboard_sfa_csv, index=False)
-        self.log.info("score_sfa.ranked", count=len(df), csv=self.leaderboard_sfa_csv)
+        self.log.info("score_sfa.ranked to score", count=len(df), csv=self.leaderboard_sfa_csv)
 
         for _, row in df.iterrows():
             score = row["score"]
@@ -291,7 +291,7 @@ class Judge(JudgeBase):
                 })
 
         if not records:
-            self.log.info("factor_pool.empty")
+            self.log.info("regression.empty records")
             return
 
         meta = pd.DataFrame(records)
@@ -307,7 +307,7 @@ class Judge(JudgeBase):
             try:
                 fdf = pd.read_parquet(r["path"])
             except Exception:
-                self.log.exception("factor_pool.read_failed", submission_id=r["sid"])
+                self.log.exception("regression.cant read factor data", submission_id=r["sid"])
                 continue
             if not {"date", "instrument", "factor"}.issubset(fdf.columns):
                 continue
@@ -321,12 +321,12 @@ class Judge(JudgeBase):
         factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
-            self.log.info("factor_pool.too_few_factors", count=len(factor_cols))
+            self.log.info("regression.too few factors", count=len(factor_cols))
             return
 
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
         pool.to_parquet(self.factor_pool_path)
-        self.log.info("factor_pool.saved", factors=len(factor_cols), path=self.factor_pool_path)
+        self.log.info("regression.save result", factors=len(factor_cols))
 
     # ---- 辅助 -------------------------------------------------------------
 

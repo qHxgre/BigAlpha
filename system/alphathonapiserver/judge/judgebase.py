@@ -222,7 +222,7 @@ class JudgeBase:
             self.alphathon_api.get_submission_file(
                 sid, file_id, file_info, save_to=os.path.join(dst_dir, file_name)
             )
-        self.log.info("submission.files_saved", submission_id=sid, count=len(files), dir=dst_dir)
+        self.log.info("submission.save_files", submission_id=sid, count=len(files))
         return dst_dir
 
     def run_user_code(self, submission: dict) -> LocalProcessUserRunner:
