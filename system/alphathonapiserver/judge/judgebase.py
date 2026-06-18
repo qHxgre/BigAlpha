@@ -247,7 +247,7 @@ class JudgeBase:
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
-        self.log.info("[submission] 处理提交文件", submission_id=sid)
+        self.log.info("[submission] 开始处理文件", submission_id=sid)
         try:
             # 先把用户提交的所有原始文件落盘留档
             self.save_submission_files(submission)
