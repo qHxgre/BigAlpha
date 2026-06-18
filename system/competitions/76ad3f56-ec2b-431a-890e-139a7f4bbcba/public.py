@@ -179,7 +179,7 @@ class Judge(JudgeBase):
         """每个 tick 重排一次单因子公榜（增量刷新）。"""
         try:
             self.score_sfa()
-            self.log.exception("[on_tick] 刷新榜单", error=str(e))
+            self.log.info("[on_tick] 刷新榜单")
         except Exception as e:
             self.log.exception("[on_tick] 刷新榜单失败", error=str(e))
 
