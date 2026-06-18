@@ -150,8 +150,10 @@ class Judge(JudgeBase):
             self.run_user_code(submission, self.JUDGE_SFA)
             self.log.info("[submission] 代码运行成功", submission_id=sid)
         except Exception as e:
-            # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里
-            self.log.exception("[submission] 代码运行失败", submission_id=sid, error=str(e))
+            # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里。
+            # 这类失败（缺 ipynb、用户代码报错等）属于预期常见情况，用 error 只记一行，
+            # 不打完整 Traceback，避免日志刷屏。
+            self.log.error("[submission] 代码运行失败", submission_id=sid, error=str(e))
             self.alphathon_api.update_submission_score(
                 submission_id=sid,
                 **{
@@ -165,7 +167,7 @@ class Judge(JudgeBase):
         try:
             self.score_sfa()
         except Exception as e:
-            self.log.exception("[sfa] 计算得分失败", submission_id=sid, error=str(e))
+            self.log.error("[sfa] 计算得分失败", submission_id=sid, error=str(e))
 
         # 第三步：用排名靠前的因子拼出因子池，并对该提交跑因子池回归（产物落盘，供后续分析）。
         try:
@@ -173,7 +175,7 @@ class Judge(JudgeBase):
             if os.path.exists(self.factor_pool_path):
                 self.run_user_code(submission, self.JUDGE_REG)
         except Exception as e:
-            self.log.exception("factor_pool_regression.failed", submission_id=sid, error=str(e))
+            self.log.error("factor_pool_regression.failed", submission_id=sid, error=str(e))
 
     def on_tick(self) -> None:
         """每个 tick 重排一次单因子公榜（增量刷新）。"""
@@ -181,7 +183,7 @@ class Judge(JudgeBase):
             self.score_sfa()
             self.log.info("[on_tick] 刷新榜单")
         except Exception as e:
-            self.log.exception("[on_tick] 刷新榜单失败", error=str(e))
+            self.log.error("[on_tick] 刷新榜单失败", error=str(e))
 
     # ---- 单因子排名 -------------------------------------------------------
 
@@ -207,15 +209,15 @@ class Judge(JudgeBase):
                 try:
                     with open(fa_path, encoding="utf-8") as reader:
                         fa = json.load(reader)
-                except Exception:
-                    self.log.exception("[sfa] 无法读取 sfa 分数结果", submission_id=sid)
+                except Exception as e:
+                    self.log.error("[sfa] 无法读取 sfa 分数结果", submission_id=sid, error=str(e))
                     continue
                 fa = dict(fa)
                 fa["id"] = sid
                 rows.append(fa)
 
         if not rows:
-            self.log.exception("[sfa] 没有任何 sfa 分数结果")
+            self.log.warning("[sfa] 没有任何 sfa 分数结果")
             return
 
         df = pd.DataFrame(rows)
@@ -285,7 +287,7 @@ class Judge(JudgeBase):
                 })
 
         if not records:
-            self.log.exception("[regression] 没有任何因子数据")
+            self.log.warning("[regression] 没有任何因子数据")
             return
 
         meta = pd.DataFrame(records)
@@ -300,8 +302,8 @@ class Judge(JudgeBase):
         for _, r in kept.iterrows():
             try:
                 fdf = pd.read_parquet(r["path"])
-            except Exception:
-                self.log.exception("[regression] 无法读取因子数据", submission_id=r["sid"])
+            except Exception as e:
+                self.log.error("[regression] 无法读取因子数据", submission_id=r["sid"], error=str(e))
                 continue
             if not {"date", "instrument", "factor"}.issubset(fdf.columns):
                 continue
@@ -315,7 +317,7 @@ class Judge(JudgeBase):
         factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
-            self.log.exception("[regression] 因子池数量太少，无法进行回归", count=len(factor_cols))
+            self.log.warning("[regression] 因子池数量太少，无法进行回归", count=len(factor_cols))
             return
 
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)

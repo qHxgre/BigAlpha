@@ -32,9 +32,11 @@ class UserCodeRunner:
             self._run_code()
             return True
         except Exception as e:
-            logger.exception(e)
             if _raise:
+                # 向上抛给调用方，由调用方决定如何记日志，避免在这里再打一遍堆栈造成重复
                 raise e from e
+            # 仅在吞掉异常（不向上抛）时记一行 error，不打完整 Traceback
+            logger.error("[runner] 运行失败", submission_id=str(self.submission_id), error=str(e))
         return False
 
     def _run_code(self) -> None:
