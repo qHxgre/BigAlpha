@@ -1,0 +1,125 @@
+"""因子池回归阶段（B 项来源）。
+
+职责：把各队伍排名靠前的因子拼成因子池落盘，跑一次 Elastic Net 回归得到 per_factor_scores，
+并据此算出每个因子的 B 项得分。
+
+作为 mixin 混入 BigAlphaJudge，依赖 BigAlphaJudgeBase 提供的 mode 感知路径与 JUDGE_REG 模板。
+"""
+from __future__ import annotations
+
+import os
+
+import pandas as pd
+
+from judge.judgebase import LocalProcessUserRunner, log_timer
+
+import scoring
+from fileio import csv_to_map, read_csv
+
+
+class RegressionMixin:
+    """因子池构建 + 回归 + B 项得分计算。"""
+
+    # ---- 因子池构建 -------------------------------------------------------
+
+    def save_factor_pool(self) -> None:
+        """汇总优质因子，构建因子池 parquet。
+
+        1. 遍历 submissions 目录读取处理后因子文件，因子名取该提交的 id；
+        2. 按队伍分组，每队保留单因子得分排名前 FACTOR_POOL_TOP_N 的因子；
+        3. 全部因子按 date / instrument 做 outer merge，落盘为 parquet。
+        """
+        # 读取单因子得分，用于每个队伍内部的因子取舍
+        sfa_scores = csv_to_map(read_csv(self.leaderboard_sfa_csv, logger=self.log), "id", "score")
+
+        records = []
+        for sid, submission, sub_dir in self._iter_submission_dirs():
+            pf_path = os.path.join(sub_dir, self.process_factor_file)
+            if not os.path.exists(pf_path):
+                continue
+            records.append({
+                "sid": sid,
+                "group": scoring.group_key(submission),
+                "factor_name": sid,
+                "score": sfa_scores.get(sid, float("nan")),
+                "path": pf_path,
+            })
+
+        if not records:
+            self.log.warning("pool.empty", msg="没有任何因子数据")
+            return
+
+        meta = pd.DataFrame(records)
+        # 每个队伍内按单因子得分倒序，保留前 N（缺失得分排最后）
+        meta["rank_in_group"] = (
+            meta.groupby("group")["score"].rank(method="first", ascending=False, na_option="bottom")
+        )
+        kept = meta[meta["rank_in_group"] <= self.FACTOR_POOL_TOP_N]
+
+        pool = None
+        for _, r in kept.iterrows():
+            try:
+                fdf = pd.read_parquet(r["path"])
+            except Exception as e:
+                self.log.error("pool.read_failed", submission_id=r["sid"], error=str(e), msg="无法读取因子数据")
+                continue
+            if not {"date", "instrument", "factor"}.issubset(fdf.columns):
+                continue
+
+            name = r["factor_name"]
+            fdf = fdf[["date", "instrument", "factor"]].rename(columns={"factor": name})
+            pool = fdf if pool is None else pool.merge(fdf, how="outer", on=["date", "instrument"])
+
+        factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
+        # 因子池回归要求至少 2 个因子，否则没有意义
+        if pool is None or len(factor_cols) < 2:
+            self.log.warning("pool.too_few", count=len(factor_cols), msg="因子池数量太少，无法进行回归")
+            return
+
+        os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
+        pool.to_parquet(self.factor_pool_path)
+        self.log.info("pool.saved", factors=len(factor_cols), msg="保存因子池数据")
+
+    # ---- 因子池回归 -------------------------------------------------------
+
+    def run_regression(self) -> None:
+        """跑一次因子池回归，产出 per_factor_scores（落盘到 leaderboard_reg_csv）。
+
+        JUDGE_REG 模板不依赖任何用户代码，只读取因子池做回归，因此作为独立脚本直接运行，
+        运行目录放在榜单目录下，与单因子分析的提交目录互不干扰。
+        """
+        runner = LocalProcessUserRunner(
+            submission_id="_regression",
+            files={"judge_runner.py": self.JUDGE_REG},
+            cmd=["python3", "-c", "from judge_runner import judge_runner_main; judge_runner_main()"],
+            runner_dir=self.regression_runner_dir,
+        )
+        with log_timer() as elapsed:
+            runner.run(_raise=True)
+        self.log.info("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
+
+    # ---- B 项得分 ---------------------------------------------------------
+
+    def load_b_scores(self) -> dict[str, float]:
+        """读取因子池回归产物并算出每个因子的 B 项得分（sid -> B_i）。
+
+        回归产物（per_factor_scores）落盘在 leaderboard_reg_csv，列含
+        factor / model_score / selection_rate。其中 factor 即提交 id。
+        回归尚未产出（文件不存在/无法解析）时返回空 dict，调用方据此把 B_i 视为 0。
+        具体的 ModelScore 百分位归一化逻辑见 scoring.compute_b_scores()。
+        """
+        if not os.path.exists(self.leaderboard_reg_csv):
+            return {}
+
+        # JUDGE_REG 以 to_parquet 落盘（文件名虽为 .csv），优先按 parquet 读，兜底按 csv。
+        try:
+            reg = pd.read_parquet(self.leaderboard_reg_csv)
+        except Exception:
+            reg = read_csv(self.leaderboard_reg_csv, logger=self.log)
+            if reg is None:
+                return {}
+
+        b_scores = scoring.compute_b_scores(reg)
+        if not b_scores:
+            self.log.warning("reg.bad_columns", columns=list(reg.columns), msg="回归得分缺少 factor/model_score 列")
+        return b_scores
