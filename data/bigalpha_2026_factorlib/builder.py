@@ -4,15 +4,15 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from base import BaseBuilder
-from bigalpha_factor_2026_factorlib.schema import BigalphaFactor2026FactorlibSchema
+from bigalpha_2026_factorlib.schema import Bigalpha2026FactorlibSchema
 
 
 class BigalphaFactor2026FactorlibBuilder(BaseBuilder):
-    datasource_id = "bigalpha_factor_2026_factorlib"
+    datasource_id = "bigalpha_2026_factorlib"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
-    schema = BigalphaFactor2026FactorlibSchema
+    schema = Bigalpha2026FactorlibSchema
 
     def __init__(self, start_date: str, end_date: str) -> None:
         self.start_date = start_date

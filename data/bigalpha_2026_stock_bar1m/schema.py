@@ -5,7 +5,7 @@ from pydantic import Field
 from base import BaseSchema
 
 
-class BigalphaFactor2026StockBar1mSchema(BaseSchema):
+class Bigalpha2026StockBar1mSchema(BaseSchema):
     date: np.datetime64 = Field(description="日期", default=0)
     instrument: pd.StringDtype = Field(description="股票代码", default=np.nan)
 

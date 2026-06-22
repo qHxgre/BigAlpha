@@ -3,7 +3,7 @@ import pandas as pd
 from pydantic import Field
 from base import BaseSchema
 
-class BigalphaFactor2026FactorlibSchema(BaseSchema):
+class Bigalpha2026FactorlibSchema(BaseSchema):
     """精选因子库 Schema
 
     从 预计算因子全集 (~6700 字段) 中精选的 37 个核心因子, 覆盖
