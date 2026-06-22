@@ -36,7 +36,7 @@ class Bigalpha2026StockBarKmBuilder(BaseBuilder):
     MIN_FIELDS = ["low"]
     # 其余字段(close、累计 volume/amount/deal_number、盘口快照)均取分段末值
 
-    def __init__(self, start_date: str, end_date: str, K: int = 5) -> None:
+    def __init__(self, start_date: str, end_date: str, K: int = 1) -> None:
         self.start_date = start_date
         self.end_date = end_date
         
