@@ -9,7 +9,6 @@ class Bigalpha2026StockBar1mPrivateSchema(BaseSchema):
     date: np.datetime64 = Field(description="日期", default=0)
     instrument: pd.StringDtype = Field(description="股票代码", default=np.nan)
 
-    adjust_factor: np.float32 = Field(description="累计后复权因子", default=np.nan)
     pre_close: np.float32 = Field(description="前收盘价", default=np.nan)
     high: np.float32 = Field(description="最高价", default=np.nan)
     open: np.float32 = Field(description="开盘价", default=np.nan)
