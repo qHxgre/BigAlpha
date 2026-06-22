@@ -128,11 +128,11 @@ class Bigalpha2026StockBarKmBuilder(BaseBuilder):
         if df.empty:
             return df
 
-        df = df.copy()
-        df["date"] = pd.to_datetime(df["date"])
-
         if self.K == 1:
             return df
+
+        df = df.copy()
+        df["date"] = pd.to_datetime(df["date"])
 
         # 用预定义时间段端点标注 bar 结束时刻; 非连续竞价时段为 NaT
         df["__bar_end"] = self._assign_bar_end(df)
