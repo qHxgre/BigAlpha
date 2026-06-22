@@ -74,10 +74,7 @@ def judge_runner_main():
     # 将 per_factor_scores 数据落盘，
     result['factor_regression']['per_factor_scores'].to_parquet("__FACTOR_REGRESSION_SCORE__")
 '''
-JUDGE_REG = (
-    JUDGE_RUNNER_CODE_2
-    .replace("__FACTOR_REGRESSION_SCORE__", FACTOR_REGRESSION_SCORE)
-)
+JUDGE_REG = JUDGE_RUNNER_CODE_2
 
 
 class Judge(JudgeBase):
@@ -90,6 +87,10 @@ class Judge(JudgeBase):
     FACTOR_POOL_TOP_N = 50
 
     # ---- 路径 -------------------------------------------------------------
+    @property
+    def leaderboard_reg_csv(self) -> str:
+        """回归分析榜单"""
+        return os.path.join(self.leaderboard_dir, "leaderboard_reg.csv")
 
     @property
     def leaderboard_sfa_csv(self) -> str:
@@ -120,6 +121,7 @@ class Judge(JudgeBase):
             runner_code
             .replace("__USER_CODE__", user_code)
             .replace("__FACTOR_POOL_FILE__", self.factor_pool_path)
+            .replace("__FACTOR_REGRESSION_SCORE__", self.leaderboard_reg_csv)
         )
 
         runner = LocalProcessUserRunner(

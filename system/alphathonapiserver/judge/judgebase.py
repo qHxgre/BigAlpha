@@ -56,9 +56,9 @@ def setup_judge_logging(log_file: str) -> None:
     终端用彩色渲染方便实时观察，文件里落盘成结构化文本方便后续查看。
 
     文件采用「按天滚动 + 追加 + 永不删除」策略：
-      - 当天写入 judge-{mode}.log，每天零点自动切到新文件；
-      - 昨天的日志归档成 judge-{mode}.log.YYYY-MM-DD，历史全部保留不删除；
-      - 追加模式：手动中断后重启，当天日志接着写，不会覆盖、不会丢失。
+        - 当天写入 judge-{mode}.log，每天零点自动切到新文件；
+        - 昨天的日志归档成 judge-{mode}.log.YYYY-MM-DD，历史全部保留不删除；
+        - 追加模式：手动中断后重启，当天日志接着写，不会覆盖、不会丢失。
 
     只配置一次即可（重复调用会清掉旧 handler 再重建，避免重复输出）。
     """
@@ -363,6 +363,7 @@ class JudgeBase:
                     competition_id=self.competition_id,
                     constraints=self.query_constraints(),
                 )
+
                 # 过滤掉本进程已派发过的，剩下的入队执行
                 pending = [s for s in submissions if s.get("id") not in dispatched]
                 for submission in pending:
