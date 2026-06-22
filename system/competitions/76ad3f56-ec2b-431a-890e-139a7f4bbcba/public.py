@@ -19,15 +19,23 @@ FACTOR_REGRESSION_SCORE = "factor_regression_score.parquet"
 # is_done() 据此判断该提交是否已跑过，避免进程重启后重复执行（尤其是注定失败的提交）。
 SFA_STATUS_FILE = "sfa_status.json"
 
-# 运行状态取值。失败再细分三类，便于排查与决定是否重试：
+# 运行状态取值。失败再细分四类，便于排查与决定是否重试：
 STATUS_SUCCESS = "success"          # 跑通
 STATUS_USER_ERROR = "user_error"    # 用户代码本身报错（子进程非 0 退出）
 STATUS_TIMEOUT = "timeout"          # 运行超时（被 judge kill）
+STATUS_FILE_ERROR = "file_error"    # 用户提交的文件本身有问题（缺失/数量不对/无法解析）
 STATUS_ENV_ERROR = "env_error"      # 评测环境自身问题（拉取/落盘/注入失败等）
 
-# 这些终态视为「已完成、不再重跑」：成功是真完成，用户报错/超时再跑也是同样结果。
+# 这些终态视为「已完成、不再重跑」：成功是真完成，用户报错/超时/文件错误再跑也是同样结果。
 # 唯独 env_error 不在此列——多半是临时性问题，重启/下个 tick 应当重试。
-TERMINAL_STATUSES = {STATUS_SUCCESS, STATUS_USER_ERROR, STATUS_TIMEOUT}
+TERMINAL_STATUSES = {STATUS_SUCCESS, STATUS_USER_ERROR, STATUS_TIMEOUT, STATUS_FILE_ERROR}
+
+
+class SubmissionFileError(Exception):
+    """用户提交的文件本身有问题：缺失、notebook 数量不对、ipynb 无法解析等。
+
+    属于用户侧错误（重试也是同样结果），与「评测环境异常」区分开，单独记为终态。
+    """
 
 # 评测分两步：先对每个提交跑「单因子分析」，再用入选的优质因子拼成「因子池」做回归。
 # 占位符（__USER_CODE__ / __XXX_FILE__）在注入时被替换成真实内容/路径。
@@ -116,6 +124,11 @@ class Judge(JudgeBase):
         """因子池 parquet 的绝对路径（注入到 JUDGE_REG 模板里供子进程读取）。"""
         return os.path.join(self.leaderboard_dir, "factor_pool.parquet")
 
+    @property
+    def submissions_summary_csv(self) -> str:
+        """所有提交运行结果的汇总统计文件。"""
+        return os.path.join(self.leaderboard_dir, "submissions_summary.csv")
+
     # ---- 运行用户/注入代码 -------------------------------------------------
 
     def run_user_code(self, submission: dict, runner_code: str) -> LocalProcessUserRunner:
@@ -125,10 +138,14 @@ class Judge(JudgeBase):
         并额外把 __FACTOR_POOL_FILE__ 替换成因子池的绝对路径。
         """
         sid = submission["id"]
-        # ipynb 会被转成 .py 字符串，便于注入到 runner 模板中
-        user_code = self.alphathon_api.get_file_content_of_submission(submission, ipynb_to_py=True, to_str=True)
-        if isinstance(user_code, bytes):
-            user_code = user_code.decode("utf-8")
+        # ipynb 会被转成 .py 字符串，便于注入到 runner 模板中。
+        # 文件缺失/数量不对/无法解析属于用户文件问题，单独抛 SubmissionFileError（终态，不重试）。
+        try:
+            user_code = self.alphathon_api.get_file_content_of_submission(submission, ipynb_to_py=True, to_str=True)
+            if isinstance(user_code, bytes):
+                user_code = user_code.decode("utf-8")
+        except Exception as e:
+            raise SubmissionFileError(str(e)) from e
         user_code = self.preprocess_user_code(submission, user_code)
 
         injected = (
@@ -247,6 +264,18 @@ class Judge(JudgeBase):
                     },
                 )
                 return
+            except SubmissionFileError as e:
+                # 用户提交的文件本身有问题（缺失/数量不对/无法解析）。属于用户侧终态，不重试。
+                self.log.error("submission.sfa_failed", status=STATUS_FILE_ERROR, error=str(e), msg="提交文件有问题")
+                self.write_sfa_status(submission, STATUS_FILE_ERROR, error=str(e))
+                self.alphathon_api.update_submission_score(
+                    submission_id=sid,
+                    **{
+                        self.score_field: -2,
+                        self.score_data_field: {"err_msg": "file error: check your submission file (exactly 1 valid .ipynb expected)"},
+                    },
+                )
+                return
             except Exception as e:
                 # 其余异常（拉取 ipynb 失败、落盘失败、注入失败等）归类为评测环境问题。
                 # 这类多半是临时性的，状态记为 env_error（非终态），下个 tick / 重启后会重试。
@@ -278,12 +307,98 @@ class Judge(JudgeBase):
                 self.log.error("regression.failed", error=str(e), msg="因子池回归失败")
 
     def on_tick(self) -> None:
-        """每个 tick 重排一次单因子公榜（增量刷新）。"""
+        """每个 tick 重排一次单因子公榜（增量刷新），并汇总各提交运行结果。"""
         try:
             self.score_sfa()
             self.log.info("tick.refreshed", msg="刷新单因子榜单")
         except Exception as e:
             self.log.error("tick.failed", error=str(e), msg="刷新榜单失败")
+
+        try:
+            self.summarize_submissions()
+        except Exception as e:
+            self.log.error("summary.failed", error=str(e), msg="汇总提交运行结果失败")
+
+    # ---- 运行结果汇总 -----------------------------------------------------
+
+    def summarize_submissions(self) -> None:
+        """把所有提交的运行结果汇总到一个统计文件 submissions_summary.csv。
+
+        逐个提交收集：
+            - 运行状态（sfa_status.json：status / finished_at / elapsed_ms / error）；
+            - 单因子分析指标（factor_analyze.json：ic_mean / ic_ir / sharpe_ratio / stress_ic_ir 等）；
+            - 截面排名得分（leaderboard_sfa.csv 里的 score）；
+            - 各产物是否落盘（raw/process factor、回归得分）。
+        汇总后按 score 倒序落盘，方便整体观察各提交的成败与表现。
+        """
+        submissions = self.alphathon_api.query_submissions(competition_id=self.competition_id)
+        sub_by_id = {str(s["id"]): s for s in submissions}
+
+        # 截面排名得分，用于补充每个提交的最终单因子得分
+        sfa_scores: dict[str, float] = {}
+        if os.path.exists(self.leaderboard_sfa_csv):
+            try:
+                sfa_df = pd.read_csv(self.leaderboard_sfa_csv)
+                sfa_scores = {str(r["id"]): r["score"] for _, r in sfa_df.iterrows()}
+            except Exception as e:
+                self.log.error("summary.sfa_read_failed", error=str(e), msg="读取单因子榜单失败")
+
+        rows = []
+        if os.path.isdir(self.submission_dir):
+            for sid in os.listdir(self.submission_dir):
+                submission = sub_by_id.get(sid)
+                if submission is None:
+                    continue
+                sub_dir = os.path.join(self.submission_dir, sid)
+
+                row: dict = {
+                    "submission_id": sid,
+                    "user_id": submission.get("user_id"),
+                    "group": self._group_key(submission),
+                }
+
+                # 运行状态
+                status = self.read_sfa_status(submission) or {}
+                row["status"] = status.get("status")
+                row["finished_at"] = status.get("finished_at")
+                row["elapsed_ms"] = status.get("elapsed_ms")
+                row["error"] = status.get("error")
+
+                # 单因子分析指标
+                fa_path = os.path.join(sub_dir, FACTOR_ANALYZE_FILE)
+                if os.path.exists(fa_path):
+                    try:
+                        with open(fa_path, encoding="utf-8") as reader:
+                            fa = json.load(reader)
+                        for col in ["ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir"]:
+                            row[col] = fa.get(col)
+                    except Exception as e:
+                        self.log.error("summary.fa_read_failed", submission_id=sid, error=str(e), msg="读取单因子分数结果失败")
+
+                # 截面排名得分
+                row["score"] = sfa_scores.get(sid)
+
+                # 产物是否落盘
+                row["has_raw_factor"] = os.path.exists(os.path.join(sub_dir, RAW_FACTOR_FILE))
+                row["has_process_factor"] = os.path.exists(os.path.join(sub_dir, PROCESS_FACTOR_FILE))
+                row["has_regression_score"] = os.path.exists(os.path.join(sub_dir, FACTOR_REGRESSION_SCORE))
+
+                rows.append(row)
+
+        if not rows:
+            self.log.warning("summary.empty", msg="没有任何提交运行结果可汇总")
+            return
+
+        df = pd.DataFrame(rows)
+        # 指标统一转数值，便于排序与后续分析
+        for col in ["ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir", "score", "elapsed_ms"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        df = df.sort_values("score", ascending=False, na_position="last")
+
+        os.makedirs(self.leaderboard_dir, exist_ok=True)
+        df.to_csv(self.submissions_summary_csv, index=False)
+        self.log.info("summary.saved", count=len(df), path=self.submissions_summary_csv, msg="汇总提交运行结果完成")
 
     # ---- 单因子排名 -------------------------------------------------------
 
