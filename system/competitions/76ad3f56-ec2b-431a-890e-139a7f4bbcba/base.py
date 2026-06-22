@@ -14,6 +14,7 @@ mixin 提供，本基类负责把它们需要的「配置位」「mode 感知的
 from __future__ import annotations
 
 import os
+import time
 
 from judge.judgebase import JudgeBase
 
@@ -44,6 +45,55 @@ class BigAlphaJudgeBase(JudgeBase):
 
     # 每个队伍最多入选因子池的因子数量
     FACTOR_POOL_TOP_N = 50
+
+    # ---- 自适应评估间隔 ---------------------------------------------------
+    # 本比赛特有：on_tick 里的 Elastic Net 回归计算量随全局因子数增长，固定间隔会在因子池
+    # 变大后频繁空转或排队堆积。开启 adaptive_interval 后，下一轮间隔按上一轮实际评估耗时自调：
+    #     t_next = max(k * t_last_run, t_min)，k = tick_safety_factor，t_min = tick_min_interval
+    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。
+    # 关闭时（默认）退化为父类的固定 tick_interval —— 私榜逐日增量构建用固定节奏即可。
+    #
+    # 实现上不改动父类主循环：父类每轮先调 on_tick() 再 sleep(self.tick_interval)。这里给
+    # 本实例的 on_tick 包一层计时，在每轮跑完后按公式回写 self.tick_interval（普通属性），
+    # 下一次 sleep 就会用上新间隔。
+    adaptive_interval: bool = False
+    tick_safety_factor: float = 1.5   # k：安全系数
+    tick_min_interval: int = 3600     # t_min：最小间隔（秒），默认 1 小时
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # 给本实例的 on_tick（无论由哪个 mixin 提供）包一层计时，跑完后据耗时回写 tick_interval。
+        if self.adaptive_interval:
+            self._wrap_on_tick_with_adaptive_interval()
+
+    def next_tick_interval(self, last_run_seconds: float) -> int:
+        """据上一轮评估实测耗时按 t_next = max(k * t_last_run, t_min) 算下一轮 sleep 秒数。"""
+        return int(max(self.tick_safety_factor * last_run_seconds, self.tick_min_interval))
+
+    def _wrap_on_tick_with_adaptive_interval(self) -> None:
+        """把实例上的 on_tick 包成「计时 + 回写 tick_interval」版本。
+
+        父类主循环在 on_tick 之后读取 self.tick_interval 决定 sleep，所以在 on_tick 末尾
+        把下一轮间隔写进 self.tick_interval 即可生效，无需改动父类。
+        """
+        original_on_tick = self.on_tick
+
+        def timed_on_tick(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return original_on_tick(*args, **kwargs)
+            finally:
+                last_run_seconds = time.perf_counter() - start
+                self.tick_interval = self.next_tick_interval(last_run_seconds)
+                self.log.info(
+                    "tick.adaptive_interval",
+                    tick_interval=self.tick_interval,
+                    last_run_seconds=round(last_run_seconds, 1),
+                    msg="按上一轮评估耗时自适应下一轮间隔",
+                )
+
+        self.on_tick = timed_on_tick  # type: ignore[assignment]
+
 
     # ---- mode 感知的产物文件名 -------------------------------------------
     # public/private 共用同一个比赛目录（同一个 competition_id），靠文件名后缀隔离产物。

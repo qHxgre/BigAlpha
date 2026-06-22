@@ -25,6 +25,13 @@ class Judge(BigAlphaJudge):
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = "2025-12-31 23:59:59"
 
+    # 自适应评估间隔：Elastic Net 计算量随全局因子数增长，间隔按上一轮实测耗时自调。
+    #     t_next = max(k * t_last_run, t_min)，k = 1.5，t_min = 1 小时。
+    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。
+    adaptive_interval = True
+    tick_safety_factor = 1.5
+    tick_min_interval = 3600
+
 
 if __name__ == "__main__":
     Judge().run()
