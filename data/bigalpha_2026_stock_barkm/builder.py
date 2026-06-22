@@ -36,7 +36,7 @@ class Bigalpha2026StockBarKmBuilder(BaseBuilder):
     MIN_FIELDS = ["low"]
     # 其余字段(close、累计 volume/amount/deal_number、盘口快照)均取分段末值
 
-    def __init__(self, start_date: str, end_date: str, K: int = 1) -> None:
+    def __init__(self, start_date: str, end_date: str, K: int = 1, suffix: str=None) -> None:
         self.start_date = start_date
         self.end_date = end_date
         
@@ -51,7 +51,12 @@ class Bigalpha2026StockBarKmBuilder(BaseBuilder):
         self.K = int(K)
         if self.K not in TIME_SETS:
             raise ValueError(f"不支持的频率 K={self.K}, 可选: {sorted(TIME_SETS)} (在 constant.py 中定义)")
-        self.datasource_id = f"bigalpha_2026_stock_bar{self.K}m"
+        
+        if suffix is None:
+            self.datasource_id = f"bigalpha_2026_stock_bar{self.K}m"
+        else:
+            self.datasource_id = f"bigalpha_2026_stock_bar{self.K}m_{suffix}"
+
         print(f"初始化！{self.datasource_id}, 频率: {self.K}分钟, 时间周期: {self.start_date}, {self.end_date}")
 
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
