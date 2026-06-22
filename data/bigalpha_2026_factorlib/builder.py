@@ -7,7 +7,7 @@ from base import BaseBuilder
 from bigalpha_2026_factorlib.schema import Bigalpha2026FactorlibSchema
 
 
-class BigalphaFactor2026FactorlibBuilder(BaseBuilder):
+class Bigalpha2026FactorlibBuilder(BaseBuilder):
     datasource_id = "bigalpha_2026_factorlib"
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
