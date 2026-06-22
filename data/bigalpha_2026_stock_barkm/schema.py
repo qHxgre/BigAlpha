@@ -5,8 +5,15 @@ from pydantic import Field
 from base import BaseSchema
 
 
-class Bigalpha2026StockBar1mTestSchema(BaseSchema):
-    date: np.datetime64 = Field(description="日期", default=0)
+class Bigalpha2026StockBarKmSchema(BaseSchema):
+    """K 分钟 K 线 + 盘口快照
+
+    字段与 bigalpha_2026_stock_bar1m 保持一致, date 为 K 分钟 bar 的
+    结束时刻(收盘时刻), 例如 5 分钟频率的早盘首个 bar 标注为 09:35,
+    早盘收盘 bar 标注为 11:30, 尾盘收盘 bar 标注为 15:00。
+    """
+
+    date: np.datetime64 = Field(description="日期(bar结束时刻)", default=0)
     instrument: pd.StringDtype = Field(description="股票代码", default=np.nan)
 
     pre_close: np.float32 = Field(description="前收盘价", default=np.nan)
@@ -14,9 +21,9 @@ class Bigalpha2026StockBar1mTestSchema(BaseSchema):
     open: np.float32 = Field(description="开盘价", default=np.nan)
     low: np.float32 = Field(description="最低价", default=np.nan)
     close: np.float32 = Field(description="收盘价", default=np.nan)
-    deal_number: np.int32 = Field(description="成交笔数", default=0)
-    volume: np.int32 = Field(description="最新总成交量", default=0)
-    amount: np.float32 = Field(description="最新成交金额", default=np.nan)
+    deal_number: np.int32 = Field(description="成交笔数(当日累计)", default=0)
+    volume: np.int32 = Field(description="最新总成交量(当日累计)", default=0)
+    amount: np.float32 = Field(description="最新成交金额(当日累计)", default=np.nan)
 
     # 委托价格
     ask_price1: np.float32 = Field(description="1档委卖价", default=0)
