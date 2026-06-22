@@ -6,8 +6,9 @@ from tortoise.transactions import in_transaction
 
 from bigshared2.auth import Credential, authenticator
 from bigshared2.auth.schemas import BIGQUANT_SPACE_ID
+from bigshared2.db.sql import utils as sql_utils
 from bigshared2.schemas.exceptions import Errors, HTTPException
-from bigshared2.schemas.http import ResponseModel
+from bigshared2.schemas.http import PagingQueryMixin, QueryConstraintsMixin, ResponseModel
 
 from .. import constants, models, schemas
 from ..constants import TeamApplyStatus
@@ -456,45 +457,49 @@ async def leave_team(
     return ResponseModel()
 
 
-# @router.get("")
-# async def reads(
-#     request: Request,
-#     credential: Credential = Depends(authenticator),
-#     constraints: QueryConstraintsMixin | None = Depends(QueryConstraintsMixin.q),
-#     order_by: list[str] | None = Query([], description="排序字段"),
-#     include_fields: list[str] | None = Query([], description="只返回指定包含的字段"),
-#     exclude_fields: list[str] | None = Query([], description="排除的字段"),
-#     paging: PagingQueryMixin | None = Depends(PagingQueryMixin.q),
-#     competition_id: uuid.UUID | None = Query(None, description="比赛ID，用于获取指定比赛的团队列表"),
-# ) -> ResponseModel:
-#     """获取团队列表"""
-#     # 构建基础查询条件
-#     base_constraints = {}
-#     if competition_id:
-#         # 检查比赛是否存在
-#         competition = await models.Competition.filter(id=competition_id).first()
-#         if not competition:
-#             raise HTTPException(Errors.NOT_FOUND.with_message("比赛不存在"))
+@router.get("")
+async def reads(
+    request: Request,
+    credential: Credential = Depends(authenticator),
+    constraints: QueryConstraintsMixin | None = Depends(QueryConstraintsMixin.q),
+    order_by: list[str] | None = Query([], description="排序字段"),
+    include_fields: list[str] | None = Query([], description="只返回指定包含的字段"),
+    exclude_fields: list[str] | None = Query([], description="排除的字段"),
+    paging: PagingQueryMixin | None = Depends(PagingQueryMixin.q),
+    competition_id: uuid.UUID | None = Query(None, description="比赛ID，用于获取指定比赛的团队列表"),
+) -> ResponseModel:
+    """获取团队列表"""
+    base_constraints = {}
+    if competition_id:
+        competition = await models.Competition.filter(id=competition_id).first()
+        if not competition:
+            raise HTTPException(Errors.NOT_FOUND.with_message("比赛不存在"))
 
-#         base_constraints["competition_id"] = competition_id
+        base_constraints["competition_id"] = competition_id
 
-#     # 合并约束条件
-#     all_constraints = base_constraints
-#     if constraints and constraints.data:
-#         all_constraints.update(constraints.data)
+    all_constraints = base_constraints
+    if constraints and constraints.data:
+        all_constraints.update(constraints.data)
 
-#     items = sql_utils.to_schema(
-#         await sql_utils.paginate(
-#             sql_utils.selects(
-#                 model=models.Team,
-#                 include_fields=include_fields,
-#                 exclude_fields=exclude_fields,
-#                 constraints=all_constraints,
-#                 order_by=order_by,
-#             ),
-#             paging=paging,
-#         ),
-#         schemas.Team,
-#     )
-#     request.state.log_data["items"] = len(items.items)
-#     return ResponseModel(data=items)
+    items = sql_utils.to_schema(
+        await sql_utils.paginate(
+            sql_utils.selects(
+                model=models.Team,
+                constraints=all_constraints,
+                order_by=order_by,
+            ),
+            paging=paging,
+        ),
+        schemas.Team,
+    )
+    new_items = schemas.schema_to_dict(schemas.Team, items.items, include_fields, exclude_fields)
+    request.state.log_data["items"] = len(new_items)
+    return ResponseModel(
+        data={
+            "page": items.page,
+            "size": items.size,
+            "total": items.total,
+            "count": len(new_items),
+            "items": new_items,
+        }
+    )
