@@ -142,10 +142,25 @@ class Judge(JudgeBase):
 
     # ---- 主流程 -----------------------------------------------------------
 
+    def is_done(self, submission: dict) -> bool:
+        """判断该提交是否已经跑过单因子分析。
+
+        以产物文件 factor_analyze.json 是否存在为准：进程重启后内存里的
+        dispatched 集合会清空，靠它判断哪些提交不必再重跑用户代码。
+        """
+        fa_path = os.path.join(self.submission_path(submission), FACTOR_ANALYZE_FILE)
+        return os.path.exists(fa_path)
+
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
         # 绑定一次 submission_id，作用域内所有 self.log 自动带上
         with log_context(submission_id=sid):
+            # 已经跑过的提交（产物已落盘）直接跳过，避免重启后重复执行用户代码。
+            # 排名由 on_tick -> score_sfa 统一刷新，跳过这里不影响榜单。
+            if self.is_done(submission):
+                self.log.info("submission.skip", msg="已跑过，跳过重复执行")
+                return
+
             self.log.info("submission.start", msg="开始处理提交")
 
             # 第一步：落盘原始文件 + 跑单因子分析。跑不通直接记 -2 并返回。
