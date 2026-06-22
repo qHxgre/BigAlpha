@@ -75,10 +75,9 @@ JUDGE_SFA = (
 
 
 # 第二步：跑因子池回归。因子池由评测系统汇总所有提交的优质因子后落盘（__FACTOR_POOL_FILE__），
-# 这里只读取它并交给 bigalpha_factorminer 做回归，不再调用用户的 main()。
+# 这里只读取它并交给 bigalpha_factorminer 做回归，不调用任何用户代码，
+# 因此模板里不注入 __USER_CODE__，可作为独立脚本运行（不依赖任何提交）。
 JUDGE_RUNNER_CODE_2 = '''
-__USER_CODE__
-
 def judge_runner_main():
     import json
     import pandas as pd
@@ -116,8 +115,13 @@ class Judge(JudgeBase):
 
     @property
     def leaderboard_sfa_csv(self) -> str:
-        """单因子分析榜单（截面 rank 后的得分快照）。"""
+        """单因子分析榜单（截面 rank 后的 A 项得分快照）。"""
         return os.path.join(self.leaderboard_dir, "leaderboard_sfa.csv")
+
+    @property
+    def leaderboard_final_csv(self) -> str:
+        """最终得分榜单（id / a_score / b_score / final_score）。"""
+        return os.path.join(self.leaderboard_dir, "leaderboard_final.csv")
 
     @property
     def factor_pool_path(self) -> str:
@@ -134,8 +138,8 @@ class Judge(JudgeBase):
     def run_user_code(self, submission: dict, runner_code: str) -> LocalProcessUserRunner:
         """拉取用户代码、注入 runner 模板，并在隔离子进程中执行。
 
-        与基类不同：runner_code 由调用方传入（JUDGE_SFA / JUDGE_REG），
-        并额外把 __FACTOR_POOL_FILE__ 替换成因子池的绝对路径。
+        与基类不同：runner_code 由调用方传入（当前为 JUDGE_SFA，跑单因子分析）。
+        因子池回归不依赖用户代码，已独立到 run_regression()，不再走这里。
         """
         sid = submission["id"]
         # ipynb 会被转成 .py 字符串，便于注入到 runner 模板中。
@@ -148,12 +152,7 @@ class Judge(JudgeBase):
             raise SubmissionFileError(str(e)) from e
         user_code = self.preprocess_user_code(submission, user_code)
 
-        injected = (
-            runner_code
-            .replace("__USER_CODE__", user_code)
-            .replace("__FACTOR_POOL_FILE__", self.factor_pool_path)
-            .replace("__FACTOR_REGRESSION_SCORE__", self.leaderboard_reg_csv)
-        )
+        injected = runner_code.replace("__USER_CODE__", user_code)
 
         runner = LocalProcessUserRunner(
             submission_id=sid,
@@ -231,15 +230,16 @@ class Judge(JudgeBase):
         # 绑定一次 submission_id，作用域内所有 self.log 自动带上
         with log_context(submission_id=sid):
             # 已经跑过的提交（产物已落盘）直接跳过，避免重启后重复执行用户代码。
-            # 排名由 on_tick -> score_sfa 统一刷新，跳过这里不影响榜单。
+            # 排名/回归/最终评分统一由 on_tick 刷新，跳过这里不影响榜单。
             if self.is_done(submission):
                 self.log.info("submission.skip", msg="已跑过，跳过重复执行")
                 return
 
             self.log.info("submission.start", msg="开始处理提交")
 
-            # 第一步：落盘原始文件 + 跑单因子分析。
-            # 失败按类型记录：user_error / timeout 是终态，env_error 会重试。
+            # on_submission 只负责「跑通用户代码 + 单因子分析」并把结果落盘保留；
+            # 截面排名（A 项）、因子池回归（B 项）与最终评分统一放到 on_tick 里做。
+            # 失败按类型记录：user_error / timeout / file_error 是终态，env_error 会重试。
             try:
                 with log_timer() as elapsed:
                     self.save_submission_files(submission)
@@ -290,34 +290,61 @@ class Judge(JudgeBase):
                 )
                 return
 
-            # 第二步：单因子横向排名，刷新公榜
-            try:
-                self.score_sfa()
-            except Exception as e:
-                self.log.error("sfa.failed", error=str(e), msg="单因子排名失败")
-
-            # 第三步：用排名靠前的因子拼出因子池，并对该提交跑因子池回归（产物落盘，供后续分析）。
-            try:
-                self.save_factor_pool()
-                if os.path.exists(self.factor_pool_path):
-                    with log_timer() as elapsed:
-                        self.run_user_code(submission, self.JUDGE_REG)
-                    self.log.info("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
-            except Exception as e:
-                self.log.error("regression.failed", error=str(e), msg="因子池回归失败")
+            # 跑通即可，等待 on_tick 统一做截面排名、因子池回归与最终评分。
+            self.log.info("submission.ready", msg="单因子分析结果已保留，等待 on_tick 统一评分")
 
     def on_tick(self) -> None:
-        """每个 tick 重排一次单因子公榜（增量刷新），并汇总各提交运行结果。"""
+        """每个 tick 统一评分：截面排名(A) -> 构建因子池 -> 因子池回归(B) -> 合成最终得分。
+
+        on_submission 只负责跑通用户代码并保留单因子分析结果，所有横向计算集中在此，
+        保证每轮都用「全体已跑通提交」做一致的截面排名与回归。
+        """
+        # 第一步：单因子横向排名（A 项），刷新 leaderboard_sfa.csv
         try:
             self.score_sfa()
-            self.log.info("tick.refreshed", msg="刷新单因子榜单")
         except Exception as e:
-            self.log.error("tick.failed", error=str(e), msg="刷新榜单失败")
+            self.log.error("sfa.failed", error=str(e), msg="单因子排名失败")
 
+        # 第二步：用排名靠前的因子拼出因子池，并跑一次因子池回归（产出 B 项所需的 ModelScore）
+        try:
+            self.save_factor_pool()
+            if os.path.exists(self.factor_pool_path):
+                self.run_regression()
+        except Exception as e:
+            self.log.error("regression.failed", error=str(e), msg="因子池回归失败")
+
+        # 第三步：合成最终得分 0.3*A + 0.7*B 并回写
+        try:
+            self.score_final()
+            self.log.info("tick.refreshed", msg="刷新单因子榜单并合成最终得分")
+        except Exception as e:
+            self.log.error("final.failed", error=str(e), msg="合成最终得分失败")
+
+        # 第四步：汇总各提交运行结果
         try:
             self.summarize_submissions()
         except Exception as e:
             self.log.error("summary.failed", error=str(e), msg="汇总提交运行结果失败")
+
+    def run_regression(self) -> None:
+        """跑一次因子池回归，产出 per_factor_scores（落盘到 leaderboard_reg_csv）。
+
+        JUDGE_REG 模板不依赖任何用户代码，只读取因子池做回归，因此作为独立脚本直接运行，
+        运行目录放在榜单目录下，与单因子分析的提交目录互不干扰。
+        """
+        runner = LocalProcessUserRunner(
+            submission_id="_regression",
+            files={"judge_runner.py": (
+                self.JUDGE_REG
+                .replace("__FACTOR_POOL_FILE__", self.factor_pool_path)
+                .replace("__FACTOR_REGRESSION_SCORE__", self.leaderboard_reg_csv)
+            )},
+            cmd=["python3", "-c", "from judge_runner import judge_runner_main; judge_runner_main()"],
+            runner_dir=os.path.join(self.leaderboard_dir, "regression"),
+        )
+        with log_timer() as elapsed:
+            runner.run(_raise=True)
+        self.log.info("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
 
     # ---- 运行结果汇总 -----------------------------------------------------
 
@@ -327,21 +354,30 @@ class Judge(JudgeBase):
         逐个提交收集：
             - 运行状态（sfa_status.json：status / finished_at / elapsed_ms / error）；
             - 单因子分析指标（factor_analyze.json：ic_mean / ic_ir / sharpe_ratio / stress_ic_ir 等）；
-            - 截面排名得分（leaderboard_sfa.csv 里的 score）；
+            - A 项截面排名得分（leaderboard_sfa.csv 的 score）与最终得分（leaderboard_final.csv 的 a/b/final）；
             - 各产物是否落盘（raw/process factor、回归得分）。
         汇总后按 score 倒序落盘，方便整体观察各提交的成败与表现。
         """
         submissions = self.alphathon_api.query_submissions(competition_id=self.competition_id)
         sub_by_id = {str(s["id"]): s for s in submissions}
 
-        # 截面排名得分，用于补充每个提交的最终单因子得分
-        sfa_scores: dict[str, float] = {}
+        # A 项（单因子截面排名得分）取自 leaderboard_sfa.csv 的 score 列
+        a_scores: dict[str, float] = {}
         if os.path.exists(self.leaderboard_sfa_csv):
             try:
                 sfa_df = pd.read_csv(self.leaderboard_sfa_csv)
-                sfa_scores = {str(r["id"]): r["score"] for _, r in sfa_df.iterrows()}
+                a_scores = {str(r["id"]): r.get("score") for _, r in sfa_df.iterrows()}
             except Exception as e:
                 self.log.error("summary.sfa_read_failed", error=str(e), msg="读取单因子榜单失败")
+
+        # 最终得分（a_score / b_score / final_score）取自 leaderboard_final.csv
+        final_scores: dict[str, dict] = {}
+        if os.path.exists(self.leaderboard_final_csv):
+            try:
+                final_df = pd.read_csv(self.leaderboard_final_csv)
+                final_scores = {str(r["id"]): r.to_dict() for _, r in final_df.iterrows()}
+            except Exception as e:
+                self.log.error("summary.final_read_failed", error=str(e), msg="读取最终得分榜单失败")
 
         rows = []
         if os.path.isdir(self.submission_dir):
@@ -375,8 +411,11 @@ class Judge(JudgeBase):
                     except Exception as e:
                         self.log.error("summary.fa_read_failed", submission_id=sid, error=str(e), msg="读取单因子分数结果失败")
 
-                # 截面排名得分
-                row["score"] = sfa_scores.get(sid)
+                # 截面排名得分：A 项、B 项与最终得分
+                final_row = final_scores.get(sid, {})
+                row["a_score"] = final_row.get("a_score", a_scores.get(sid))
+                row["b_score"] = final_row.get("b_score")
+                row["score"] = final_row.get("final_score", a_scores.get(sid))
 
                 # 产物是否落盘
                 row["has_raw_factor"] = os.path.exists(os.path.join(sub_dir, RAW_FACTOR_FILE))
@@ -391,7 +430,7 @@ class Judge(JudgeBase):
 
         df = pd.DataFrame(rows)
         # 指标统一转数值，便于排序与后续分析
-        for col in ["ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir", "score", "elapsed_ms"]:
+        for col in ["ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir", "a_score", "b_score", "score", "elapsed_ms"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         df = df.sort_values("score", ascending=False, na_position="last")
@@ -446,18 +485,16 @@ class Judge(JudgeBase):
         df.to_csv(self.leaderboard_sfa_csv, index=False)
         self.log.info("sfa.ranked", count=len(df), msg="单因子分数截面排名完成")
 
-        for _, row in df.iterrows():
-            score = row["score"]
-            # NaN != NaN：空分数统一记为 -2 失败
-            if score != score:
-                score = -2
-            self.alphathon_api.update_submission_score(
-                submission_id=row["id"],
-                **{self.score_field: float(score)},
-            )
+        # 注意：这里只计算并落盘 A 项（单因子得分），不直接回写 public_score。
+        # 最终分数 = 0.3*A + 0.7*B 由 score_final() 统一合成后回写，避免 A 覆盖最终分。
 
     def compute_sfa_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """计算单因子得分：四个指标各占 25%，按截面 rank 百分位加权。"""
+        """计算单因子得分 A 项：四个指标各占 25%，按截面 rank 百分位加权。
+
+        对应评分规则中的：
+            A_i = 0.25*Rank_IC_mean + 0.25*Rank_IC_IR + 0.25*Rank_SR + 0.25*Rank_Stress
+        四项均为在全体提交因子上做截面百分位排名（pct rank）后的结果，落在 [0, 1]。
+        """
         df["score"] = (
             df["ic_mean"].rank(pct=True) * 0.25
             + df["ic_ir"].rank(pct=True) * 0.25
@@ -465,6 +502,108 @@ class Judge(JudgeBase):
             + df["stress_ic_ir"].rank(pct=True) * 0.25
         )
         return df
+
+    # ---- B 项与最终得分 ---------------------------------------------------
+
+    def compute_b_scores(self) -> dict[str, float]:
+        """从因子池 Elastic Net 回归产物计算每个因子的 B 项得分。
+
+        评分规则：
+            B_i = 在全体被回归因子上做百分位归一化后的 ModelScore，落在 [0, 1]；
+            若该因子未被 Elastic Net 选中（权重恒为 0），则 B_i = 0。
+
+        回归产物（per_factor_scores）落盘在 leaderboard_reg_csv，列含
+        factor / model_score / selection_rate。其中 factor 即提交 id
+        （save_factor_pool 以 sid 作为因子列名）。
+
+        返回 sid -> B_i 的映射；回归尚未产出（文件不存在/无法解析）时返回空 dict，
+        调用方据此把 B_i 视为 0。
+        """
+        if not os.path.exists(self.leaderboard_reg_csv):
+            return {}
+
+        # JUDGE_REG 以 to_parquet 落盘（文件名虽为 .csv），优先按 parquet 读，兜底按 csv。
+        try:
+            reg = pd.read_parquet(self.leaderboard_reg_csv)
+        except Exception:
+            try:
+                reg = pd.read_csv(self.leaderboard_reg_csv)
+            except Exception as e:
+                self.log.error("reg.read_failed", error=str(e), msg="读取因子池回归得分失败")
+                return {}
+
+        if "factor" not in reg.columns or "model_score" not in reg.columns:
+            self.log.warning("reg.bad_columns", columns=list(reg.columns), msg="回归得分缺少 factor/model_score 列")
+            return {}
+
+        reg = reg.copy()
+        reg["model_score"] = pd.to_numeric(reg["model_score"], errors="coerce")
+
+        # 被选中的判定：ModelScore 为正即说明跨窗口存在非零权重；
+        # 若有 selection_rate 列则进一步要求其 > 0（权重并非恒为 0）。
+        selected = reg["model_score"] > 0
+        if "selection_rate" in reg.columns:
+            sel_rate = pd.to_numeric(reg["selection_rate"], errors="coerce")
+            selected = selected & (sel_rate > 0)
+
+        # 在全体被回归因子上做百分位归一化，未被选中的因子强制置 0。
+        reg["b_score"] = reg["model_score"].rank(pct=True)
+        reg.loc[~selected, "b_score"] = 0.0
+        reg["b_score"] = reg["b_score"].fillna(0.0)
+
+        return {str(f): float(b) for f, b in zip(reg["factor"], reg["b_score"])}
+
+    def score_final(self) -> None:
+        """合成并回写每个提交的最终得分：Score_i = 0.3 * A_i + 0.7 * B_i。
+
+        三类结果分别落盘，互不覆盖：
+            - 单因子分析（A 项）：leaderboard_sfa.csv，由 score_sfa() 产出；
+            - 因子池回归（B 项来源）：leaderboard_reg.csv，由 run_regression() 产出；
+            - 最终得分：leaderboard_final.csv，由本方法产出（id / a_score / b_score / final_score）。
+
+        - A_i：单因子截面排名得分，取自 leaderboard_sfa.csv 的 score 列；
+        - B_i：因子池回归的 ModelScore 百分位归一化（compute_b_scores），
+                回归尚未产出或该因子未入池时记 0，此时 Score_i = 0.3 * A_i，后续 tick 会自动补齐。
+        """
+        if not os.path.exists(self.leaderboard_sfa_csv):
+            self.log.warning("final.no_sfa", msg="缺少单因子得分，跳过最终合成")
+            return
+        try:
+            sfa_df = pd.read_csv(self.leaderboard_sfa_csv)
+        except Exception as e:
+            self.log.error("final.sfa_read_failed", error=str(e), msg="读取单因子榜单失败")
+            return
+        if "id" not in sfa_df.columns:
+            self.log.warning("final.no_id", msg="单因子榜单缺少 id 列")
+            return
+
+        b_scores = self.compute_b_scores()
+
+        # 最终得分单独成表，只保留评分相关列，不污染单因子分析榜单
+        final = pd.DataFrame({"id": sfa_df["id"]})
+        final["a_score"] = pd.to_numeric(sfa_df.get("score"), errors="coerce")
+        final["b_score"] = final["id"].astype(str).map(b_scores).astype(float).fillna(0.0)
+        final["final_score"] = 0.3 * final["a_score"] + 0.7 * final["b_score"]
+        final = final.sort_values("final_score", ascending=False, na_position="last")
+
+        os.makedirs(self.leaderboard_dir, exist_ok=True)
+        final.to_csv(self.leaderboard_final_csv, index=False)
+
+        for _, row in final.iterrows():
+            score = row["final_score"]
+            # NaN != NaN：A 缺失（如指标全空）时最终分也为 NaN，统一记为 -2 失败
+            if score != score:
+                score = -2
+            self.alphathon_api.update_submission_score(
+                submission_id=row["id"],
+                **{self.score_field: float(score)},
+            )
+        self.log.info(
+            "final.scored",
+            count=len(final),
+            with_b=int((final["b_score"] > 0).sum()),
+            msg="合成最终得分 0.3*A + 0.7*B 完成",
+        )
 
     # ---- 因子池构建 -------------------------------------------------------
 
