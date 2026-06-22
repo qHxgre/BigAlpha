@@ -5,15 +5,29 @@ for path in paths:
     if path not in sys.path:
         sys.path.append(path)
 
+import datetime
 import json
 import pandas as pd
 
-from judge.judgebase import JudgeBase, LocalProcessUserRunner, log_context, log_timer
+from judge.judgebase import JudgeBase, LocalProcessUserRunner, UserCodeRunError, log_context, log_timer
 
 RAW_FACTOR_FILE = "raw_factor.parquet"
 PROCESS_FACTOR_FILE = "process_factor.parquet"
 FACTOR_ANALYZE_FILE = "factor_analyze.json"
 FACTOR_REGRESSION_SCORE = "factor_regression_score.parquet"
+# 每个提交单因子分析的运行状态记录文件：无论成功/失败都会落盘一份，
+# is_done() 据此判断该提交是否已跑过，避免进程重启后重复执行（尤其是注定失败的提交）。
+SFA_STATUS_FILE = "sfa_status.json"
+
+# 运行状态取值。失败再细分三类，便于排查与决定是否重试：
+STATUS_SUCCESS = "success"          # 跑通
+STATUS_USER_ERROR = "user_error"    # 用户代码本身报错（子进程非 0 退出）
+STATUS_TIMEOUT = "timeout"          # 运行超时（被 judge kill）
+STATUS_ENV_ERROR = "env_error"      # 评测环境自身问题（拉取/落盘/注入失败等）
+
+# 这些终态视为「已完成、不再重跑」：成功是真完成，用户报错/超时再跑也是同样结果。
+# 唯独 env_error 不在此列——多半是临时性问题，重启/下个 tick 应当重试。
+TERMINAL_STATUSES = {STATUS_SUCCESS, STATUS_USER_ERROR, STATUS_TIMEOUT}
 
 # 评测分两步：先对每个提交跑「单因子分析」，再用入选的优质因子拼成「因子池」做回归。
 # 占位符（__USER_CODE__ / __XXX_FILE__）在注入时被替换成真实内容/路径。
@@ -142,14 +156,58 @@ class Judge(JudgeBase):
 
     # ---- 主流程 -----------------------------------------------------------
 
-    def is_done(self, submission: dict) -> bool:
-        """判断该提交是否已经跑过单因子分析。
+    def sfa_status_path(self, submission: dict) -> str:
+        """该提交单因子分析状态文件的绝对路径。"""
+        return os.path.join(self.submission_path(submission), SFA_STATUS_FILE)
 
-        以产物文件 factor_analyze.json 是否存在为准：进程重启后内存里的
-        dispatched 集合会清空，靠它判断哪些提交不必再重跑用户代码。
+    def write_sfa_status(self, submission: dict, status: str, **extra) -> None:
+        """记录该提交单因子分析的运行结果（成功/失败都写）。
+
+        status 取 STATUS_* 之一（success / user_error / timeout / env_error）。
+        额外字段（如 elapsed_ms、error、return_code）一并落盘，方便排查；
+        写文件失败不应影响主流程，故吞掉异常只记一行日志。
         """
-        fa_path = os.path.join(self.submission_path(submission), FACTOR_ANALYZE_FILE)
-        return os.path.exists(fa_path)
+        record = {
+            "submission_id": str(submission["id"]),
+            "status": status,
+            "finished_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            **extra,
+        }
+        try:
+            os.makedirs(self.submission_path(submission), exist_ok=True)
+            with open(self.sfa_status_path(submission), "w", encoding="utf-8") as writer:
+                json.dump(record, writer, ensure_ascii=False, default=str)
+        except Exception as e:
+            self.log.error("submission.status_write_failed", error=str(e), msg="写入运行状态文件失败")
+
+    def read_sfa_status(self, submission: dict) -> dict | None:
+        """读取该提交的状态文件，不存在或读不出时返回 None。"""
+        path = self.sfa_status_path(submission)
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, encoding="utf-8") as reader:
+                return json.load(reader)
+        except Exception as e:
+            self.log.error("submission.status_read_failed", error=str(e), msg="读取运行状态文件失败")
+            return None
+
+    def is_done(self, submission: dict) -> bool:
+        """判断该提交是否已到达终态，无需再跑。
+
+        以状态文件 sfa_status.json 的 status 为准：
+            - success / user_error / timeout 属于终态（重跑也是同样结果），跳过；
+            - env_error（评测环境自身问题）不算终态，留待重试。
+        进程重启后内存里的 dispatched 集合会清空，靠这个文件判断哪些提交不必重跑。
+
+        兼容旧数据：状态文件机制之前跑成功的提交只有 factor_analyze.json、没有状态文件，
+        这类也视为已完成，避免上线后把历史成功提交全部重跑一遍。
+        """
+        status = self.read_sfa_status(submission)
+        if status is not None:
+            return status.get("status") in TERMINAL_STATUSES
+        legacy_fa = os.path.join(self.submission_path(submission), FACTOR_ANALYZE_FILE)
+        return os.path.exists(legacy_fa)
 
     def on_submission(self, submission: dict) -> None:
         sid = submission["id"]
@@ -163,22 +221,42 @@ class Judge(JudgeBase):
 
             self.log.info("submission.start", msg="开始处理提交")
 
-            # 第一步：落盘原始文件 + 跑单因子分析。跑不通直接记 -2 并返回。
+            # 第一步：落盘原始文件 + 跑单因子分析。
+            # 失败按类型记录：user_error / timeout 是终态，env_error 会重试。
             try:
                 with log_timer() as elapsed:
                     self.save_submission_files(submission)
                     self.run_user_code(submission, self.JUDGE_SFA)
                 self.log.info("submission.sfa_done", elapsed_ms=elapsed(), msg="单因子分析完成")
-            except Exception as e:
-                # -2 表示用户代码运行失败；err_msg 会回显在前端的提交详情里。
-                # 这类失败（缺 ipynb、用户代码报错等）属于预期常见情况，用 error 只记一行，
-                # 不打完整 Traceback，避免日志刷屏。
-                self.log.error("submission.sfa_failed", error=str(e), msg="单因子分析运行失败")
+                self.write_sfa_status(submission, STATUS_SUCCESS, elapsed_ms=elapsed())
+            except UserCodeRunError as e:
+                # 用户代码子进程异常退出，reason 区分「用户报错」与「超时」。两者都是终态。
+                status = STATUS_TIMEOUT if e.reason == "timeout" else STATUS_USER_ERROR
+                err_msg = (
+                    "timeout: your code exceeded the time limit"
+                    if status == STATUS_TIMEOUT
+                    else "run error: check your code / get code templates in [code] tab"
+                )
+                self.log.error("submission.sfa_failed", status=status, error=str(e), msg="单因子分析运行失败")
+                self.write_sfa_status(submission, status, error=str(e), return_code=e.return_code)
                 self.alphathon_api.update_submission_score(
                     submission_id=sid,
                     **{
                         self.score_field: -2,
-                        self.score_data_field: {"err_msg": "run error: check your code / get code templates in [code] tab"},
+                        self.score_data_field: {"err_msg": err_msg},
+                    },
+                )
+                return
+            except Exception as e:
+                # 其余异常（拉取 ipynb 失败、落盘失败、注入失败等）归类为评测环境问题。
+                # 这类多半是临时性的，状态记为 env_error（非终态），下个 tick / 重启后会重试。
+                self.log.error("submission.sfa_failed", status=STATUS_ENV_ERROR, error=str(e), msg="评测环境异常，稍后重试")
+                self.write_sfa_status(submission, STATUS_ENV_ERROR, error=str(e))
+                self.alphathon_api.update_submission_score(
+                    submission_id=sid,
+                    **{
+                        self.score_field: -2,
+                        self.score_data_field: {"err_msg": "evaluation system error, will retry automatically"},
                     },
                 )
                 return

@@ -13,7 +13,7 @@ import structlog
 
 from .api import AlphathonAPI
 from .paths import FILE_DIR
-from .runner import K8SPodUserRunner, LocalProcessUserRunner, UserCodeRunner
+from .runner import K8SPodUserRunner, LocalProcessUserRunner, UserCodeRunError, UserCodeRunner
 
 logger = structlog.get_logger()
 
@@ -46,6 +46,7 @@ __all__ = [
     "JudgeBase",
     "K8SPodUserRunner",
     "LocalProcessUserRunner",
+    "UserCodeRunError",
     "UserCodeRunner",
 ]
 

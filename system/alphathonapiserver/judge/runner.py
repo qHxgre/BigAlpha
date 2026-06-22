@@ -11,6 +11,23 @@ from .paths import FILE_DIR
 logger = structlog.get_logger()
 
 
+class UserCodeRunError(Exception):
+    """用户代码子进程异常退出。
+
+    reason 用于上层归类失败类型：
+        - "timeout":   运行超时（被 judge kill）
+        - "user_error": 用户代码本身报错（子进程非 0 退出）
+    其余「评测环境自身问题」（拉取文件失败、注入失败等）不在这里抛，
+    会以普通 Exception 的形式冒泡，由上层归类为环境问题。
+    """
+
+    def __init__(self, reason: str, return_code=None, message: str = "") -> None:
+        self.reason = reason
+        self.return_code = return_code
+        super().__init__(message or f"{reason} (return_code={return_code})")
+
+
+
 class UserCodeRunner:
     def __init__(self, submission_id, files: dict, cmd: list, runner_dir: str = None) -> None:
         self.submission_id = submission_id
@@ -72,6 +89,7 @@ class LocalProcessUserRunner(UserCodeRunner):
         drain_thread = threading.Thread(target=_drain, daemon=True)
         drain_thread.start()
 
+        timed_out = False
         while process.poll() is None:
             if time.time() - start > timeout:
                 logger.warning(
@@ -79,18 +97,35 @@ class LocalProcessUserRunner(UserCodeRunner):
                     submission_id=self.submission_id,
                     elapsed=round(time.time() - start, 1),
                 )
+                timed_out = True
                 process.kill()
                 break
             time.sleep(5)
 
         process.wait()
         drain_thread.join(timeout=30)
+        elapsed = round(time.time() - start, 1)
         logger.info(
             "runner.finished",
             submission_id=self.submission_id,
             return_code=process.returncode,
-            elapsed=round(time.time() - start, 1),
+            elapsed=elapsed,
         )
+
+        # 超时：被 judge 主动 kill，归类为 timeout。
+        if timed_out:
+            raise UserCodeRunError(
+                "timeout",
+                return_code=process.returncode,
+                message=f"user code timed out after {elapsed}s",
+            )
+        # 非 0 退出：用户代码本身报错（异常、sys.exit 非 0 等），归类为 user_error。
+        if process.returncode != 0:
+            raise UserCodeRunError(
+                "user_error",
+                return_code=process.returncode,
+                message=f"user code exited with code {process.returncode}",
+            )
         return process.returncode
 
 
