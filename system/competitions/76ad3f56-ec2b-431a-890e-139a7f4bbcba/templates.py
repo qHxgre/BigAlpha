@@ -60,8 +60,10 @@ def judge_runner_main():
         show=True,
     )
 
-    # 将 per_factor_scores 数据落盘，
-    result['factor_regression']['per_factor_scores'].to_parquet("__FACTOR_REGRESSION_SCORE__")
+    # 将 per_factor_scores 落盘为 CSV（utf-8-sig 带 BOM，Excel 打开中文不乱码）
+    result['factor_regression']['per_factor_scores'].to_csv(
+        "__FACTOR_REGRESSION_SCORE__", index=False, encoding="utf-8-sig"
+    )
 '''
 
 

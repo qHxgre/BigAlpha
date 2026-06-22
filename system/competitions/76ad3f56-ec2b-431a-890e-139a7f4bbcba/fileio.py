@@ -32,7 +32,9 @@ def read_csv(path: str, logger=None) -> pd.DataFrame | None:
     if not os.path.exists(path):
         return None
     try:
-        return pd.read_csv(path)
+        # utf-8-sig 兼容带 BOM（to_csv encoding=utf-8-sig 产出）与不带 BOM 的 csv，
+        # 避免 BOM 残留在首列列名上（如 ﻿factor）导致后续按列名匹配失败。
+        return pd.read_csv(path, encoding="utf-8-sig")
     except Exception as e:
         (logger or _logger).error("read.csv_failed", path=path, error=str(e), msg="读取 csv 文件失败")
         return None

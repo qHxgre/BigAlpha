@@ -111,12 +111,12 @@ class RegressionMixin:
         if not os.path.exists(self.leaderboard_reg_csv):
             return {}
 
-        # JUDGE_REG 以 to_parquet 落盘（文件名虽为 .csv），优先按 parquet 读，兜底按 csv。
-        try:
-            reg = pd.read_parquet(self.leaderboard_reg_csv)
-        except Exception:
-            reg = read_csv(self.leaderboard_reg_csv, logger=self.log)
-            if reg is None:
+        # JUDGE_REG 以 to_csv 落盘，优先按 csv 读，兜底按 parquet（兼容历史旧文件）。
+        reg = read_csv(self.leaderboard_reg_csv, logger=self.log)
+        if reg is None:
+            try:
+                reg = pd.read_parquet(self.leaderboard_reg_csv)
+            except Exception:
                 return {}
 
         b_scores = scoring.compute_b_scores(reg)
