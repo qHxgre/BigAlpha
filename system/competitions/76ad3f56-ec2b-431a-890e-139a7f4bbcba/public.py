@@ -26,15 +26,15 @@ class Judge(BigAlphaJudge):
         "bar1m": "bigalpha_2026_stock_bar1m_test",
         "financial": "bigalpha_2026_financial_test",
     }
-    DATE_START = "2025-01-01 00:00:00"
-    DATE_END = "2025-12-31 23:59:59"
+    DATE_START = "2025-03-01 00:00:00"
+    DATE_END = "2025-11-30 23:59:59"
 
     # 自适应评估间隔：Elastic Net 计算量随全局因子数增长，间隔按上一轮实测耗时自调。
     #     t_next = max(k * t_last_run, t_min)，k = 1.5，t_min = 1 小时。
     # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。
     adaptive_interval = True
     tick_safety_factor = 1.5
-    tick_min_interval = 3600
+    tick_min_interval = 60
 
     # 只跑部分提交（调试 / 复测用）：填上后整条流水线（跑用户代码 + 排名 + 回归 + 汇总）
     # 只处理这几个 id，留空则跑全量。MAX_PAGES 可选，限制拉取页数。
