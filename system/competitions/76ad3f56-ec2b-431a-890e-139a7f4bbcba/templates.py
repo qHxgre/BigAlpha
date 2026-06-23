@@ -7,10 +7,17 @@ public.py / private.py 不必再各写一份模板。
 
 占位符约定（注入时被替换）：
     __USER_CODE__          用户提交的代码
-    __DATASET__            因子计算所用数据集名
+    __DATASETS__           因子计算所用数据集表名映射（dict，注入成 Python 字面量，非字符串）
     __DATE_START__ / __DATE_END__   数据时间区间
     __RAW_FACTOR_FILE__ / __PROCESS_FACTOR_FILE__ / __FACTOR_ANALYZE_FILE__   单因子分析产物文件名
     __FACTOR_POOL_FILE__ / __FACTOR_REGRESSION_SCORE__                        回归阶段读入/产出文件
+
+关于 __DATASETS__：
+    一个因子可能要同时用到多张表（如分钟 K 线 + 财务数据合成），且各表在 public / private
+    阶段是不同的物理表（带不同后缀）。因此不再注入单个表名，而是注入一个 {逻辑名: 物理表名}
+    的 dict，由评测系统按阶段填好物理表名，用户代码只认逻辑名、从 dict 里取实际表名拼 SQL。
+    注入时用 repr() 渲染成 Python 字面量（如 {'bar1m': '..._test', 'financial': '..._test'}），
+    所以模板里 main(__DATASETS__, ...) 不加引号。
 """
 from __future__ import annotations
 
@@ -22,7 +29,7 @@ def judge_runner_main():
     import json
     import pandas as pd
 
-    factor_data = main("__DATASET__", "__DATE_START__", "__DATE_END__")
+    factor_data = main(__DATASETS__, "__DATE_START__", "__DATE_END__")
 
     from bigmodule import M
     result = M.bigalpha_factorminer._latest(
@@ -69,20 +76,24 @@ def judge_runner_main():
 
 def build_sfa_runner(
     *,
-    dataset: str,
+    datasets: dict[str, str],
     date_start: str,
     date_end: str,
     raw_factor_file: str,
     process_factor_file: str,
     factor_analyze_file: str,
 ) -> str:
-    """注入数据集/日期/产物文件名，返回单因子分析 runner 模板。
+    """注入数据集映射/日期/产物文件名，返回单因子分析 runner 模板。
+
+    datasets 是 {逻辑名: 物理表名} 的 dict（如 {"bar1m": "..._test", "financial": "..._test"}），
+    用 repr() 渲染成 Python 字面量注入到 main(__DATASETS__, ...) 处（不带引号），
+    用户代码以单个 dict 入参收下、按逻辑名取物理表名。
 
     注入完仍保留 __USER_CODE__ 占位符，由调用方在拿到用户代码后再替换。
     """
     return (
         _SFA_TEMPLATE
-        .replace("__DATASET__", dataset)
+        .replace("__DATASETS__", repr(datasets))
         .replace("__DATE_START__", date_start)
         .replace("__DATE_END__", date_end)
         .replace("__RAW_FACTOR_FILE__", raw_factor_file)

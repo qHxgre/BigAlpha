@@ -20,8 +20,13 @@ class Judge(BigAlphaJudge):
 
     mode = "private"
 
-    # TODO: 换成私榜数据集与对应的数据时间区间
-    DATASET = "bigalpha_factor_2026_stock_bar1m_private"
+    # TODO: 换成私榜各表的物理表名与对应的数据时间区间
+    # DATASETS：{逻辑名: 物理表名}，逻辑名须与公榜一致（"bar1m"/"financial"），
+    # 物理表名换成私榜带后缀的版本，使用户代码无需改动即可在私榜运行。
+    DATASETS = {
+        "bar1m": "bigalpha_2026_stock_bar1m_private",
+        "financial": "bigalpha_2026_financial_private",
+    }
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = "2025-12-31 23:59:59"
 

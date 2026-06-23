@@ -21,7 +21,11 @@ class Judge(BigAlphaJudge):
     mode = "public"
 
     # 公榜数据集与数据时间区间
-    DATASET = "bigalpha_factor_2026_stock_bar1m"
+    # DATASETS：{逻辑名: 物理表名}，用户代码用逻辑名（"bar1m"/"financial"）取物理表名拼 SQL。
+    DATASETS = {
+        "bar1m": "bigalpha_2026_stock_bar1m_test",
+        "financial": "bigalpha_2026_financial_test",
+    }
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = "2025-12-31 23:59:59"
 
