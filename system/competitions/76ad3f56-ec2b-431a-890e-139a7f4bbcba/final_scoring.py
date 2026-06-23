@@ -62,7 +62,11 @@ class ScoringMixin:
                 score = -2
             self.alphathon_api.update_submission_score(
                 submission_id=row["id"],
-                **{self.score_field: float(score)},
+                **{
+                    self.score_field: float(score),
+                    self.score_data_field: row,
+                },
+
             )
         self.log.info(
             "final.scored",
