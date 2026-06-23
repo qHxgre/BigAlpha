@@ -57,7 +57,7 @@ class Bigalpha2026FinancialBuilder(BaseBuilder):
     def build(self) -> pd.DataFrame:
         # 读取数据
         t0 = datetime.now()
-        df = self.get_data(self.start_date, self.end_date)
+        df = self.get_data()
         t1 = datetime.now()
         print(f"获取数据耗时: {round((t1-t0).total_seconds(), 4)} 秒")
 

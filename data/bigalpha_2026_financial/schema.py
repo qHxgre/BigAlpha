@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from pydantic import Field
-from warehouse.builder.base import BaseSchema
+from base import BaseSchema
 
 class BigAlpha2026FinancialSchema(BaseSchema):
     """清洗后的财务数据"""
