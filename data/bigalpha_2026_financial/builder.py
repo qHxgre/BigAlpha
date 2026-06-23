@@ -13,7 +13,7 @@ class Bigalpha2026FinancialBuilder(BaseBuilder):
     indexes = ["date"]
     schema = BigAlpha2026FinancialSchema
 
-    def __init__(self, start_date: str, end_date: str) -> None:
+    def __init__(self, start_date: str, end_date: str, suffix: str=None) -> None:
         self.start_date = start_date
         self.end_date = end_date
 
@@ -24,6 +24,9 @@ class Bigalpha2026FinancialBuilder(BaseBuilder):
         WHERE instrument='000852.SH'
         AND date>'2019-01-01'
         """).df()['member_code'].unique().tolist()
+
+        if suffix is not None:
+            self.datasource_id = f"{self.datasource_id}_{suffix}"
 
         print(f"初始化！{self.datasource_id}, 时间周期: {self.start_date}, {self.end_date}")
 
