@@ -30,6 +30,14 @@ class Judge(BigAlphaJudge):
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = "2025-12-31 23:59:59"
 
+    # 只跑部分提交（调试 / 复测用）：在私榜默认约束（只跑入围 selected_for_private 的提交）
+    # 之上再叠加 id 子集过滤；留空则跑全部入围提交。MAX_PAGES 可选，限制拉取页数。
+    # SUBMISSION_IDS = [
+    #     "00c316c9-b866-40a6-ad8d-1034865d24c5",
+    #     # "e48c7e3d-1426-439e-a1ab-b5e53ff8b999",
+    # ]
+    # MAX_PAGES = 1
+
 
 if __name__ == "__main__":
     Judge().run()
