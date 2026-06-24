@@ -133,7 +133,7 @@ class SFAMixin:
             # 已经跑过的提交（产物已落盘）直接跳过，避免重启后重复执行用户代码。
             # 排名/回归/最终评分统一由 on_tick 刷新，跳过这里不影响榜单。
             if self.is_done(submission):
-                self.log.info("submission.skip", msg="已跑过，跳过重复执行")
+                self.log.debug("submission.skip", msg="已跑过，跳过重复执行")
                 return
 
             self.log.info("submission.start", msg="开始处理提交")
@@ -163,11 +163,11 @@ class SFAMixin:
                 return
 
             # 跑通即可，等待 on_tick 统一做截面排名、因子池回归与最终评分。
-            self.log.info("submission.ready", msg="单因子分析结果已保留，等待 on_tick 统一评分")
+            # submission.sfa_done 已记录成功，这里不再重复一行。
 
     # ---- 单因子排名 (A) ---------------------------------------------------
 
-    def score_sfa(self) -> None:
+    def score_sfa(self) -> int:
         """单因子分析横向排名。
 
         参考基类 rank_score()，区别：
@@ -176,6 +176,8 @@ class SFAMixin:
 
         注意：这里只计算并落盘 A 项（单因子得分），不直接回写 public_score。
         最终分数 = 0.3*A + 0.7*B 由 score_final() 统一合成后回写，避免 A 覆盖最终分。
+
+        返回参与排名的因子数（供 on_tick 汇总成一行日志）；无数据时返回 0。
         """
         rows = []
         for sid, _submission, sub_dir in self._iter_submission_dirs():
@@ -188,7 +190,7 @@ class SFAMixin:
 
         if not rows:
             self.log.warning("sfa.empty", msg="没有任何单因子分数结果")
-            return
+            return 0
 
         df = pd.DataFrame(rows)
         # 指标可能因 json 序列化变成字符串/缺失，统一转数值，rank 会自动忽略 NaN
@@ -199,4 +201,5 @@ class SFAMixin:
 
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.leaderboard_sfa_csv, index=False)
-        self.log.info("sfa.ranked", count=len(df), msg="单因子分数截面排名完成")
+        self.log.debug("sfa.ranked", count=len(df), msg="单因子分数截面排名完成")
+        return len(df)

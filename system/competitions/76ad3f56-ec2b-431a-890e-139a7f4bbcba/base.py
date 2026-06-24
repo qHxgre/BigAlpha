@@ -97,12 +97,16 @@ class BigAlphaJudgeBase(JudgeBase):
             finally:
                 last_run_seconds = time.perf_counter() - start
                 self.tick_interval = self.next_tick_interval(last_run_seconds)
-                self.log.info(
+                self.log.debug(
                     "tick.adaptive_interval",
                     tick_interval=self.tick_interval,
                     last_run_seconds=round(last_run_seconds, 1),
                     msg="按上一轮评估耗时自适应下一轮间隔",
                 )
+                # 间隔已按本轮实测耗时算好，此时输出汇总行，next= 才是真实的下一轮间隔。
+                emit = getattr(self, "_emit_tick_summary", None)
+                if emit is not None:
+                    emit()
 
         self.on_tick = timed_on_tick  # type: ignore[assignment]
 

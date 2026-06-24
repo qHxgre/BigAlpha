@@ -56,6 +56,12 @@ def setup_judge_logging(log_file: str) -> None:
 
     终端用彩色渲染方便实时观察，文件里落盘成结构化文本方便后续查看。
 
+    分级策略（终端清爽、文件完整）：
+        - 终端 handler 只收 INFO 及以上：每个 tick 一行汇总 + 单提交关键行 + 告警/错误；
+        - 文件 handler 收 DEBUG 及以上：各阶段明细（sfa.ranked / pool.saved / tick.start...）
+          全部落盘，排查问题时翻文件即可，终端不被刷屏。
+        - root logger 设到 DEBUG，让 DEBUG 记录能流到文件 handler；终端由 handler 级别过滤。
+
     文件采用「按天滚动 + 追加 + 永不删除」策略：
         - 当天写入 judge-{mode}.log，每天零点自动切到新文件；
         - 昨天的日志归档成 judge-{mode}.log.YYYY-MM-DD，历史全部保留不删除；
@@ -99,6 +105,8 @@ def setup_judge_logging(log_file: str) -> None:
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(console_formatter)
+    # 终端只收 INFO 及以上，DEBUG 明细只进文件，避免刷屏
+    console_handler.setLevel(logging.INFO)
 
     # 按天滚动：when="midnight" 每天零点切文件；backupCount=0 表示不删除任何历史归档。
     # 默认 mode="a"（追加），中断重启后当天日志接着写。归档文件名形如 judge-public.log.2026-06-14。
@@ -110,6 +118,8 @@ def setup_judge_logging(log_file: str) -> None:
     )
     file_handler.suffix = "%Y-%m-%d"
     file_handler.setFormatter(file_formatter)
+    # 文件收 DEBUG 及以上，保留完整明细方便排查
+    file_handler.setLevel(logging.DEBUG)
 
     root_logger = logging.getLogger()
     # 重复调用时先清掉旧 handler，避免日志被打印多份
@@ -117,7 +127,8 @@ def setup_judge_logging(log_file: str) -> None:
         root_logger.removeHandler(handler)
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
-    root_logger.setLevel(logging.INFO)
+    # root 设到 DEBUG，让 DEBUG 流到文件 handler；终端是否显示由 console_handler 级别决定
+    root_logger.setLevel(logging.DEBUG)
 
     # 第三方 HTTP 库默认会在 INFO 级别打印每一次正常请求（200 OK），噪音很大。
     # 抬到 WARNING，只有请求失败（4xx/5xx/超时）时才输出。
@@ -148,7 +159,7 @@ class JudgeBase:
     competition_id: str = ""
     mode: str = "public"  # public / private
     tick_interval: int = 60
-    heartbeat_interval: int = 15  # 心跳间隔（秒），证明评测器仍在运行
+    heartbeat_interval: int = 60  # 心跳间隔（秒），证明评测器仍在运行（仅在有任务在跑时打）
     max_workers: int = 5
     JUDGE_RUNNER_CODE: str = ""
 
@@ -248,7 +259,7 @@ class JudgeBase:
             self.alphathon_api.get_submission_file(
                 sid, file_id, file_info, save_to=os.path.join(dst_dir, file_name)
             )
-        self.log.info("submission.files_saved", count=len(files), msg="下载并保存提交原始文件")
+        self.log.debug("submission.files_saved", count=len(files), msg="下载并保存提交原始文件")
         return dst_dir
 
     def run_user_code(self, submission: dict) -> LocalProcessUserRunner:
@@ -301,7 +312,7 @@ class JudgeBase:
     def rank_score(self) -> None:
         # 拉取本场比赛的所有提交，按 raw_result 横向计算名次/分数
         all_submissions = self.alphathon_api.query_submissions(competition_id=self.competition_id)
-        self.log.info("rank.fetched", count=len(all_submissions))
+        self.log.debug("rank.fetched", count=len(all_submissions))
 
         raw_results = []
         for x in all_submissions:
@@ -321,7 +332,7 @@ class JudgeBase:
         # compute_score 由子类实现，必须返回带 score 列的 DataFrame
         df = self.compute_score(df)
         df.to_csv(self.leaderboard_csv, index=False)
-        self.log.info("rank.done", count=len(df), msg="榜单重排完成")
+        self.log.debug("rank.done", count=len(df), msg="榜单重排完成")
 
         for _, row in df.iterrows():
             score = row.score
@@ -338,13 +349,16 @@ class JudgeBase:
         dispatched: set[str] = set()  # 本进程已派发过的提交，避免重复入队
         futures: dict[str, concurrent.futures.Future] = {}  # 仍在运行/未回收的 future
 
-        # 心跳线程：独立于主循环，按 heartbeat_interval 周期性打印一条 alive 日志，
-        # 证明评测系统仍在运行（即便某个 tick 正卡在拉取/排名上也能看到心跳）。
+        # 心跳线程：独立于主循环，按 heartbeat_interval 周期性打印一条 alive 日志。
+        # 只在有任务在跑（len(futures) > 0）时才打：tick 一行汇总已能证明系统存活，
+        # 空闲 sleep 期间（尤其 adaptive 模式下间隔被拉到很长）不再刷屏。
         stop_heartbeat = threading.Event()
         beat = {"n": 0}
 
         def _heartbeat() -> None:
             while not stop_heartbeat.wait(self.heartbeat_interval):
+                if not futures:
+                    continue
                 beat["n"] += 1
                 self.log.info(
                     "judge.heartbeat",
@@ -359,7 +373,7 @@ class JudgeBase:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers)
         try:
             while True:
-                self.log.info("tick.start")
+                self.log.debug("tick.start")
                 submissions = self.alphathon_api.query_submissions(
                     competition_id=self.competition_id,
                     constraints=self.query_constraints(),
@@ -375,11 +389,11 @@ class JudgeBase:
                 # 回收本轮已经跑完的任务
                 for sid in [sid for sid, f in futures.items() if f.done()]:
                     futures.pop(sid, None)
-                self.log.info("tick.status", pending=len(pending), running=len(futures))
+                self.log.debug("tick.status", pending=len(pending), running=len(futures))
 
                 # 即使本轮没有新提交，也要走一次 on_tick（默认重排榜单）
                 self.on_tick()
-                self.log.info("tick.sleep", seconds=self.tick_interval)
+                self.log.debug("tick.sleep", seconds=self.tick_interval)
                 time.sleep(self.tick_interval)
         finally:
             # 进程退出时停掉心跳线程，并不等正在跑的子任务，直接尝试取消未开始的 future

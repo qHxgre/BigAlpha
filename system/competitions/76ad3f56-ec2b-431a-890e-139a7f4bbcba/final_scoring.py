@@ -25,7 +25,7 @@ class ScoringMixin:
 
     # ---- 最终得分 ---------------------------------------------------------
 
-    def score_final(self) -> None:
+    def score_final(self) -> dict:
         """合成并回写每个提交的最终得分：Score_i = 0.3 * A_i + 0.7 * B_i。
 
         三类结果分别落盘，互不覆盖：
@@ -36,16 +36,18 @@ class ScoringMixin:
         - A_i：单因子截面排名得分，取自 leaderboard_sfa.csv 的 score 列；
         - B_i：因子池回归的 ModelScore 百分位归一化（load_b_scores），
                 回归尚未产出或该因子未入池时记 0，此时 Score_i = 0.3 * A_i，后续 tick 会自动补齐。
+
+        返回 {"count": 合成总数, "with_b": 有 B 项得分的因子数}（供 on_tick 汇总成一行日志）。
         """
         if not os.path.exists(self.leaderboard_sfa_csv):
             self.log.warning("final.no_sfa", msg="缺少单因子得分，跳过最终合成")
-            return
+            return {"count": 0, "with_b": 0}
         sfa_df = read_csv(self.leaderboard_sfa_csv, logger=self.log)
         if sfa_df is None:
-            return
+            return {"count": 0, "with_b": 0}
         if "id" not in sfa_df.columns:
             self.log.warning("final.no_id", msg="单因子榜单缺少 id 列")
-            return
+            return {"count": 0, "with_b": 0}
 
         b_scores = self.load_b_scores()
 
@@ -78,12 +80,13 @@ class ScoringMixin:
                         self.score_data_field: row,
                     },
                 )
-        self.log.info(
+        self.log.debug(
             "final.scored",
             count=len(final),
             with_b=int((final["b_score"] > 0).sum()),
             msg="合成最终得分 0.3*A + 0.7*B 完成",
         )
+        return {"count": len(final), "with_b": int((final["b_score"] > 0).sum())}
 
     # ---- 运行结果汇总 -----------------------------------------------------
 
@@ -155,4 +158,4 @@ class ScoringMixin:
 
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.submissions_summary_csv, index=False)
-        self.log.info("summary.saved", count=len(df), path=self.submissions_summary_csv, msg="汇总提交运行结果完成")
+        self.log.debug("summary.saved", count=len(df), msg="汇总提交运行结果完成")

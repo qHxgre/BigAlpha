@@ -22,12 +22,14 @@ class RegressionMixin:
 
     # ---- 因子池构建 -------------------------------------------------------
 
-    def save_factor_pool(self) -> None:
+    def save_factor_pool(self) -> int:
         """汇总优质因子，构建因子池 parquet。
 
         1. 遍历 submissions 目录读取处理后因子文件，因子名取该提交的 id；
         2. 按队伍分组，每队保留单因子得分排名前 FACTOR_POOL_TOP_N 的因子；
         3. 全部因子按 date / instrument 做 outer merge，落盘为 parquet。
+
+        返回入池因子数（供 on_tick 汇总成一行日志）；未落盘时返回 0。
         """
         # 读取单因子得分，用于每个队伍内部的因子取舍
         sfa_scores = csv_to_map(read_csv(self.leaderboard_sfa_csv, logger=self.log), "id", "score")
@@ -47,7 +49,7 @@ class RegressionMixin:
 
         if not records:
             self.log.warning("pool.empty", msg="没有任何因子数据")
-            return
+            return 0
 
         meta = pd.DataFrame(records)
         # 每个队伍内按单因子得分倒序，保留前 N（缺失得分排最后）
@@ -74,19 +76,22 @@ class RegressionMixin:
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
             self.log.warning("pool.too_few", count=len(factor_cols), msg="因子池数量太少，无法进行回归")
-            return
+            return len(factor_cols)
 
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
         pool.to_parquet(self.factor_pool_path)
-        self.log.info("pool.saved", factors=len(factor_cols), msg="保存因子池数据")
+        self.log.debug("pool.saved", factors=len(factor_cols), msg="保存因子池数据")
+        return len(factor_cols)
 
     # ---- 因子池回归 -------------------------------------------------------
 
-    def run_regression(self) -> None:
+    def run_regression(self) -> float:
         """跑一次因子池回归，产出 per_factor_scores（落盘到 leaderboard_reg_csv）。
 
         JUDGE_REG 模板不依赖任何用户代码，只读取因子池做回归，因此作为独立脚本直接运行，
         运行目录放在榜单目录下，与单因子分析的提交目录互不干扰。
+
+        返回回归耗时（秒，供 on_tick 汇总成一行日志）。
         """
         runner = LocalProcessUserRunner(
             submission_id="_regression",
@@ -96,7 +101,8 @@ class RegressionMixin:
         )
         with log_timer() as elapsed:
             runner.run(_raise=True)
-        self.log.info("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
+        self.log.debug("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
+        return elapsed() / 1000.0
 
     # ---- B 项得分 ---------------------------------------------------------
 
