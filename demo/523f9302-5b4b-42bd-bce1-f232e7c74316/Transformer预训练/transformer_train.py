@@ -5,7 +5,11 @@
   1. 沉淀 **训练与推理共用** 的定义 (配置 / 模型结构 / 数据构建), 作为单一事实来源;
      配套 notebook 在推理时直接 `from transformer_train import ...` 复用, 避免两边漂移。
   2. 提供 `train_and_save(...)`: 在写死的训练区间上从零训练, 把
-     **权重 + 标准化统计 + 结构超参** 一并保存到 `transformer_model.pt`。
+     **权重 + 标准化统计 + 结构超参** 一并保存到 `transformer_model.json` (纯文本)。
+
+模型一律存为 **文本类文件 (JSON)**, 不使用 `.pt` 等二进制格式: state_dict 里的张量
+会被转成 {dtype, shape, data(扁平 list)} 结构, 加载时按 dtype/shape 还原, 便于版本
+管理、人工查阅与跨环境传输 (见 `save_model` / `load_model`)。
 
 用法 (参赛者本地运行一次, 产物随 notebook 一起上传):
     python transformer_train.py
@@ -17,6 +21,7 @@
 私榜阶段平台用 `train_and_save` 在隔离环境从零重训, 故训练逻辑需保持可复现 (固定随机种子)。
 """
 import os
+import json
 import time
 
 import numpy as np
@@ -30,8 +35,9 @@ import structlog
 logger = structlog.get_logger()
 
 # 训练好的模型保存路径; 参赛者本地训练后, 把该文件随 notebook 一并上传
+# 平台限制只能提交文本类文件, 故存为 JSON (而非 torch 的 .pt 二进制)
 _HERE = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(_HERE, "transformer_model.pt")
+MODEL_PATH = os.path.join(_HERE, "transformer_model.json")
 
 # ---------- 配置 (写死, 不随平台入参变化) ----------
 TRAIN_START, TRAIN_END = "2022-01-01", "2023-12-31 23:59:59"  # 训练区间写死, 切勿用平台注入的测试区间训练
@@ -122,6 +128,43 @@ def build_dataset(table, sd, ed, mode, instruments, stats=None):
     return X, None, pd.DataFrame(keys, columns=["date", "instrument"]), stats
 
 
+# ==== 模型存/读: 一律用文本类文件 (JSON), 不使用 .pt 等二进制 ====
+def save_model(ckpt, model_path=MODEL_PATH):
+    """把 checkpoint 存成 JSON 文本文件。
+
+    state_dict 里每个张量转成 {dtype, shape, data(扁平 list)}, 其余字段 (结构超参 /
+    标准化统计等) 原样写入; 加载时用 load_model 按 dtype/shape 还原。"""
+    sd = ckpt["state_dict"]
+    tensors = {}
+    for k, v in sd.items():
+        t = v.detach().cpu()
+        tensors[k] = {
+            "dtype": str(t.dtype).replace("torch.", ""),   # 如 'float32'
+            "shape": list(t.shape),
+            "data": t.reshape(-1).tolist(),                # 扁平存, 加载时按 shape 还原
+        }
+    payload = {k: v for k, v in ckpt.items() if k != "state_dict"}
+    payload["state_dict"] = tensors
+    with open(model_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
+    return model_path
+
+
+def load_model(model_path=MODEL_PATH, map_location="cpu"):
+    """读取 save_model 写出的 JSON, 把 state_dict 还原为张量 dict。
+
+    返回结构与原 torch.load(...) 的 checkpoint 一致 (state_dict 为 {name: Tensor})。"""
+    with open(model_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    sd = {}
+    for k, meta in payload["state_dict"].items():
+        t = torch.tensor(meta["data"], dtype=getattr(torch, meta["dtype"]))
+        sd[k] = t.reshape(meta["shape"]).to(map_location)
+    ckpt = {k: v for k, v in payload.items() if k != "state_dict"}
+    ckpt["state_dict"] = sd
+    return ckpt
+
+
 # ==== 训练并持久化 (参赛者本地运行一次, 产物随 notebook 一起上传) ====
 def train_and_save(datasources, model_path=MODEL_PATH):
     """在写死的训练区间上从零训练, 把 权重 + 标准化统计 + 结构超参 一并存盘。
@@ -166,8 +209,9 @@ def train_and_save(datasources, model_path=MODEL_PATH):
                     elapsed=round(time.time() - t, 2))
 
     # ---------- 持久化: 权重 + 统计 + 结构超参 (推理端据此重建并复用) ----------
+    # 一律存为文本类文件 (JSON), 张量在 save_model 内转成 {dtype, shape, data}
     mean, std = stats
-    torch.save({
+    save_model({
         "state_dict": model.state_dict(),
         "model_cfg": MODEL_CFG,
         "feature_cols": FEATURE_COLS,
@@ -180,6 +224,6 @@ def train_and_save(datasources, model_path=MODEL_PATH):
 
 
 if __name__ == "__main__":
-    # 本地训练入口: 在写死的训练区间上从零训练并保存 transformer_model.pt
+    # 本地训练入口: 在写死的训练区间上从零训练并保存 transformer_model.json
     datasources = {"bar1m": "bigalpha_2026_stock_bar1m"}
     train_and_save(datasources)
