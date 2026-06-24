@@ -39,7 +39,7 @@ def judge_runner_main():
         score_data = score_data.rename(columns={"score": "factor"})
 
     from bigmodule import M
-    result = M.bigalpha_factorminer._latest(
+    result = M.bigalpha_eval._latest(
         factor_data=score_data,
         show=True,
     )
