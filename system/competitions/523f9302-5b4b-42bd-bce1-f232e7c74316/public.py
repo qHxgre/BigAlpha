@@ -28,10 +28,9 @@ class Judge(EndToEndJudge):
         "bar5m": "bigalpha_2026_stock_bar5m_test",
         "bar15m": "bigalpha_2026_stock_bar15m_test",
         "bar30m": "bigalpha_2026_stock_bar30m_test",
-        "snapshot": "bigalpha_2026_stock_snapshot_test",
     }
-    DATE_START = "2024-01-01 00:00:00"
-    DATE_END = "2024-12-31 23:59:59"
+    DATE_START = "2025-01-01 00:00:00"
+    DATE_END = "2025-12-31 23:59:59"
 
 
 if __name__ == "__main__":
