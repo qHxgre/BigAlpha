@@ -14,6 +14,10 @@ import pandas as pd
 
 import scoring
 from fileio import csv_to_map, read_csv, read_json
+from constants import (
+    STATUS_ENV_ERROR,
+    STATUS_ERR_MSG,
+)
 
 
 class ScoringMixin:
@@ -59,15 +63,21 @@ class ScoringMixin:
             score = row["final_score"]
             # NaN != NaN：A 缺失（如指标全空）时最终分也为 NaN，统一记为 -2 失败
             if score != score:
-                score = -2
-            self.alphathon_api.update_submission_score(
-                submission_id=row["id"],
-                **{
-                    self.score_field: float(score),
-                    self.score_data_field: row,
-                },
-
-            )
+                self.alphathon_api.update_submission_score(
+                    submission_id=row["id"],
+                    **{
+                        self.score_field: -2,
+                        self.score_data_field: {"err_msg": STATUS_ERR_MSG[STATUS_ENV_ERROR]},
+                    },
+                )
+            else:
+                self.alphathon_api.update_submission_score(
+                    submission_id=row["id"],
+                    **{
+                        self.score_field: float(score),
+                        self.score_data_field: row,
+                    },
+                )
         self.log.info(
             "final.scored",
             count=len(final),
