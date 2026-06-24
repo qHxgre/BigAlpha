@@ -21,7 +21,23 @@
       "Bash(awk END{print NR} *)",
       "Bash(python3.11 *)",
       "Bash(rm -- judge-5c3f7783-4158-4196-97ab-171b27218c7c.py judge-5c3f7783-4158-4196-97ab-171b27218c7c-private.py judge-bf1b4468-6b4d-43dc-98e1-8c2358c61793.py judge-bf1b4468-6b4d-43dc-98e1-8c2358c61793-private.py judge-fe59d6c6-04c6-41cc-b125-cd01872494fa.py)",
-      "Bash(rm -rf __pycache__)"
+      "Bash(rm -rf __pycache__)",
+      "Bash(git checkout *)",
+      "Bash(perl -i -ne 'print unless /^\\\\s*# PLACEHOLDER_\\(CLASS|MAIN|SCORING|FINAL\\)\\\\s*$/' public.py)",
+      "Bash(perl -i -ne 'print unless /^\\\\s*# PLACEHOLDER_\\(CLASS|MAIN|SCORING|FINAL\\)\\\\s*$/' system/competitions/76ad3f56-ec2b-431a-890e-139a7f4bbcba/public.py)",
+      "Bash(awk 'BEGIN{c=0} /^$/{c++; if\\(c>=3\\) print NR\": \"c\" blanks\"} !/^$/{c=0}' public.py)",
+      "Bash(git mv *)",
+      "Bash(mv judge.py bigalpha_judge.py)",
+      "Bash(git -C /Users/xiehao/Desktop/workspace/BigQuant/BigAlpha status --short -- system/competitions/76ad3f56-ec2b-431a-890e-139a7f4bbcba/)",
+      "Bash(pip3 install *)",
+      "Bash(jupyter nbconvert *)",
+      "Bash(curl -s -m 15 https://bigquant.com/bigapis/auth/v1/me -H 'Cookie: bigjwt=__TRACKED_VAR__' -H 'accept: application/json')",
+      "Bash(pip show *)",
+      "Bash(pip3 list *)",
+      "Read(//Users/xiehao/.bigquant/**)",
+      "Bash(find / -name \"auth.json\")",
+      "Bash(awk NR>=118 *)",
+      "Bash(unzip -p \"/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/docs/ppt/20260624/【总方案】白皮书.pptx\" ppt/presentation.xml)"
     ]
   }
 }
