@@ -37,7 +37,11 @@
       "Read(//Users/xiehao/.bigquant/**)",
       "Bash(find / -name \"auth.json\")",
       "Bash(awk NR>=118 *)",
-      "Bash(unzip -p \"/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/docs/ppt/20260624/【总方案】白皮书.pptx\" ppt/presentation.xml)"
+      "Bash(unzip -p \"/Users/xiehao/Desktop/workspace/BigQuant/BigAlpha/docs/ppt/20260624/【总方案】白皮书.pptx\" ppt/presentation.xml)",
+      "Bash(find / -path \"*/judge/api.py\")",
+      "Bash(find / -path \"*/judge/judgebase.py\")",
+      "Bash(find / -name \"judgebase.py\")",
+      "Bash(git check-ignore *)"
     ]
   }
 }
