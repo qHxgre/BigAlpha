@@ -77,7 +77,7 @@ class ScoringMixin:
                     submission_id=row["id"],
                     **{
                         self.score_field: float(score),
-                        self.score_data_field: row,
+                        self.score_data_field: self._row_to_jsonable(row),
                     },
                 )
         self.log.debug(
@@ -87,6 +87,27 @@ class ScoringMixin:
             msg="合成最终得分 0.3*A + 0.7*B 完成",
         )
         return {"count": len(final), "with_b": int((final["b_score"] > 0).sum())}
+
+    @staticmethod
+    def _row_to_jsonable(row: pd.Series) -> dict:
+        """把 DataFrame 的一行（pandas Series，含 numpy 标量）转成可 JSON 序列化的纯 dict。
+
+        iterrows() 产出的 Series 及其 numpy 标量（np.float64 等）不能直接 json.dumps，
+        否则触发 'Object of type Series is not JSON serializable'。这里逐项转成原生 Python
+        类型，NaN/Inf 一律转 None，保证回写时可序列化。
+        """
+        import math
+
+        out: dict = {}
+        for key, val in row.items():
+            # numpy 标量 -> python 原生
+            if hasattr(val, "item"):
+                val = val.item()
+            # NaN / Inf -> None（JSON 不支持）
+            if isinstance(val, float) and not math.isfinite(val):
+                val = None
+            out[str(key)] = val
+        return out
 
     # ---- 运行结果汇总 -----------------------------------------------------
 
