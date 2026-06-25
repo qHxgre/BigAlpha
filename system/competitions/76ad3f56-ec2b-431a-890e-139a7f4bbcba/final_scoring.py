@@ -132,6 +132,11 @@ class ScoringMixin:
             else {}
         )
 
+        # 因子池回归得分（sid -> B_i），其 keyset 即真正进入因子池回归的因子集合。
+        # 回归产物是全局一张表（leaderboard_reg.csv），并非各提交目录下的文件，
+        # 故 has_regression_score 据「是否在回归产物中」判定，而非检查 per-submission 文件。
+        b_scores = self.load_b_scores()
+
         rows = []
         for sid, submission, sub_dir in self._iter_submission_dirs():
             row: dict = {
@@ -162,7 +167,8 @@ class ScoringMixin:
             # 产物是否落盘
             row["has_raw_factor"] = os.path.exists(os.path.join(sub_dir, self.raw_factor_file))
             row["has_process_factor"] = os.path.exists(os.path.join(sub_dir, self.process_factor_file))
-            row["has_regression_score"] = os.path.exists(os.path.join(sub_dir, self.factor_regression_score_file))
+            # 该因子是否进入因子池回归（出现在全局回归产物 leaderboard_reg.csv 中）
+            row["has_regression_score"] = sid in b_scores
 
             rows.append(row)
 

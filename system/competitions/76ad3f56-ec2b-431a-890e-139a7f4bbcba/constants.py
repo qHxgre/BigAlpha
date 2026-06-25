@@ -4,7 +4,6 @@
 RAW_FACTOR_FILE = "raw_factor.parquet"
 PROCESS_FACTOR_FILE = "process_factor.parquet"
 FACTOR_ANALYZE_FILE = "factor_analyze.json"
-FACTOR_REGRESSION_SCORE = "factor_regression_score.parquet"
 # 每个提交单因子分析的运行状态记录文件：无论成功/失败都会落盘一份，
 # is_done() 据此判断该提交是否已跑过，避免进程重启后重复执行（尤其是注定失败的提交）。
 SFA_STATUS_FILE = "sfa_status.json"

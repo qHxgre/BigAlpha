@@ -133,10 +133,6 @@ class BigAlphaJudgeBase(JudgeBase):
         return _with_suffix(constants.FACTOR_ANALYZE_FILE, self.mode_suffix)
 
     @property
-    def factor_regression_score_file(self) -> str:
-        return _with_suffix(constants.FACTOR_REGRESSION_SCORE, self.mode_suffix)
-
-    @property
     def sfa_status_file(self) -> str:
         return _with_suffix(constants.SFA_STATUS_FILE, self.mode_suffix)
 
