@@ -57,3 +57,8 @@ if __name__ == "__main__":
     print(f"共拉到 {len(df)} 条报名记录")
     print(df.groupby(["competition_id", "status"]).size())
 
+    import json
+    user_id = df['user_id'].unique().tolist()
+    # 把这个list保存到json文件中
+    with open('/home/aiuser/work/workspace/BigAlpha/system/scripts/user_id.json', 'w') as f:
+        json.dump(user_id, f)

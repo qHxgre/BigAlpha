@@ -1,4 +1,4 @@
-"""把比赛里"待审核"的参赛者批量改成"通过审核并加入空间"。
+"""把比赛里"还没审核通过"的参赛者批量改成"通过审核并加入空间"。
 
 报名记录的状态见 alphathonapiserver.constants.UserStatus：
     pending               待审核
@@ -6,105 +6,56 @@
     approved_join_space   通过审核并加入空间（审批时会把用户拉进比赛空间）
     rejected              拒绝
 
-本脚本默认只处理 pending 的记录，逐条调用 POST /users/{user_id} 把状态
-改成 approved_join_space。服务端在该状态下会调用 join_space 把人加入空间，
-并发送审核通过通知 + 微信消息。
+做法：对每场比赛拉全部报名记录，把状态还不是目标状态的（默认 pending + approved，
+不动 rejected）逐条调用 POST /users/{报名记录id} 改成 approved_join_space。
+服务端在该状态下会把人加入空间，并发送审核通过通知 + 微信消息。
 
-默认是 dry-run（只打印将要处理的人），加 --apply 才真正写入。
+注意：这里用的是「报名记录 id」(u["id"])，不是 participants.py 里保存的账号
+user_id (u["user_id"])，两者不是一回事，所以不能直接读那个 json，得按比赛查。
 
-用法:
-    python approve_pending.py <比赛ID> [<比赛ID> ...]            # 预览
-    python approve_pending.py <比赛ID> --apply                  # 执行
-    python approve_pending.py <比赛ID> --status approved --apply # 改成只通过、不加空间
+先用 DRY_RUN=True 预览名单，确认无误后改成 False 再跑。
 """
 
 from __future__ import annotations
 
-import argparse
-import sys
-
 from _client import AlphathonClient
 
-PENDING = "pending"
-TARGET_DEFAULT = "approved_join_space"
-VALID_TARGETS = ("approved", "approved_join_space")
+# ===== 配置：改这里就行 =====================================================
+COMPETITION_IDS = [
+    "76ad3f56-ec2b-431a-890e-139a7f4bbcba",
+    "523f9302-5b4b-42bd-bce1-f232e7c74316",
+    "63dd885c-2488-4efd-9c61-9e3a536f172c",
+]
+TARGET_STATUS = "approved_join_space"      # 目标状态：通过并加入空间
+SOURCE_STATUSES = {"pending", "approved"}  # 要处理的源状态（不含 rejected）
+DRY_RUN = True                             # True 只预览；确认后改 False 真正写入
+# ===========================================================================
 
 
-def collect_pending(client: AlphathonClient, competition_id: str) -> list[dict]:
-    """拉这场比赛里所有 pending 的报名记录。"""
-    users = client.list_users(
-        competition_id,
-        constraints={"status": PENDING},
-        order_by=["created_at"],
-    )
-    return users
+def approve_competition(client: AlphathonClient, competition_id: str) -> None:
+    """把一场比赛里源状态命中的参赛者改成 TARGET_STATUS。"""
+    users = client.list_users(competition_id, order_by=["created_at"])
+    todo = [u for u in users if u.get("status") in SOURCE_STATUSES]
 
-
-def approve_competition(
-    client: AlphathonClient,
-    competition_id: str,
-    *,
-    target_status: str,
-    apply: bool,
-) -> dict:
-    """把一场比赛里 pending 的参赛者改成 target_status。
-
-    apply=False 时只预览，不写入。返回处理结果汇总。
-    """
-    pending = collect_pending(client, competition_id)
-    results = {"competition_id": competition_id, "pending_count": len(pending), "ok": [], "failed": []}
-
-    for u in pending:
-        user_id = str(u.get("id"))
+    print(f"\n=== 比赛 {competition_id}  待处理 {len(todo)} 人 ===")
+    for u in todo:
+        record_id = str(u.get("id"))
         name = (u.get("data") or {}).get("name") or str(u.get("user_id"))
-        if not apply:
-            print(f"  [dry-run] {name}  ({user_id}) -> {target_status}")
-            results["ok"].append(user_id)
+        cur = u.get("status")
+        if DRY_RUN:
+            print(f"  [dry-run] {name}  ({record_id})  {cur} -> {TARGET_STATUS}")
             continue
         try:
-            client.update_user_status(user_id, target_status)
-            print(f"  [ok] {name}  ({user_id}) -> {target_status}")
-            results["ok"].append(user_id)
+            client.update_user_status(record_id, TARGET_STATUS)
+            print(f"  [ok] {name}  ({record_id})  {cur} -> {TARGET_STATUS}")
         except Exception as e:  # noqa: BLE001 — 单条失败不影响其他人
-            print(f"  [失败] {name}  ({user_id}): {e}")
-            results["failed"].append({"user_id": user_id, "error": str(e)})
-
-    return results
-
-
-def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="把比赛里待审核的参赛者批量改成通过并加入空间")
-    parser.add_argument("competition_ids", nargs="+", help="一个或多个比赛ID")
-    parser.add_argument(
-        "--status",
-        default=TARGET_DEFAULT,
-        choices=VALID_TARGETS,
-        help=f"目标状态，默认 {TARGET_DEFAULT}（通过并加入空间）",
-    )
-    parser.add_argument("--apply", action="store_true", help="真正写入；不加则只预览 (dry-run)")
-    parser.add_argument("--base-url", default=None, help="覆盖 ALPHATHON_API_BASE_URL")
-    parser.add_argument("--token", default=None, help="覆盖 ALPHATHON_API_TOKEN")
-    args = parser.parse_args(argv)
-
-    client = AlphathonClient(base_url=args.base_url, token=args.token)
-
-    mode = "执行" if args.apply else "预览(dry-run)"
-    total_ok = total_failed = total_pending = 0
-    for cid in args.competition_ids:
-        print(f"\n=== 比赛 {cid}  [{mode}] 目标状态: {args.status} ===")
-        result = approve_competition(client, cid, target_status=args.status, apply=args.apply)
-        if not result["pending_count"]:
-            print("  (没有待审核的报名记录)")
-        total_pending += result["pending_count"]
-        total_ok += len(result["ok"])
-        total_failed += len(result["failed"])
-
-    print(f"\n汇总：待审核 {total_pending} 条，成功 {total_ok} 条，失败 {total_failed} 条。")
-    if not args.apply and total_pending:
-        print("当前为预览模式，加 --apply 才会真正写入。")
-    return 1 if total_failed else 0
+            print(f"  [失败] {name}  ({record_id})  {cur}: {e}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    client = AlphathonClient()
+    for cid in COMPETITION_IDS:
+        approve_competition(client, cid)
 
+    if DRY_RUN:
+        print("\n当前为预览模式(DRY_RUN=True)，确认名单无误后把 DRY_RUN 改成 False 再跑。")

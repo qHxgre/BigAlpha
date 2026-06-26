@@ -10,6 +10,7 @@ class UserStatus(str, Enum):
 
     PENDING = "pending"  # 待定/待审核
     APPROVED = "approved"  # 通过审核
+    APPROVED_JOIN_SPACE = "approved_join_space"  # 通过审核并加入空间
     REJECTED = "rejected"  # 拒绝
 
 
