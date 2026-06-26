@@ -121,3 +121,14 @@ class AlphathonClient:
         if order_by:
             params["order_by"] = order_by
         return self._paginate("/submissions", params=params)
+
+    # ---- 业务写入 ------------------------------------------------------
+
+    def update_user_status(self, user_id: str, status: str) -> dict[str, Any]:
+        """更新某条报名记录的状态（审批）。
+
+        对应 POST /users/{user_id}。需要比赛创建者或 competition_manage 权限。
+        status 取值见 alphathonapiserver.constants.UserStatus：
+        pending / approved / approved_join_space / rejected。
+        """
+        return self._request("POST", f"/users/{user_id}", json_data={"status": status})
