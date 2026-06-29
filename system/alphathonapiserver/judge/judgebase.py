@@ -234,6 +234,14 @@ class JudgeBase:
         """每个 tick 的额外动作，默认重排一次榜单。"""
         self.rank_score()
 
+    def heartbeat_fields(self) -> Dict[str, Any]:
+        """心跳日志的附加字段，默认不附加。
+
+        比赛可重写返回进度等字段（如 total/done/remaining），会被展开进 judge.heartbeat
+        那一行；返回 remaining>0 时，即便线程池已排空，心跳也会继续打印（见 run()）。
+        """
+        return {}
+
     # ---- 通用机制 ----------------------------------------------------------
 
     def submission_path(self, submission: dict) -> str:
@@ -350,21 +358,24 @@ class JudgeBase:
         futures: dict[str, concurrent.futures.Future] = {}  # 仍在运行/未回收的 future
 
         # 心跳线程：独立于主循环，按 heartbeat_interval 周期性打印一条 alive 日志。
-        # 只在有任务在跑（len(futures) > 0）时才打：tick 一行汇总已能证明系统存活，
+        # 默认只在有任务在跑（len(futures) > 0）时才打：tick 一行汇总已能证明系统存活，
         # 空闲 sleep 期间（尤其 adaptive 模式下间隔被拉到很长）不再刷屏。
+        # 比赛可重写 heartbeat_fields() 附加进度字段（如 total/done/remaining）；
+        # 此时即便线程池已排空，只要还有提交没跑完（remaining>0）也打，便于观察收尾进度。
         stop_heartbeat = threading.Event()
         beat = {"n": 0}
 
         def _heartbeat() -> None:
             while not stop_heartbeat.wait(self.heartbeat_interval):
-                if not futures:
+                fields = self.heartbeat_fields()
+                if not futures and not fields.get("remaining"):
                     continue
                 beat["n"] += 1
                 self.log.info(
                     "judge.heartbeat",
                     seq=beat["n"],
                     running=len(futures),
-                    dispatched=len(dispatched),
+                    **fields,
                 )
 
         heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
@@ -378,6 +389,8 @@ class JudgeBase:
                     competition_id=self.competition_id,
                     constraints=self.query_constraints(),
                 )
+                # 缓存本场比赛当前的提交总数，供心跳附加进度字段时复用（不额外打 API）
+                self._submission_total = len(submissions)
 
                 # 过滤掉本进程已派发过的，剩下的入队执行
                 pending = [s for s in submissions if s.get("id") not in dispatched]

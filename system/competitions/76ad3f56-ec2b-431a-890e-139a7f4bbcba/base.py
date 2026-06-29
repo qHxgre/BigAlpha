@@ -22,7 +22,8 @@ from judge.judgebase import JudgeBase
 
 import constants
 import templates
-from fileio import read_json
+from constants import STATUS_SUCCESS, TERMINAL_STATUSES
+from fileio import read_csv, read_json
 
 
 def _with_suffix(filename: str, suffix: str) -> str:
@@ -193,6 +194,28 @@ class BigAlphaJudgeBase(JudgeBase):
         )
 
     # ---- 共享小工具 -------------------------------------------------------
+    def heartbeat_fields(self) -> dict:
+        """给心跳日志附加运行进度：total / done / remaining / ok / failed。
+
+        - total：本场比赛当前提交总数，复用主循环每 tick 缓存的 _submission_total（不额外打 API）；
+        - done / ok / failed：取自上一个 tick 落盘的 submissions_summary.csv 的 status 分布，
+          done = 终态数（success/user_error/timeout/file_error），ok = success，failed = done - ok；
+        - remaining = total - done，涵盖「刚提交还没建目录」与 env_error（会重试）的提交。
+
+        两个来源都最多滞后一个 tick；csv 尚未生成时只回退显示 total。
+        """
+        total = getattr(self, "_submission_total", None)
+        df = read_csv(self.submissions_summary_csv, logger=self.log)
+        if df is None or "status" not in df.columns:
+            return {"total": total} if total is not None else {}
+        counts = df["status"].value_counts().to_dict()
+        done = sum(counts.get(s, 0) for s in TERMINAL_STATUSES)
+        ok = counts.get(STATUS_SUCCESS, 0)
+        fields = {"total": total, "done": done, "ok": ok, "failed": done - ok}
+        if total is not None:
+            fields["remaining"] = total - done
+        return fields
+
     def query_constraints(self) -> dict:
         """限定拉取提交的范围：在父类约束（private 默认只跑入围者）之上，叠加
         SUBMISSION_IDS 子集过滤。两处拉取提交的入口（主循环与 _iter_submission_dirs）
