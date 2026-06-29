@@ -122,6 +122,29 @@ class AlphathonClient:
             params["order_by"] = order_by
         return self._paginate("/submissions", params=params)
 
+    def get_submissions_by_ids(
+        self,
+        submission_ids: list[str],
+        *,
+        batch_size: int = 200,
+        order_by: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """按 submission id 批量查询提交信息，不需要预先知道 competition_id。
+
+        走 GET /submissions 的 constraints={"id__in": [...]}，分批查询避免 URL 过长。
+        需要 competition_manage 权限（否则后端会把范围裁剪成「只看自己的提交」）。
+        查不到的 id 不会报错，只是不出现在返回结果里。
+        """
+        ids = [str(s).strip() for s in submission_ids if str(s).strip()]
+        results: list[dict[str, Any]] = []
+        for i in range(0, len(ids), batch_size):
+            chunk = ids[i : i + batch_size]
+            params: dict[str, Any] = {"constraints": json.dumps({"id__in": chunk})}
+            if order_by:
+                params["order_by"] = order_by
+            results.extend(self._paginate("/submissions", params=params))
+        return results
+
     # ---- 业务写入 ------------------------------------------------------
 
     def update_user_status(self, user_id: str, status: str) -> dict[str, Any]:
