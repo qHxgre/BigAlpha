@@ -35,7 +35,7 @@ def judge_runner_main():
     factor_data = main(__DATASETS__, "__DATE_START__", "__DATE_END__")
 
     from bigmodule import M
-    result = M.bigalpha_factorminer._latest(
+    result = M.bigalpha_eval._latest(
         factor_data=factor_data,
         start_date="__DATE_START__",
         end_date="__DATE_END__",
@@ -55,7 +55,7 @@ def judge_runner_main():
 
 
 # 第二步：跑因子池回归。因子池由评测系统汇总所有提交的优质因子后落盘（__FACTOR_POOL_FILE__），
-# 这里只读取它并交给 bigalpha_factorminer 做回归，不调用任何用户代码，
+# 这里只读取它并交给 bigalpha_eval 做回归，不调用任何用户代码，
 # 因此模板里不注入 __USER_CODE__，可作为独立脚本运行（不依赖任何提交）。
 _REG_TEMPLATE = '''
 def judge_runner_main():
@@ -66,7 +66,7 @@ def judge_runner_main():
     factor_pool = pd.read_parquet("__FACTOR_POOL_FILE__")
 
     from bigmodule import M
-    result = M.bigalpha_factorminer._latest(
+    result = M.bigalpha_eval._latest(
         factor_pool=factor_pool,
         start_date="__DATE_START__",
         end_date="__DATE_END__",
