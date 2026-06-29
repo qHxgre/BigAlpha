@@ -29,11 +29,16 @@ def judge_runner_main():
     import json
     import pandas as pd
 
+    # 日期区间是「评估输出区间」：要求该区间内每个官方交易日都产出因子值（缺整天会被判不通过）。
+    # 时序因子（滚动窗口/动量等）须在 __DATE_START__ 之前自行向前多取 warmup 历史，
+    # 使输出覆盖到区间第一个交易日，否则会因缺交易日而被拒。
     factor_data = main(__DATASETS__, "__DATE_START__", "__DATE_END__")
 
     from bigmodule import M
     result = M.bigalpha_factorminer._latest(
         factor_data=factor_data,
+        start_date="__DATE_START__",
+        end_date="__DATE_END__",
         show=True,
     )
 
@@ -63,6 +68,8 @@ def judge_runner_main():
     from bigmodule import M
     result = M.bigalpha_factorminer._latest(
         factor_pool=factor_pool,
+        start_date="__DATE_START__",
+        end_date="__DATE_END__",
         process_pools=False,
         show=True,
     )
@@ -102,10 +109,22 @@ def build_sfa_runner(
     )
 
 
-def build_reg_runner(*, factor_pool_file: str, factor_regression_score: str) -> str:
-    """注入因子池读入路径与回归得分产出路径，返回可独立运行的回归 runner 模板。"""
+def build_reg_runner(
+    *,
+    date_start: str,
+    date_end: str,
+    factor_pool_file: str,
+    factor_regression_score: str,
+) -> str:
+    """注入日期区间与因子池读入/回归得分产出路径，返回可独立运行的回归 runner 模板。
+
+    date_start/date_end 传给 _latest()，使回归阶段也用官方配置窗口裁 instruments 定 sd/ed
+    并把因子池对齐到官方面板，保证回归窗口与单因子分析一致、跨提交可比。
+    """
     return (
         _REG_TEMPLATE
+        .replace("__DATE_START__", date_start)
+        .replace("__DATE_END__", date_end)
         .replace("__FACTOR_POOL_FILE__", factor_pool_file)
         .replace("__FACTOR_REGRESSION_SCORE__", factor_regression_score)
     )

@@ -44,9 +44,34 @@ def _non_key_columns(df: pd.DataFrame) -> list:
     return [c for c in df.columns if c not in _KEY_COLS]
 
 
+def _load_pool_pairs(start_date: str, end_date: str) -> pd.DataFrame:
+    """加载中证 1000 历史成分股面板 (date, instrument): bigalpha_2026_instruments
+    """
+    import dai
+
+    sql = "SELECT date, instrument FROM bigalpha_2026_instruments"
+    df = dai.query(sql, filters={"date": [start_date, end_date]}).df()
+    if df is None or df.empty:
+        raise ValueError("无法获取中证 1000 股票池数据，无法进行评估，请联系官方解决")
+
+    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+    df["instrument"] = df["instrument"].astype(str)
+    return df[["date", "instrument"]].drop_duplicates()
+
+
+def _align_to_pool(pool_pairs: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
+    """把因子数据 left-join 到官方面板，统一 universe 与交易日。
+    """
+    factor_cols = _non_key_columns(df)
+    aligned = pd.merge(df, pool_pairs, how='right', on=['date', 'instrument'])
+    return aligned.sort_values(["date", "instrument"]).reset_index(drop=True)
+
+
 def run(
     factor_data: I.port("因子数据: 包含列 (date, instrument, factor) 的DataFrame；为 None 时只进行因子池回归") = None,
     factor_pool: I.port("因子池，包含因子池的的DataFrame，不能包含 factor 列；为 None 时只进行单因子分析") = None,
+    start_date: I.str("评估窗口起始日 YYYY-MM-DD；官方权威窗口，用于裁定 instruments 与对齐面板。为空则回退到数据自身范围") = None,
+    end_date: I.str("评估窗口结束日 YYYY-MM-DD；官方权威窗口。为空则回退到数据自身范围") = None,
     process_pools: I.bool("是否对因子池的数据进行预处理") = True,
     show: I.bool("画出绩效图") = True,
 )->[
@@ -89,40 +114,58 @@ def run(
     # ---------- 组装待检查/回归的面板 ----------
     if has_factor and has_pool:
         merge_df = pd.merge(factor_data, factor_pool, how='inner', on=['date', 'instrument'])
-        mode_desc = "合并后"
     elif has_factor:
         logger.info('未提供因子池，只进行单因子分析')
         merge_df = factor_data
-        mode_desc = "单因子"
     else:
         logger.info('未提供单因子，只进行因子池回归')
         merge_df = factor_pool
-        mode_desc = "因子池"
 
-    sd = merge_df['date'].min().strftime("%Y-%m-%d")
-    ed = merge_df['date'].max().strftime("%Y-%m-%d")
-    logger.info(f'{mode_desc}时间范围: {sd} 至 {ed}')
+    # ---------- 确定官方权威窗口并加载股票池面板 ----------
+    # 评估窗口与股票池以 bigalpha_2026_instruments 为准：start_date/end_date 为官方配置窗口，
+    # 据此查官方面板，sd/ed 取面板真实交易日，保证所有提交的时间跨度与 universe 一致。
+    if not start_date or not end_date:
+        logger.warning(
+            '未传入官方评估窗口 start_date/end_date，回退到数据自身范围（仅建议本地调试时使用）'
+        )
+        win_start = merge_df['date'].min().strftime("%Y-%m-%d")
+        win_end = merge_df['date'].max().strftime("%Y-%m-%d")
+    else:
+        win_start, win_end = start_date, end_date
+    pool_pairs = _load_pool_pairs(win_start, win_end)
 
-    from .datachecker import DataCheck
+    # ---------- 对齐官方面板 ----------
+    # 把因子 left-join 到官方面板：超窗 / 非成分股行被丢弃，未覆盖格补 NaN。
+    # 此后所有口径都基于对齐面板（universe / 交易日跨提交一致）。
+    aligned = _align_to_pool(pool_pairs, merge_df)
+    sd = aligned['date'].min().strftime("%Y-%m-%d")
+    ed = aligned['date'].max().strftime("%Y-%m-%d")
+    logger.info(f'对齐中证1000历史成分后，官方评估窗口: {sd} 至 {ed}')
+
     logger.info('========== 数据检查 ==========')
-    DataCheck(sd, ed).validate(merge_df)
+    from .datachecker import DataCheck
+    DataCheck(sd, ed).validate(aligned)
 
     from .dataprocess import DataProcess
     logger.info('========== 数据预处理 ==========')
     dp = DataProcess(sd, ed)
     if process_pools:
-        # 对面板内全部因子（单因子和/或因子池）一并预处理
-        pdf = dp.validate(merge_df)
+        # 对全部因子（单因子和/或因子池）一并预处理
+        pdf = dp.validate(aligned)
     elif has_factor and has_pool:
-        # 仅对单因子预处理，再与未处理的因子池合并
-        process_factor = dp.validate(factor_data)
-        pdf = pd.merge(process_factor, factor_pool, how='inner', on=['date', 'instrument'])
+        # 仅对单因子预处理，再与未处理的因子池（已对齐）合并
+        process_factor = dp.validate(aligned[['date', 'instrument', 'factor']])
+        pdf = pd.merge(
+            process_factor,
+            aligned[['date', 'instrument'] + pool_cols],
+            how='inner', on=['date', 'instrument'],
+        )
     elif has_factor:
         # 只有单因子时只需预处理单因子
-        pdf = dp.validate(factor_data)
+        pdf = dp.validate(aligned)
     else:
-        # 只有因子池且不预处理，直接使用原始因子池
-        pdf = factor_pool
+        # 只有因子池且不预处理，直接使用对齐后的因子池
+        pdf = aligned
 
     # ---------- 单因子分析（仅在提供单因子时执行） ----------
     if has_factor:

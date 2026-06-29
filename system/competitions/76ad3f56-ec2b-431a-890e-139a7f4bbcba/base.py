@@ -183,8 +183,11 @@ class BigAlphaJudgeBase(JudgeBase):
 
     @property
     def JUDGE_REG(self) -> str:
-        """因子池回归 runner 模板：注入因子池读入路径与回归得分产出路径。"""
+        """因子池回归 runner 模板：注入日期区间与因子池读入路径、回归得分产出路径。"""
+        assert self.DATE_START and self.DATE_END, "子类必须设置 DATE_START / DATE_END"
         return templates.build_reg_runner(
+            date_start=self.DATE_START,
+            date_end=self.DATE_END,
             factor_pool_file=self.factor_pool_path,
             factor_regression_score=self.leaderboard_reg_csv,
         )

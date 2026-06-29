@@ -1,5 +1,3 @@
-import re
-import dai
 import numpy as np
 import pandas as pd
 import structlog
@@ -11,54 +9,22 @@ class DataValidationError(ValueError):
     """因子数据校验失败时抛出（用户数据问题）。"""
 
 
-# 中证 1000 指数代码
-INDEX_CODE = "000852.SH"
 # 单日因子缺失率上限
 MAX_MISSING_RATE = 0.4
-# 数据泄露：相对误差阈值与超阈样本占比上限
-DATA_BREACH_RTOL = 1e-5
-DATA_BREACH_ATOL = 1e-8
-DATA_BREACH_RATIO_LIMIT = 0.05
-# instrument 合法格式
-INSTRUMENT_PATTERN = re.compile(r"^\d{6}\.(SZ|SH)$")
 
 
 class DataCheck:
-    def __init__(
-        self,
-        start_date: str,
-        end_date: str,
-    ) -> None:
+    """因子数据校验器（不触碰 dai / 不加载股票池）。
+
+    股票池加载与对齐由调用方（__init__.py）在校验前完成：把提交因子 left-join 到官方面板后，
+    再交给本类 validate 一次性走完全部检查。sd/ed 为对齐所用的官方评估窗口（面板真实交易日），
+    仅用于日志标注。任一检查失败抛 DataValidationError。
+    """
+
+    def __init__(self, start_date: str, end_date: str) -> None:
         # 统一为 Timestamp，避免后续字符串比较脆弱
         self.start_date = pd.to_datetime(start_date).normalize()
         self.end_date = pd.to_datetime(end_date).normalize()
-
-    @property
-    def pool_pairs(self) -> pd.DataFrame:
-        """中证 1000 历史成分股 (date, instrument)，惰性加载。"""
-        return self._load_pool_pairs()
-
-    @property
-    def pool_days(self) -> pd.DatetimeIndex:
-        return pd.DatetimeIndex(self.pool_pairs["date"].unique())
-
-    def _load_pool_pairs(self) -> pd.DataFrame:
-        sql = "SELECT date, instrument FROM bigalpha_2026_instruments"
-        df = dai.query(
-            sql,
-            filters={"date": [
-                self.start_date.strftime('%Y-%m-%d'),
-                self.end_date.strftime('%Y-%m-%d'),
-            ]},
-        ).df()
-
-        if df is None or df.empty:
-            error_msg = "无法获取中证 1000 股票池数据，无法进行数据校验，请联系官方解决"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
-        return df[["date", "instrument"]].drop_duplicates()
 
     def _fail(self, msg: str, **fields) -> None:
         logger.error(msg, **fields)
@@ -81,16 +47,6 @@ class DataCheck:
         if not self._factor_cols(df):
             self._fail("列检查失败：未发现任何因子列（date/instrument 之外）")
 
-    def check_instrument_format(self, df: pd.DataFrame) -> None:
-        """格式检查：instrument 必须形如 6 位数字 + .SZ/.SH。"""
-        ok = df["instrument"].astype(str).str.match(INSTRUMENT_PATTERN)
-        if (~ok).any():
-            bad = df.loc[~ok, ["date", "instrument"]].head(50)
-            self._fail(
-                "instrument 格式不符合 ^\\d{6}\\.(SZ|SH)$",
-                sample=bad.to_dict(orient="records"),
-            )
-
     def check_factor_finite(self, df: pd.DataFrame) -> None:
         """有限值检查：所有因子列须可数值化且不允许出现 inf/-inf（NaN 由覆盖度规则约束）。"""
         for col in self._factor_cols(df):
@@ -104,37 +60,12 @@ class DataCheck:
                     sample=bad.to_dict(orient="records"),
                 )
 
-    def check_time_period(self, df: pd.DataFrame) -> None:
-        """时间范围：date 须落在 [start_date, end_date] 之内。"""
-        min_day = df["date"].min()
-        max_day = df["date"].max()
-        if min_day < self.start_date:
-            self._fail(
-                "因子最早日期超出规定时间周期",
-                min=min_day.strftime("%Y-%m-%d"),
-                start=self.start_date.strftime("%Y-%m-%d"),
-            )
-        if max_day > self.end_date:
-            self._fail(
-                "因子最晚日期超出规定时间周期",
-                max=max_day.strftime("%Y-%m-%d"),
-                end=self.end_date.strftime("%Y-%m-%d"),
-            )
-
-    def check_trading_days_complete(self, df: pd.DataFrame) -> None:
-        """交易日完整性：评估期内每个股票池交易日都必须有提交记录。"""
-        submitted = pd.DatetimeIndex(df["date"].unique())
-        missing = self.pool_days.difference(submitted).sort_values()
-        if len(missing) > 0:
-            sample = [d.strftime("%Y-%m-%d") for d in missing[:50]]
-            self._fail(
-                "交易日完整性检查失败：存在缺失交易日",
-                missing_count=len(missing),
-                sample=sample,
-            )
-
     def check_uniqueness(self, df: pd.DataFrame) -> None:
-        """唯一性：同一 (date, instrument) 组合不允许出现多条记录。"""
+        """唯一性：同一 (date, instrument) 组合不允许出现多条记录。
+
+        与官方面板 left-join 不会消除提交里原有的重复键（一行面板会被放大成多行），
+        因此对齐后仍可在此检出提交存在的重复 (date, instrument)。
+        """
         dup_mask = df.duplicated(subset=["date", "instrument"], keep=False)
         if dup_mask.any():
             cols = ["date", "instrument"] + self._factor_cols(df)
@@ -144,32 +75,32 @@ class DataCheck:
                 sample=sample.to_dict(orient="records"),
             )
 
-    def check_stock_pool(self, df: pd.DataFrame) -> None:
-        """股票池：所有 (date, instrument) 都必须是当日的中证 1000 成分股。"""
-        factor_pairs = df[["date", "instrument"]].drop_duplicates()
-        merged = factor_pairs.merge(
-            self.pool_pairs, on=["date", "instrument"], how="left", indicator=True
-        )
-        out_of_pool = merged[merged["_merge"] == "left_only"]
-        if not out_of_pool.empty:
-            sample = out_of_pool.head(50)
-            details = sample.groupby("date")["instrument"].apply(list).to_dict()
+    def check_missing_days(self, df: pd.DataFrame) -> None:
+        """缺日检查：对齐面板后，不允许存在「整日所有因子值全缺」的交易日。
+
+        时序因子（滚动窗口 / 动量等）若未在窗口前向前多取 warmup 历史，会在评估区间
+        开头缺若干交易日；对齐到官方面板后表现为这些交易日因子值全为 NaN。这里把这种
+        整日全缺单列出来报错，给出明确的缺失日清单，比混在覆盖度里更直观。
+        """
+        factor_cols = self._factor_cols(df)
+        all_nan = df.groupby("date")[factor_cols].apply(lambda g: g.isna().all().all())
+        missing = all_nan[all_nan].index.sort_values()
+        if len(missing) > 0:
+            sample = [d.strftime("%Y-%m-%d") for d in missing[:50]]
             self._fail(
-                "股票池检查失败：存在非当日中证1000成分股",
-                sample=details,
-                total=len(out_of_pool),
+                "缺日检查失败：存在整日因子值全缺的交易日（时序因子需向前多取 warmup 历史）",
+                missing_count=len(missing),
+                sample=sample,
             )
 
     def check_factor_coverage(self, df: pd.DataFrame) -> None:
-        """覆盖度：每交易日各因子列缺失率（按股票池口径，未提交视为缺失）须 <= MAX_MISSING_RATE。"""
+        """覆盖度：对齐面板后，每交易日各因子列缺失率须 <= MAX_MISSING_RATE。
+
+        df 已是对齐到官方面板的结果（未提交的格子为 NaN），直接按 date 统计缺失率即可。
+        """
         factor_cols = self._factor_cols(df)
-        full = self.pool_pairs.merge(
-            df[["date", "instrument"] + factor_cols],
-            on=["date", "instrument"],
-            how="left",
-        )
         for col in factor_cols:
-            miss_rate = full[col].isna().groupby(full["date"]).mean()
+            miss_rate = df[col].isna().groupby(df["date"]).mean()
             high_miss = miss_rate[miss_rate > MAX_MISSING_RATE]
             if not high_miss.empty:
                 top = high_miss.sort_values(ascending=False).head(50)
@@ -181,69 +112,31 @@ class DataCheck:
                     total_days=len(high_miss),
                 )
 
-    def check_data_breach(self, factor_data: pd.DataFrame, check_data: pd.DataFrame) -> None:
-        """数据泄露：与 check_data 在 (date, instrument) 上对齐比对，超阈值样本占比过高视为存在未来函数。"""
-        check_data = check_data.copy()
-        check_data["date"] = pd.to_datetime(check_data["date"]).dt.normalize()
-        merged = pd.merge(
-            check_data, factor_data, how="left",
-            on=["date", "instrument"], suffixes=["_check", ""],
-        ).dropna(subset=["factor_check", "factor"])
+    def validate(self, df: pd.DataFrame) -> None:
+        """完整校验流程，对「已对齐官方面板的因子数据」依次检查，不通过抛 DataValidationError。
 
-        if merged.empty:
-            logger.warning("数据泄露检查：无法对齐，跳过")
-            return
-
-        # 用相对误差 + 绝对误差的组合，避免 factor==0 导致除零
-        diff = (merged["factor_check"] - merged["factor"]).abs()
-        tol = DATA_BREACH_ATOL + DATA_BREACH_RTOL * merged["factor"].abs()
-        invalid_ratio = (diff > tol).mean()
-        if invalid_ratio > DATA_BREACH_RATIO_LIMIT:
-            self._fail(
-                "数据泄露检查不通过，代码可能存在未来函数",
-                invalid_ratio=float(invalid_ratio),
-                limit=DATA_BREACH_RATIO_LIMIT,
-            )
-
-    def validate(self, factor_data: pd.DataFrame) -> None:
-        """完整校验流程。校验失败抛 DataValidationError。"""
-        if factor_data is None or len(factor_data) == 0:
-            self._fail("提交的因子数据为空")
-
-        df = factor_data.copy()
+        df 是调用方把提交因子 left-join 到官方面板后的结果（越界 / 非成分股行已丢弃，
+        未覆盖格为 NaN），即真正参与打分的口径。检查顺序：
+            列 → 唯一性 → 有限值 → 缺日 → 覆盖度。
+        """
+        if df is None or len(df) == 0:
+            self._fail("对齐官方面板后的因子数据为空")
 
         self.check_required_columns(df)
         logger.info("通过：列名检查（date/instrument + 至少 1 个因子列）", factor_cols=self._factor_cols(df))
 
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        if df["date"].isna().any():
-            self._fail("date 列存在无法解析的值")
-        df["date"] = df["date"].dt.normalize()
-
-        self.check_instrument_format(df)
-        logger.info("通过：instrument 格式检查")
+        self.check_uniqueness(df)
+        logger.info("通过：唯一性检查")
 
         self.check_factor_finite(df)
         logger.info("通过：factor 有限值检查（禁止 inf/-inf）")
 
-        self.check_time_period(df)
-        logger.info("通过：时间范围检查")
-
-        self.check_trading_days_complete(df)
-        logger.info("通过：交易日完整性检查")
-
-        self.check_uniqueness(df)
-        logger.info("通过：唯一性检查")
-
-        self.check_stock_pool(df)
-        logger.info("通过：股票池范围检查（中证1000历史成分）")
+        self.check_missing_days(df)
+        logger.info("通过：缺日检查（无整日全缺的交易日）")
 
         self.check_factor_coverage(df)
         logger.info(f"通过：覆盖度检查（每交易日缺失率<={MAX_MISSING_RATE:.0%}）")
 
-        # if self.check_data is not None:
-        #     self.check_data_breach(df, self.check_data)
-        #     logger.info("通过：数据泄露检查")
-        # else:
-        #     logger.info("跳过：数据泄露检查")
+
+
 
