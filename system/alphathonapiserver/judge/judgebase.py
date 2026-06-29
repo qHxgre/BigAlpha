@@ -159,7 +159,7 @@ class JudgeBase:
     competition_id: str = ""
     mode: str = "public"  # public / private
     tick_interval: int = 60
-    heartbeat_interval: int = 60  # 心跳间隔（秒），证明评测器仍在运行（仅在有任务在跑时打）
+    heartbeat_interval: int = 60  # 心跳间隔（秒），证明评测器仍在运行（每个间隔都打）
     max_workers: int = 5
     JUDGE_RUNNER_CODE: str = ""
 
@@ -358,18 +358,14 @@ class JudgeBase:
         futures: dict[str, concurrent.futures.Future] = {}  # 仍在运行/未回收的 future
 
         # 心跳线程：独立于主循环，按 heartbeat_interval 周期性打印一条 alive 日志。
-        # 默认只在有任务在跑（len(futures) > 0）时才打：tick 一行汇总已能证明系统存活，
-        # 空闲 sleep 期间（尤其 adaptive 模式下间隔被拉到很长）不再刷屏。
-        # 比赛可重写 heartbeat_fields() 附加进度字段（如 total/done/remaining）；
-        # 此时即便线程池已排空，只要还有提交没跑完（remaining>0）也打，便于观察收尾进度。
+        # 每到一个间隔就打，证明评测器仍在运行，无论是否有任务在跑。
+        # 比赛可重写 heartbeat_fields() 附加进度字段（如 total/done/remaining）。
         stop_heartbeat = threading.Event()
         beat = {"n": 0}
 
         def _heartbeat() -> None:
             while not stop_heartbeat.wait(self.heartbeat_interval):
                 fields = self.heartbeat_fields()
-                if not futures and not fields.get("remaining"):
-                    continue
                 beat["n"] += 1
                 self.log.info(
                     "judge.heartbeat",
