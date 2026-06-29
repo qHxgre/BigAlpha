@@ -1,6 +1,6 @@
-"""bigalpha_factorminer package.
+"""bigalpha_eval package.
 
-BigAlpha AI因子挖掘评估函数
+BigAlpha 评估函数
 """
 
 import pandas as pd
@@ -20,7 +20,7 @@ author = "BigQuant"
 # 模块分类
 category = "BigAlpha"
 # 模块显示名
-friendly_name = "AI因子挖掘"
+friendly_name = "评估打分"
 # 文档地址, optional
 doc_url = "https://bigquant.com/wiki/"
 # 是否自动缓存结果
