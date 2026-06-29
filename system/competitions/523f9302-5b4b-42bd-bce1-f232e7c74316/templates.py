@@ -41,6 +41,8 @@ def judge_runner_main():
     from bigmodule import M
     result = M.bigalpha_eval._latest(
         factor_data=score_data,
+        start_date="__DATE_START__",
+        end_date="__DATE_END__",
         show=True,
     )
 
