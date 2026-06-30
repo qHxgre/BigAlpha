@@ -179,11 +179,15 @@ class Bigalpha2026E2EBarKmBuilder(BaseBuilder):
         if df.empty:
             return df
 
-        if self.K == 1:
-            return df
-
         df = df.copy()
         df["date"] = pd.to_datetime(df["date"])
+        # get_data 用 how='left' 关联成分股, 当日无分钟数据的股票会留下
+        # date 为 NaT 的空行。这些行的 strftime 会变成 NaN, astype(int) 直接
+        # 报 "cannot convert float NaN to integer", 故先丢弃。
+        df = df.dropna(subset=["date"])
+
+        if self.K == 1:
+            return df
 
         # 用预定义时间段端点标注 bar 结束时刻; 非连续竞价时段为 NaT
         df["__bar_end"] = self._assign_bar_end(df)
