@@ -4,11 +4,11 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from bigalpha_2026_stock_barkm_local.constant import TIME_SETS
-from bigalpha_2026_stock_barkm_local.schema import Bigalpha2026StockBarKmLocalSchema
+from bigalpha_2026_e2e_barkm.constant import TIME_SETS
+from bigalpha_2026_e2e_barkm.schema import Bigalpha2026E2EBarKmSchema
 
 
-class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
+class Bigalpha2026E2EBarKmBuilder(BaseBuilder):
     """K 分钟 K 线构建器
 
     基于已构建的 1 分钟数据源 bigalpha_2026_stock_bar1m, 按交易时段
@@ -28,7 +28,7 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
     unique_together = ["date", "instrument_id"]
     sort_by = [("date", "ascending"), ("instrument_id", "ascending")]
     indexes = ["date"]
-    schema = Bigalpha2026StockBarKmLocalSchema
+    schema = Bigalpha2026E2EBarKmSchema
 
     # 取分段最后一笔(快照/累计类字段) / 首笔 / 极值
     FIRST_FIELDS = ["open", "pre_close"]
