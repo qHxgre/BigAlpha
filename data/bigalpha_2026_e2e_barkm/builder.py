@@ -61,9 +61,9 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
             raise ValueError(f"不支持的频率 K={self.K}, 可选: {sorted(TIME_SETS)} (在 constant.py 中定义)")
         
         if suffix is None:
-            self.datasource_id = f"bigalpha_2026_stock_bar{self.K}m_local"
+            self.datasource_id = f"bigalpha_2026_e2e_bar{self.K}m"
         else:
-            self.datasource_id = f"bigalpha_2026_stock_bar{self.K}m_{suffix}_local"
+            self.datasource_id = f"bigalpha_2026_e2e_bar{self.K}m_{suffix}"
 
         print(f"初始化！{self.datasource_id}, 频率: {self.K}分钟, 时间周期: {self.start_date}, {self.end_date}")
 
@@ -134,7 +134,7 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
 
         # 去掉列
         result = result.drop(['trading_day', 'instrument'], axis=1)
-        return df
+        return result
 
     @staticmethod
     def _hms_to_minute(hms: int) -> int:
