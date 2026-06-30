@@ -5,7 +5,7 @@ from pydantic import Field
 from base import BaseSchema
 
 
-class Bigalpha2026StockBarKmSchema(BaseSchema):
+class Bigalpha2026StockBarKmLocalSchema(BaseSchema):
     """K 分钟 K 线 + 盘口快照
 
     字段与 bigalpha_2026_stock_bar1m 保持一致, date 为 K 分钟 bar 的
