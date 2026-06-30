@@ -25,8 +25,8 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
     K=1 时即原始 1 分钟, 不做聚合, 仅过滤连续竞价时段。
     """
 
-    unique_together = ["date", "instrument"]
-    sort_by = [("date", "ascending"), ("instrument", "ascending")]
+    unique_together = ["date", "instrument_id"]
+    sort_by = [("date", "ascending"), ("instrument_id", "ascending")]
     indexes = ["date"]
     schema = Bigalpha2026StockBarKmLocalSchema
 
@@ -172,7 +172,7 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
         return bar_end
 
     def aggregate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """按 (instrument, bar结束时刻) 聚合 1 分钟数据为 K 分钟 bar。
+        """按 (instrument_id, bar结束时刻) 聚合 1 分钟数据为 K 分钟 bar。
 
         K=1 时目标频率即为 1 分钟, 无需聚合, 仅过滤连续竞价时段后直接返回。
         """
@@ -189,9 +189,9 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
         df["__bar_end"] = self._assign_bar_end(df)
         df = df.dropna(subset=["__bar_end"])
         # 时间先排序, 保证 first/last 取到真正的段首/段末
-        df = df.sort_values(["instrument", "date"])
+        df = df.sort_values(["instrument_id", "date"])
 
-        cols = [c for c in self.schema.columns() if c not in ("date", "instrument")]
+        cols = [c for c in self.schema.columns() if c not in ("date", "instrument_id")]
         agg_map = {}
         for c in cols:
             if c in self.FIRST_FIELDS:
@@ -205,7 +205,7 @@ class Bigalpha2026StockBarKmLocalBuilder(BaseBuilder):
                 agg_map[c] = "last"
 
         out = (
-            df.groupby(["instrument", "__bar_end"], sort=True)
+            df.groupby(["instrument_id", "__bar_end"], sort=True)
             .agg(agg_map)
             .reset_index()
             .rename(columns={"__bar_end": "date"})
