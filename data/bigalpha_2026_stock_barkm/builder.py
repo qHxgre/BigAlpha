@@ -78,12 +78,37 @@ class Bigalpha2026StockBarKmBuilder(BaseBuilder):
         )
 
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        sql = f"SELECT * FROM cn_stock_bar1m_derived_c"
+        # 复权因子
+        sql = """
+        SELECT date as trading_day, instrument, adjust_factor
+        FROM cn_stock_real_bar1d
+        """
+        dff = dai.query(sql, filters={
+            "date": [start_date, end_date],
+            "instrument": self.instruments
+        }).df()
+        dff['trading_day'] = dff['trading_day'].dt.strftime('%Y-%m-%d')
+        dff['trading_day'] = dff['trading_day'].str.replace('-', '').astype(int)
+
+        # 分钟数据 
+        sql = """
+        SELECT 
+            cn_stock_bar1m_derived_c.*,
+            all_instruments.instrument_id
+        FROM cn_stock_bar1m_derived_c
+        LEFT JOIN all_instruments USING (instrument)
+        """
         df = dai.query(sql, filters={
             "date": [f"{start_date} 00:00:00", f"{end_date} 23:59:59"],
             "instrument": self.instruments
         }).df()
-        return df
+
+        # 合并数据
+        result = pd.merge(df, dff, how='left', on=['trading_day', 'instrument'])
+
+        # 去掉列
+        result = result.drop(['trading_day', 'time'], axis=1)
+        return result
 
     @staticmethod
     def _hms_to_minute(hms: int) -> int:
