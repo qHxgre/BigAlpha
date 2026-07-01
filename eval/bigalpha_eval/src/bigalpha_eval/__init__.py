@@ -167,6 +167,11 @@ def run(
         # 只有因子池且不预处理，直接使用对齐后的因子池
         pdf = aligned
 
+    logger.info('========== 预处理后数据检查 ==========')
+    # 预处理（去极值/标准化/风格剔除取残差）可能引入新的 NaN 或异常值，
+    # 打分前再对 pdf 走一遍同样的校验，确保参与打分的数据仍然合规。
+    DataCheck(sd, ed).validate(pdf)
+
     # ---------- 单因子分析（仅在提供单因子时执行） ----------
     if has_factor:
         result['process_factor'] = pdf[['date', 'instrument', 'factor']]
