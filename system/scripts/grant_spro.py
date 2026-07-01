@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(1)
 
 # ===== 配置：改这里就行 =====================================================
-USER_ID_FILE = Path(__file__).with_name("user_id.json")  # 用户 ID 列表（JSON 数组）
+USER_ID_FILE = Path(__file__).parent / "files" / "participants" / "user_id.json"  # 用户 ID 列表（JSON 数组）
 SPACE_ID = "00000000-0000-0000-0000-000000000000"        # 主空间（全零 UUID）
 PRO_TYPE = "spro"                                         # 旗舰版 L1
 EXPIRE_AT = "2026-08-20"                                  # 权益到期日 YYYY-MM-DD
