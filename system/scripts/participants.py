@@ -45,21 +45,32 @@ def fetch_participants_df(client: AlphathonClient, competition_ids: list[str]):
 
 
 competition_ids = [
-    '76ad3f56-ec2b-431a-890e-139a7f4bbcba',
-    '523f9302-5b4b-42bd-bce1-f232e7c74316',
-    '63dd885c-2488-4efd-9c61-9e3a536f172c'
+    '76ad3f56-ec2b-431a-890e-139a7f4bbcba',     # AI 因子挖掘
+    '523f9302-5b4b-42bd-bce1-f232e7c74316',     # 端到端大模型
+    '63dd885c-2488-4efd-9c61-9e3a536f172c'      # AI 开放创新
 ]
 
 
 if __name__ == "__main__":
+    import json
+    from pathlib import Path
+
     client = AlphathonClient()
     df = fetch_participants_df(client, competition_ids)
     print(f"共拉到 {len(df)} 条报名记录")
     print(df.groupby(["competition_id", "status"]).size())
 
-    import json
-    user_id = df['user_id'].unique().tolist()
-    print(f"共拉到 {len(user_id)} 为参赛者")
-    # 把这个list保存到json文件中
-    with open('/home/aiuser/work/workspace/BigAlpha/system/scripts/user_id.json', 'w') as f:
-        json.dump(user_id, f)
+    out_dir = Path(__file__).parent
+
+    # 1) 合并去重的全量列表（老产物，保持兼容）
+    user_id = df["user_id"].unique().tolist()
+    print(f"共拉到 {len(user_id)} 位参赛者")
+    (out_dir / "user_id.json").write_text(json.dumps(user_id, ensure_ascii=False))
+
+    # 2) 按赛道分开落一份 participants_<competition_id>.json
+    #    每条含 user_id / status，供 grant_coins.py 按赛道取较大金额、按状态过滤。
+    for cid, sub in df.groupby("competition_id"):
+        records = sub[["user_id", "status"]].to_dict("records")
+        path = out_dir / f"participants_{cid}.json"
+        path.write_text(json.dumps(records, ensure_ascii=False, indent=2))
+        print(f"  {cid}: {len(records)} 条 -> {path.name}")
