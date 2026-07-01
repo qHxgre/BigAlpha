@@ -36,6 +36,9 @@ class Judge(BigAlphaJudge):
     tick_safety_factor = 1.5
     tick_min_interval = 60
 
+    # 并行跑用户代码的线程数上限（同时评测的提交数）。默认继承基类的 5，这里按需覆盖。
+    max_workers = 5
+
     # 只跑部分提交（调试 / 复测用）：填上后整条流水线（跑用户代码 + 排名 + 回归 + 汇总）
     # 只处理这几个 id，留空则跑全量。MAX_PAGES 可选，限制拉取页数。
     SUBMISSION_IDS = [
