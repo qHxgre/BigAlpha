@@ -59,6 +59,7 @@ if __name__ == "__main__":
 
     import json
     user_id = df['user_id'].unique().tolist()
+    print(f"共拉到 {len(user_id)} 为参赛者")
     # 把这个list保存到json文件中
     with open('/home/aiuser/work/workspace/BigAlpha/system/scripts/user_id.json', 'w') as f:
         json.dump(user_id, f)
