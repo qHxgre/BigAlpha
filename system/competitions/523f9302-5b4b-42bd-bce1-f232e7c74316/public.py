@@ -37,7 +37,7 @@ class Judge(EndToEndJudge):
     # 只新增/替换这些 id 的记录，不会删除其余已跑过的 submission 记录。
     # MAX_PAGES 可选，限制拉取页数。
     SUBMISSION_IDS = [
-        "fe0722a2-887c-4dbe-bb9b-6634c0b392bb",
+        "284e0c6f-49c8-40ba-9c9f-73c996fdee12",
     ]
     # MAX_PAGES = 1
 

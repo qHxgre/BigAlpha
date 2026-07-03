@@ -41,9 +41,9 @@ class Judge(BigAlphaJudge):
 
     # 只跑部分提交（调试 / 复测用）：填上后整条流水线（跑用户代码 + 排名 + 回归 + 汇总）
     # 只处理这几个 id，留空则跑全量。MAX_PAGES 可选，限制拉取页数。
-    SUBMISSION_IDS = [
-        "fe0722a2-887c-4dbe-bb9b-6634c0b392bb",
-    ]
+    # SUBMISSION_IDS = [
+    #     "4ec02a39-de56-4aa7-8c19-b195f212b3cd",
+    # ]
     # MAX_PAGES = 1
 
 
