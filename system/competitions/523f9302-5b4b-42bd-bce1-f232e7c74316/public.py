@@ -32,6 +32,15 @@ class Judge(EndToEndJudge):
     DATE_START = "2025-03-01 00:00:00"
     DATE_END = "2025-11-30 23:59:59"
 
+    # 只跑部分提交（调试 / 复测用）：填上后整条流水线（跑用户代码 + 排名 + 打分 + 汇总）
+    # 只处理这几个 id，留空则跑全量。汇总时对 submissions_summary.csv 做 upsert，
+    # 只新增/替换这些 id 的记录，不会删除其余已跑过的 submission 记录。
+    # MAX_PAGES 可选，限制拉取页数。
+    SUBMISSION_IDS = [
+        "fe0722a2-887c-4dbe-bb9b-6634c0b392bb",
+    ]
+    # MAX_PAGES = 1
+
 
 if __name__ == "__main__":
     Judge().run()

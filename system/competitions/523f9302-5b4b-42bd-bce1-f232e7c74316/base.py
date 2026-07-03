@@ -45,6 +45,15 @@ class EndToEndJudgeBase(JudgeBase):
     DATE_START: str = ""
     DATE_END: str = ""
 
+    # ---- 只跑部分提交（调试 / 复测用）------------------------------------
+    # SUBMISSION_IDS 非空时，整条流水线只处理这些 submission id：主循环只拉取它们来跑用户
+    # 代码，截面排名 / 打分 / 汇总也只遍历它们。留空（默认）则跑全量。子类（public/private）
+    # 临时复测某几个提交时填上即可，无需改其它逻辑：
+    #     SUBMISSION_IDS = ["fe0722a2-887c-4dbe-bb9b-6634c0b392bb", ...]
+    # MAX_PAGES 限制拉取页数，配合调试用；None 表示用 API 默认（全量翻页）。
+    SUBMISSION_IDS: list[str] = []
+    MAX_PAGES: int | None = None
+
     # ---- mode 感知的产物文件名 -------------------------------------------
     # public/private 共用同一个比赛目录（同一个 competition_id），靠文件名后缀隔离产物。
 
@@ -100,6 +109,31 @@ class EndToEndJudgeBase(JudgeBase):
             score_analyze_file=self.score_analyze_file,
         )
 
+    # ---- 只跑部分提交时统一收敛的拉取逻辑 --------------------------------
+    def query_constraints(self) -> dict:
+        """限定拉取提交的范围：在父类约束（private 默认只跑入围者）之上，叠加
+        SUBMISSION_IDS 子集过滤。两处拉取提交的入口（主循环与 _iter_submission_dirs）
+        都走这里，保证「只跑部分提交」在跑用户代码、排名、打分、汇总各环节口径一致。
+        """
+        constraints = dict(super().query_constraints())
+        if self.SUBMISSION_IDS:
+            constraints["id__in"] = list(self.SUBMISSION_IDS)
+        return constraints
+
+    def _query_submissions_kwargs(self) -> dict:
+        """统一组装 query_submissions 的关键字参数（约束 + 可选页数上限）。"""
+        kwargs: dict = {
+            "competition_id": self.competition_id,
+            "constraints": self.query_constraints(),
+        }
+        if self.MAX_PAGES is not None:
+            kwargs["max_pages"] = self.MAX_PAGES
+        return kwargs
+
+    def query_submissions(self) -> list[dict]:
+        """按本比赛的约束（含 SUBMISSION_IDS 子集）拉取提交列表。"""
+        return self.alphathon_api.query_submissions(**self._query_submissions_kwargs())
+
     # ---- 共享小工具 -------------------------------------------------------
     def score_status_path(self, submission: dict) -> str:
         """该提交评分状态文件的绝对路径。"""
@@ -114,8 +148,9 @@ class EndToEndJudgeBase(JudgeBase):
 
         只产出仍在本场比赛提交列表里的 sid，过滤掉目录残留的无效项；
         score_models / summarize_submissions 共用此遍历逻辑。
+        设置 SUBMISSION_IDS 时只产出该子集，与主循环口径一致。
         """
-        submissions = self.alphathon_api.query_submissions(competition_id=self.competition_id)
+        submissions = self.query_submissions()
         sub_by_id = {str(s["id"]): s for s in submissions}
         if not os.path.isdir(self.submission_dir):
             return
