@@ -95,7 +95,12 @@ class ScoreMixin:
 
         兼容旧数据：状态文件机制之前跑成功的提交只有 score_analyze.json、没有状态文件，
         这类也视为已完成，避免上线后把历史成功提交全部重跑一遍。
+
+        例外：显式列在 SUBMISSION_IDS 里的提交是「指定复测」，无论此前是否已到终态都强制重跑，
+        否则填了 SUBMISSION_IDS 也只会被这里的终态判断跳过、达不到复测的目的。
         """
+        if self.SUBMISSION_IDS and str(submission["id"]) in {str(s) for s in self.SUBMISSION_IDS}:
+            return False
         status = self.read_score_status(submission)
         if status is not None:
             return status.get("status") in TERMINAL_STATUSES
