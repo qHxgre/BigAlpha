@@ -61,29 +61,36 @@ class ScoringMixin:
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         final.to_csv(self.leaderboard_final_csv, index=False)
 
+        skipped = 0
         for _, row in final.iterrows():
             score = row["final_score"]
             # NaN != NaN：A 缺失（如指标全空）时最终分也为 NaN，统一记为 -2 失败
-            if score != score:
-                self.alphathon_api.update_submission_score(
-                    submission_id=row["id"],
-                    **{
-                        self.score_field: -2,
-                        self.score_data_field: {"err_msg": STATUS_ERR_MSG[STATUS_ENV_ERROR]},
-                    },
-                )
-            else:
-                self.alphathon_api.update_submission_score(
-                    submission_id=row["id"],
-                    **{
-                        self.score_field: float(score),
-                        self.score_data_field: self._row_to_jsonable(row),
-                    },
-                )
+            try:
+                if score != score:
+                    self.alphathon_api.update_submission_score(
+                        submission_id=row["id"],
+                        **{
+                            self.score_field: -2,
+                            self.score_data_field: {"err_msg": STATUS_ERR_MSG[STATUS_ENV_ERROR]},
+                        },
+                    )
+                else:
+                    self.alphathon_api.update_submission_score(
+                        submission_id=row["id"],
+                        **{
+                            self.score_field: float(score),
+                            self.score_data_field: self._row_to_jsonable(row),
+                        },
+                    )
+            except Exception as e:
+                # 提交在服务端已不存在（404）或其他临时错误，跳过该条，不影响其余提交回写
+                self.log.warning("final.skip_submission", submission_id=row["id"], error=str(e), msg="回写得分失败，跳过")
+                skipped += 1
         self.log.debug(
             "final.scored",
             count=len(final),
             with_b=int((final["b_score"] > 0).sum()),
+            skipped=skipped,
             msg="合成最终得分 0.3*A + 0.7*B 完成",
         )
         return {"count": len(final), "with_b": int((final["b_score"] > 0).sum())}
