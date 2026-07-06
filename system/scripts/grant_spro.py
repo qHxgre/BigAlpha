@@ -30,7 +30,7 @@ USER_ID_FILE = Path(__file__).parent / "files" / "participants" / "user_id.json"
 SPACE_ID = "00000000-0000-0000-0000-000000000000"        # 主空间（全零 UUID）
 PRO_TYPE = "spro"                                         # 旗舰版 L1
 EXPIRE_AT = "2026-08-20"                                  # 权益到期日 YYYY-MM-DD
-DRY_RUN = False                                            # True 只预览；确认后改 False 真正写入
+DRY_RUN = True                                            # True 只预览；确认后改 False 真正写入
 
 # spro（旗舰版 L1）固定权益结构，见 skill references/users/management.md
 EQUITY = {
@@ -68,6 +68,28 @@ def load_auth() -> tuple[str, str]:
             server = data.get("server", "https://bigquant.com").rstrip("/")
 
     return token, server or "https://bigquant.com"
+
+
+def get_privilege(token: str, server: str, user_id: str) -> dict | None:
+    """查询用户当前权益，返回权益 dict（items 第一条）；查不到或异常返回 None。"""
+    url = f"{server}{API_BASE}/user_equity/@query"
+    params = {"constraints": json.dumps({"user_id": user_id}), "page": 1, "size": 1}
+    try:
+        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+        items = data.get("data", {}).get("items") or data.get("items") or []
+        return items[0] if items else None
+    except Exception as e:
+        print(f"    [warn] 查询权益失败 {user_id}: {e}")
+        return None
+
+
+def has_spro(privilege: dict | None) -> bool:
+    """判断用户是否已持有 spro 权益（equity.specification == 'spro'，不校验过期）。"""
+    if not privilege:
+        return False
+    return privilege.get("equity", {}).get("specification") == PRO_TYPE
 
 
 def set_privilege(token: str, server: str, user_id: str) -> dict:
@@ -114,13 +136,25 @@ def main() -> None:
     print(f"用户数量 : {len(user_ids)}")
     print(f"服务地址 : {server}\n")
 
-    ok, fail = 0, 0
+    ok, skip, fail = 0, 0, 0
     failures: list[tuple[str, str]] = []
 
     for i, uid in enumerate(user_ids, 1):
         if DRY_RUN:
-            print(f"  [dry-run] [{i}/{len(user_ids)}] {uid}  -> {PRO_TYPE} 至 {EXPIRE_AT}")
+            privilege = get_privilege(token, server, uid)
+            if has_spro(privilege):
+                print(f"  [dry-run][已有spro] [{i}/{len(user_ids)}] {uid}  -> 跳过")
+            else:
+                print(f"  [dry-run] [{i}/{len(user_ids)}] {uid}  -> {PRO_TYPE} 至 {EXPIRE_AT}")
             continue
+
+        # 已有有效 spro 权益则跳过，不覆盖
+        privilege = get_privilege(token, server, uid)
+        if has_spro(privilege):
+            skip += 1
+            print(f"  [跳过][已有spro] [{i}/{len(user_ids)}] {uid}")
+            continue
+
         try:
             set_privilege(token, server, uid)
             ok += 1
@@ -143,7 +177,7 @@ def main() -> None:
     if DRY_RUN:
         print(f"\n当前为预览模式(DRY_RUN=True)，共 {len(user_ids)} 人。确认无误后把 DRY_RUN 改成 False 再跑。")
     else:
-        print(f"\n=== 完成：成功 {ok}，失败 {fail} ===")
+        print(f"\n=== 完成：成功 {ok}，跳过（已有spro） {skip}，失败 {fail} ===")
         if failures:
             print("失败明细：")
             for uid, reason in failures:

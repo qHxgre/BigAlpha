@@ -1,0 +1,6269 @@
+{
+  "reason": "初始礼包",
+  "space_id": "00000000-0000-0000-0000-000000000000",
+  "since": "2026-06-30",
+  "generated_at": "2026-07-06T11:23:14.621686+08:00",
+  "source": "TASK_KEY=初始礼包",
+  "plan_csv": "charge_plan.csv",
+  "history": {
+    "002811d4-b565-40f1-a204-86a772241a04": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ff0fb702-210e-48da-ae86-6624f9fa20d3"
+      }
+    ],
+    "00a7ce00-7f72-49bf-beba-9a027380d3c9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "74bb8465-fa68-4b3c-8ef0-2b5c97368837"
+      }
+    ],
+    "01ac075b-9ae5-40d0-9160-aa7459c4ed2a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "67974a94-6e82-4ebe-bd24-360925765fb2"
+      }
+    ],
+    "01efd435-029c-4db6-9e24-aff33774a588": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "442af7f3-8327-4f8f-a2e3-1f19791f07a8"
+      }
+    ],
+    "022f198b-9eea-4ef5-9bfb-235c43d3a49d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a8ca7ffe-2da5-401a-b532-9657917a47f0"
+      }
+    ],
+    "02b64fd1-464a-4b8d-b7e1-eb201822711f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c7a85ee5-f638-4556-9178-36609d845b35"
+      }
+    ],
+    "030dacdc-469d-4e80-80cb-e58a91522d15": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6560be70-8b53-4b24-9dd0-2fb8095416be"
+      }
+    ],
+    "0330d71b-ad6f-4fb0-9c45-85dffbf87e3b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1308b69f-65cc-44df-820c-654984252e5b"
+      }
+    ],
+    "03ed981d-dcc2-4a28-bae3-0191caf0753f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ad1d957b-469c-4a2c-bd26-1bc252d7bb49"
+      }
+    ],
+    "04fc0e02-26ab-43a6-8e14-7fe34dbb6ae6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "847c2863-2eea-4b4d-947a-d157eb013add"
+      }
+    ],
+    "0500f13a-4457-4312-a3e6-169dea314974": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6a90b519-16a5-4299-b93b-01539019f261"
+      }
+    ],
+    "057dedb4-f36f-43c0-928a-e986ee1c9ea1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "83ca43e1-05ad-4602-96ad-99a1f1077676"
+      }
+    ],
+    "059e1195-77f5-4476-a5b6-a2dd843efecc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "03983d56-056a-4a9f-91ee-9bafd3d4a7ac"
+      }
+    ],
+    "06a879b8-3898-425e-9b2b-30234686010e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "80d2243a-972c-413a-b02f-b1c537fb6aae"
+      }
+    ],
+    "070fbc55-efc8-4552-a10d-2711764093f2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "47f79cb7-425d-4ee7-a5da-520c6fd3081f"
+      }
+    ],
+    "07885e87-864d-4bdf-92cc-30fdbcb37ca2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fd087c6e-fde8-44b3-8862-87d8ae8074e9"
+      }
+    ],
+    "07cf959c-63f2-4d03-87b0-5593408bbd9e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e28b2fe7-8970-4abf-9dd2-e9eac1a7a41f"
+      }
+    ],
+    "08279ea2-7c0a-4bd9-97d6-00617155daa5": [],
+    "0846d1bc-79f5-40d7-a985-adb38595faf9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4e186d1c-98e0-4bc4-9e61-a84e63c8c95c"
+      }
+    ],
+    "08d2d048-f0e7-41f1-a532-086edb5d1af3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1cd592ef-471f-4736-9ead-2d58ee1610f5"
+      }
+    ],
+    "08d55a35-684a-43f7-839f-8bac71ad219b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "edfea9fe-e57d-427f-af36-f7c34b83c87a"
+      }
+    ],
+    "08fd1369-0228-432e-a96b-8931ee643f2f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c15fa44-fb96-4622-9880-ac7afd5805e2"
+      }
+    ],
+    "09382c6b-205a-4c43-ba15-5083300739a8": [],
+    "093e34b3-a150-44b1-8580-62f184b4111f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bf8c878e-458d-4cf3-ba46-d438469bf86e"
+      }
+    ],
+    "09877c39-2653-4aa1-9100-ac56fb8693a7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "acb29b5e-6008-4c18-8360-8ec57f1024b0"
+      }
+    ],
+    "09906196-8637-41e7-b940-c3cd0959350d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "efa7175d-dd69-43a1-9746-84fef6e3cfa7"
+      }
+    ],
+    "099092b2-a834-400f-904b-b3b975dbbd4e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4fef6811-b2fa-42f8-bd75-d66b41db64e5"
+      }
+    ],
+    "09943855-ba53-4619-99b4-6fde66a9e49e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "aea2c79d-81bf-4565-953e-3ca5b447d7f6"
+      }
+    ],
+    "099b26af-d053-47e4-9e13-90f1b9308c24": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f33f5ea-ea51-401b-ba89-0a44ca7d6872"
+      }
+    ],
+    "09c9885f-13ff-4a59-829f-cf9ab8b6a907": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "732fc372-278b-4102-b89a-f7090eececd0"
+      }
+    ],
+    "09db68fc-9c58-439d-aa4a-b62c26ab59e4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7efdefa7-00c0-4f1a-870a-794ca9c46de7"
+      }
+    ],
+    "09e9ef5c-768c-49aa-9d22-6602ced02762": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "debe08d5-ae4e-4776-9ee0-c6c8e78de8c0"
+      }
+    ],
+    "0a2f5dad-f4d0-4f97-be7a-6e833f99441b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a739dac6-7f4c-44e7-9235-50c1ecfa2d1a"
+      }
+    ],
+    "0a795020-64cd-45d4-8a77-a24b9cfbd968": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c6269411-effc-4c76-b025-d5d7cbf32ddc"
+      }
+    ],
+    "0a7b3e6c-1ab4-4c79-be3d-10234860bb3f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e12db564-af32-4222-b021-cc09b8cdc059"
+      }
+    ],
+    "0a95f972-f573-4224-b1a1-217e2fefc1a3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ce2f0dce-1526-4dc4-ab9f-2abd234cff58"
+      }
+    ],
+    "0aecb96d-d428-48b6-accd-3c296b3c723b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a49f76c6-e507-48a5-9b1f-02d5cc2385ec"
+      }
+    ],
+    "0b6b8dd4-64f8-42c9-9d1f-f03031c0437a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "88251c2c-f329-4c12-8787-5eff70ee3fce"
+      }
+    ],
+    "0c0b02d8-a2b4-466d-86a3-c0b3e8450d6a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "91d84810-013d-44a9-bd0d-65d05e03764f"
+      }
+    ],
+    "0c36fd40-dde3-490d-bfb4-429c399337c2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0e6d2665-87eb-4043-9847-de7891e101b6"
+      }
+    ],
+    "0c8beb62-9018-43a5-ba1e-0da6a6bbd385": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "66bcaad8-bf70-4fc1-b44c-efb66f3c7e31"
+      }
+    ],
+    "0ca3fe62-92df-4429-bc23-630caf17c9ab": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bab02098-80b3-49ff-af7f-1722637b3197"
+      }
+    ],
+    "0cd932dc-0ac8-4718-8173-9dd7818c107f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "610f307d-aef6-4ebd-bca4-a02310945936"
+      }
+    ],
+    "0cfbb755-00e3-46b1-ad5f-a0e487ba802f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "df892ec7-8c4a-4584-b079-a1e0d5cd7d43"
+      }
+    ],
+    "0d7b59ae-1c50-4f37-b04b-71c98a4fb72c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ba33dd1d-b7cc-4016-81a0-5d7a71bdbc3d"
+      }
+    ],
+    "0d9d6ef9-9c1a-4e7a-bda0-d3b0aea5eeb7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8c5c53e9-9553-4a04-ad32-adeb58cca5a4"
+      }
+    ],
+    "0d9ede06-6ca6-4be5-8d3e-2105047c1f59": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a2d4be1c-68dd-45ad-b1b6-06d9990bb2b3"
+      }
+    ],
+    "0e2fc608-94e3-4e57-a14d-9d8211287642": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b457272b-9ff6-42de-a307-533cd330717b"
+      }
+    ],
+    "0e57d455-2f99-4a9f-a16e-3bfce382565e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "690f5157-301f-4bf1-952e-a8ca171bb388"
+      }
+    ],
+    "0e80f90a-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ab8c69dd-e937-443e-aa97-2b08d1c34d9f"
+      }
+    ],
+    "0f8bbae9-fb60-47ef-95ee-77720e87eb6f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ccb29df3-d8cc-4b74-820f-34b3bb5b2cd0"
+      }
+    ],
+    "0f955a3e-9819-4cba-a831-7220af582169": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "654e7baa-a557-4801-9296-c8321c1dd09a"
+      }
+    ],
+    "0fa5bf1e-58fd-4ecb-8e1e-03d7f59f36b8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "97077054-2e92-4d0e-94b6-ee94a07eaff6"
+      }
+    ],
+    "0fc7fb55-6c6b-41d3-978e-9d9d21aace19": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c28ed82d-e63e-4c91-a717-2d69331214e0"
+      }
+    ],
+    "0ff83f05-8cb0-4713-b28e-ba74daeac6b4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8ad0d06e-fba7-4797-a493-4e176f0fab59"
+      }
+    ],
+    "0ffca298-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f72e5455-2b01-41ec-841a-f0ef2ed54fdc"
+      }
+    ],
+    "10000000-0000-0000-0000-000000000001": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "968f4da8-89d3-4953-b1e4-b6b7a714be96"
+      }
+    ],
+    "10119f87-ed08-4610-984f-d30945cc0669": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8ece3efe-54d7-435a-aab3-9709a5a5e5b9"
+      }
+    ],
+    "10f09041-e8e0-4ffe-b79b-5dd90d0535b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "83c12b09-3b91-44fd-81d0-cae583472637"
+      }
+    ],
+    "111632bf-c7a8-48b7-bd80-afc1a1d8cd03": [],
+    "1124af08-76cd-44d5-8106-be1bfa8b41fc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "29d258db-a92a-418f-8453-79e6de76f5bd"
+      }
+    ],
+    "1182fec8-ccf0-46d1-a121-8f076516e05e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "94a6c74a-3d45-4af6-a0a0-058b7bf5ca5a"
+      }
+    ],
+    "11c5628c-45ad-4114-b712-cc725ce65345": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8d1da6e8-750e-4452-8890-5a0ac90a3332"
+      }
+    ],
+    "11e85f0e-87ef-4e47-913b-8958daab231e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "80b403a0-a963-4712-84ce-af764e67fc8d"
+      }
+    ],
+    "13824cd7-a3fc-4d1b-b272-2b35214dd232": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f64fb770-577f-45ee-96dc-e8cfdca4b431"
+      }
+    ],
+    "13a9473a-2707-4d40-a96c-4e5fcd6d21e9": [],
+    "13e645fb-cdd3-4fb1-ab97-e59dd39016c6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ce222f07-f4c2-4840-b366-97382792815e"
+      }
+    ],
+    "14031cd1-3875-4e38-bb8b-3b5a1c7ca1b6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fe5585bc-d776-4c35-81a2-1a7473232639"
+      }
+    ],
+    "142eb6fc-5753-4a7b-9678-fd6b2c0f6a00": [],
+    "144336bd-6473-4633-85b4-fba130a493ca": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a2a37daa-44d3-47fd-b8dc-c34aea610d3f"
+      }
+    ],
+    "1460e0a9-7dcf-4b5a-9aa8-8858bb67a5bb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "615970fc-3d35-4cfa-9d67-2bbff0e4c218"
+      }
+    ],
+    "1461a9ae-343d-4a56-9a20-8d057e803df4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "32e93800-838a-4bdc-92d0-d1a95e1544f6"
+      }
+    ],
+    "14bf944b-5c1e-4acc-87e1-e4851d167abe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bf8b37ca-7ed3-4ea0-a1d9-d291e598cd05"
+      }
+    ],
+    "152372ef-6902-40ab-bf8f-ac5d830c391e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e2647ae4-3adc-4e57-bb90-0352480ad888"
+      }
+    ],
+    "15ceecca-fb51-4c33-bf8a-d21c61abe847": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ae4e8043-7dd7-47f0-849d-aa80b72b5942"
+      }
+    ],
+    "15f37d42-9b3a-482d-aee0-2687ebfb30ea": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "de8de5fa-8287-4fc0-a16e-ded07ba699ce"
+      }
+    ],
+    "16211b35-10f8-4d63-9190-780af35e0892": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d534ea6d-0f62-4eef-8ee5-b2e293ff8ab4"
+      }
+    ],
+    "164b72df-8fcd-4420-a8ea-413e01277bc4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7672ab77-5541-4a34-9a85-bbcf1bd042b0"
+      }
+    ],
+    "16afe7bc-a569-4a3d-b862-52b0c569cc9e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4c1354c9-d41b-480c-9aa8-8f3f466f8db8"
+      }
+    ],
+    "1730c360-b0e0-4844-8c05-a705a09879f8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "77a74c80-869f-4db1-b800-03cd1e246ea7"
+      }
+    ],
+    "17b80b57-d0ce-41b2-8337-cfdc346bc7f6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6ecac90f-012d-4e0c-9621-a555b0d6d344"
+      }
+    ],
+    "180d5145-2c57-4ff7-925f-959d0980019a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8a775dff-236d-4d8c-9ea1-f15e1da373af"
+      }
+    ],
+    "18428dc9-bf1c-4506-8a8c-6a5d8966114e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dbb73724-5bfb-4031-a629-463413929d72"
+      }
+    ],
+    "189c541b-e6b0-43af-a076-c212aa291117": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ac48c4d9-24f9-4b3a-8dc7-c839cf176d58"
+      }
+    ],
+    "18ae3101-b60d-45b5-83fc-5a4c02fe2ed3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cde755fe-5137-40c0-94cb-0a020902c31f"
+      }
+    ],
+    "18eb986a-7be8-43f4-a1ca-cf6b313c6a9b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "155a3458-bbcd-4e58-b818-3cf2c3cef1ed"
+      }
+    ],
+    "19450479-58f9-4737-87fc-742f62ba1e27": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "54e43852-aa19-408e-acd0-95e9c84814e3"
+      }
+    ],
+    "1a80e67c-0a16-427d-95d9-0bd609bd6a6f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5ff247ab-06d7-47e4-b2cd-636cf0309597"
+      }
+    ],
+    "1b000b15-8ce7-42cb-972e-2e7dc8c8cc61": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0d2271cc-c4b2-4041-bc6e-616caa3bfa73"
+      }
+    ],
+    "1c74790c-4699-4a3a-aa8d-63a04e9f3128": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a235244f-dd04-45ea-abca-330dcfdb2246"
+      }
+    ],
+    "1c965e6c-56f4-4a24-95e2-4a893ba879f6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6e544364-8104-4290-81ac-a20b91a8c955"
+      }
+    ],
+    "1ce9beea-21e4-43a7-8cfa-36d16bdb533d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "68c8760a-df1c-4045-8f9f-c2ce377c1e53"
+      }
+    ],
+    "1d4a55c5-8174-4ade-8329-bd017ebc7b48": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0a291b3f-a637-47b9-9d5a-8cd6d988a053"
+      }
+    ],
+    "1d5c1fb5-dec6-4551-b7b4-630baf80ebb7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9e6a0607-10a3-45b5-8ac2-47c0703caab5"
+      }
+    ],
+    "1e11e2c6-a7e3-478e-8f5d-5c4fa1cc367e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "61ea82ff-218c-4183-a49d-d14b67b5eaff"
+      }
+    ],
+    "1e5da58e-e8cb-4749-b16a-3a064a19acb9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7765a032-8bba-4fff-a6d1-0f3d6f444b00"
+      }
+    ],
+    "1eb822d3-ab5c-401a-b39b-60a71bebfcbe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2ef82545-fb0e-43e6-8447-d0d4611f81ab"
+      }
+    ],
+    "1eeba849-4a6a-4f39-9b12-fdca71fcb76f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ba0802f1-8c1f-4f7b-bb00-f8ed9695c4cb"
+      }
+    ],
+    "1f3afd9e-7eda-4e5e-9605-34f0cb6173f0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "421ea573-d585-448c-bd97-655394937be0"
+      }
+    ],
+    "1f58e909-f2e4-4eca-b707-c52462502399": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0f3febac-6f6b-4dd4-83e8-caa56bcd1575"
+      }
+    ],
+    "1f778bc8-f89e-482b-93f4-035697c00554": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bec42f9c-02be-4c56-8ee6-45078a8d2824"
+      }
+    ],
+    "1f8a31f7-2f6f-422b-ad96-6f69b35e2629": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7d4574f3-a181-49c1-88c9-ab4dcf78aa5d"
+      }
+    ],
+    "1fae27cb-444a-4c6e-82f7-d4b1d10c3f1a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ee4bbc5f-e466-4dba-8957-2e0e06fae652"
+      }
+    ],
+    "201d2b22-28d1-43fa-8d46-eef8a980ad56": [],
+    "2051a613-5e18-4f43-8661-881d90dda391": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "17a7b08b-afcf-477e-8f99-1e7078669941"
+      }
+    ],
+    "205a014f-5f47-4d4d-9856-c910792a29a5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1325e1d0-f71f-4b66-81c1-8e8b3177c721"
+      }
+    ],
+    "207097ed-25c3-4f57-863a-dab572fa0061": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "50f72e74-b516-4166-ad42-d4e2814f90c5"
+      }
+    ],
+    "20d979e9-ffc1-44e3-bf99-b072fe44e6ba": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "99781ceb-4170-4415-b0a0-a34d13169ee4"
+      }
+    ],
+    "21672741-7298-48e1-936c-08e2a04f1ef8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "85e137eb-a818-4f6f-bec0-a4cc1303329d"
+      }
+    ],
+    "21fa4459-6cb2-45ed-a995-5b64e609fc67": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6f5a4339-b133-41e2-ba08-6ffeaaa9c64f"
+      }
+    ],
+    "228f636d-79fb-4185-9fc0-40c443a7468a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5b770ae7-ecf3-46ae-87b4-40db50cb202a"
+      }
+    ],
+    "229ed75e-09d6-41b9-9260-a4495a63e5d7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2e8c7da1-c9ae-4a88-b1c4-632ba8ef2f55"
+      }
+    ],
+    "239ba5a8-8d09-45a8-89a9-fca6aea1162d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b6fabb2d-46de-4133-8124-a21bfe50086d"
+      }
+    ],
+    "23e0e210-2849-482b-88f1-7b460d1e72ee": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c45c0f1c-0699-4bda-81fc-9592682681bd"
+      }
+    ],
+    "24b9c5c7-ac02-4b05-a25a-9ad064b7cd06": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "883f3ee5-10a0-4958-898b-71a3997731cf"
+      }
+    ],
+    "25211165-28d5-4630-a6a0-df79b808206e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ef9b1c95-3a1a-43ab-b3b0-bb7bdfe70ca5"
+      }
+    ],
+    "256b16e3-cf3c-4520-8384-9507b27382f1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7afa702f-937d-4f91-b55b-68971e1cdffc"
+      }
+    ],
+    "25eccebb-ce85-4559-ab0b-d1e6cfb7f246": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bd5c10a7-b48a-4607-9c16-a2a1be6b7ec8"
+      }
+    ],
+    "26a30233-6b1c-4333-954a-b019db2a7e3c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e642db73-c994-4b8f-8a8a-e5595cafc211"
+      }
+    ],
+    "26bfb214-7e63-4d52-b744-3ae406f980e2": [],
+    "27201532-0f84-4be5-a41c-e56936c315c2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a71b6f84-60bf-488c-96e2-5edb8e8aff2a"
+      }
+    ],
+    "272e47f2-d626-4b9c-905f-5a0037d46536": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "db00515e-2fc9-4019-b903-2d5f8c1ae56d"
+      }
+    ],
+    "275526cc-3b21-4b17-a71b-538e497dcf7d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6a696308-bef9-45ba-9a49-48b49f898f63"
+      }
+    ],
+    "277486ff-c360-47f8-8838-4861124894b5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "334a812d-cbd5-44ca-a6bd-bd3731343886"
+      }
+    ],
+    "27c0f7fa-20ed-4396-a606-dd99bfae22b8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c0e525cd-73d9-41e3-a1aa-6a7a9222c4fe"
+      }
+    ],
+    "28e3aa4e-bd32-4333-870c-dc77b7d507c2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bb8ac3bd-5d49-414e-9a80-755406f88f5b"
+      }
+    ],
+    "28e6d5cd-b21f-4d3c-b504-f2ca80ac2679": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "90f4548b-6c84-4544-a015-8a6c18c7353c"
+      }
+    ],
+    "28eda1e7-0409-4b81-90d2-a7cc89121490": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ad8f498a-2db4-4132-8cf9-33b00b977457"
+      }
+    ],
+    "291607dd-161e-4608-b15b-3f0d0dca5682": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dafe87ed-f614-4ff4-bd74-427b00f76760"
+      }
+    ],
+    "2998b58f-e75a-47a1-b9e8-f60ddaee2c77": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e426c8f4-fbbb-4490-a058-feaa6e8ca508"
+      }
+    ],
+    "2a086eab-836d-43ec-a00b-c61b018f68e1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "26835c22-d425-435a-87f9-2590a782e081"
+      }
+    ],
+    "2a0f1ee8-c016-4eda-af3e-053e38d3c190": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4778fae5-df87-45b1-9545-2c65359eb209"
+      }
+    ],
+    "2a3d14ff-f644-4dfe-99d5-1b83a988b47c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "323c55f6-499e-4b58-8462-41b4e07970ce"
+      }
+    ],
+    "2a52d1d0-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ff5c7822-8c5b-44f4-8f9c-6e3990395618"
+      }
+    ],
+    "2a8c1c54-5fd8-4b8c-9268-510c4265a132": [],
+    "2af84494-f243-4d50-88b5-aae91006ffda": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6758d47a-df3f-4d22-9148-37aa15e96e5c"
+      }
+    ],
+    "2b0f819b-8e92-4f94-9f3b-1b1f0f925050": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "eaeff17f-6330-48d9-9a70-5ecc3fffc331"
+      }
+    ],
+    "2b1aa83b-3d5d-4af2-ac5a-2d49c2b2016c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "45f464a2-515d-431c-aa3a-1ef74031e5d5"
+      }
+    ],
+    "2b29e5f5-ecfa-4792-83a9-72738a151daa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "18c2fe17-24e5-447f-92b5-2f6f06d7e7e5"
+      }
+    ],
+    "2b615c3c-1166-4c4a-a1c4-88151fc73a24": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "38a7c4c4-00a2-44f3-a09d-54e64957ae25"
+      }
+    ],
+    "2c04692d-3a56-404a-8d21-cae6e4b1b611": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9e1a1648-bba9-40aa-b0c8-516e3f949cee"
+      }
+    ],
+    "2c2c7524-3b46-4d64-8d7a-398d81dafc6d": [],
+    "2c656e0a-2a53-4020-8f82-e6b644b5d0b6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f213ecab-866a-4538-951f-0b2083a2fc37"
+      }
+    ],
+    "2c9564c2-53ee-4b41-93e7-0c6d7663bb90": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8c323084-5a24-4d52-b8ed-6830a1729a49"
+      }
+    ],
+    "2d37e338-b22b-4159-894a-0519ec7c2138": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "363b73b6-2292-458b-b13d-71b8e3fdf6c7"
+      }
+    ],
+    "2e2bc5d2-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6f7b3002-8161-4b4f-998b-717987d6bd20"
+      }
+    ],
+    "2eecff7c-2653-4acd-98c9-93b9d400a2ee": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "35688cac-f279-41f7-96fc-da494182bf3d"
+      }
+    ],
+    "2f37464a-6b16-4f08-8d7d-3d606d14b046": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1cfef2b4-dcf0-4f41-a728-21c6dc321a75"
+      }
+    ],
+    "2f6ba3a8-e515-4d26-97ca-a61e7e215d9d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "76c2e3a4-4ad9-4574-823e-56ecc7122b84"
+      }
+    ],
+    "3025ed00-c2dd-4c4c-b7ed-f87eeee0a778": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ecfe5f12-f8fb-4e8b-b313-515b85a299ea"
+      }
+    ],
+    "304b7703-0395-4c26-a431-e2189c500c43": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "547c3f2b-24e8-4ead-97a0-fc0d7e1496eb"
+      }
+    ],
+    "30b8cd11-469c-42e6-bb7c-3cc832a3fca6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "728d406e-ab03-451c-97ca-15372e803664"
+      }
+    ],
+    "3143502a-61ce-46f4-86e6-77bf081a5a88": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8d476d45-0b50-4619-9e74-8e5941d583fd"
+      }
+    ],
+    "318feb15-2619-4e34-9f6f-df4d9d2363a6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ec45acd3-982c-4c85-882b-945358995197"
+      }
+    ],
+    "3232d82d-9cb5-4fea-b8b7-1bc2583a0cc5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c37b43a2-a792-41d5-946e-751a929c40dd"
+      }
+    ],
+    "326d9605-9dbc-4af7-8826-69d98f6e6298": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "aa0b8c5b-d68e-439f-a4d0-0429062cd64c"
+      }
+    ],
+    "33056a39-5697-4746-9d10-501684dbf06e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c8f89cba-60c7-4d2e-90e9-b9b4d130d5a6"
+      }
+    ],
+    "3325e450-2602-4133-a457-10401ec9eca4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "eb66dce0-49e6-4bf0-898e-d63f27686f36"
+      }
+    ],
+    "3372427e-7996-47a2-a0c9-2e9b1ee98fc1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fb6e97ab-2d37-4650-ab9c-721a0b625e30"
+      }
+    ],
+    "33a678cc-01ed-48fc-b619-c53d5d8a5e91": [],
+    "33dd9d02-ddfe-41cb-a3b7-59f3b5e4dd01": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bf140b57-3b66-4795-9455-f5947003f3c9"
+      }
+    ],
+    "33e743bb-e3a2-41d1-b487-355d20d67b88": [],
+    "345bb39b-bffd-405e-8fde-d078868b3718": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "68f70ea3-f25a-4009-91b3-e55de5448526"
+      }
+    ],
+    "3480f3ee-3df6-40ba-9754-59ec06bb0e4d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8862f311-d459-4757-b07a-848e6ab0f12d"
+      }
+    ],
+    "34d7a3b8-8596-4553-a822-08d3988218c0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c0bb1a11-61a6-40b3-92b2-da3c6d376352"
+      }
+    ],
+    "3558ed27-c18b-4b32-ba35-0d51f4b1e5f1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b5e4104c-af57-4996-8309-56558ab28aaa"
+      }
+    ],
+    "359136d0-333f-4632-9a3a-3e1036a10d05": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1c305856-69ca-47fc-87f5-9f08ccaa7215"
+      }
+    ],
+    "35ebaff0-08a0-4706-b262-57fc9a4ad8b5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "91a94d8c-6484-47d0-9513-64158f71bd36"
+      }
+    ],
+    "3718ce4d-7132-4ba2-8bd1-035bcc0bb115": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7ce2748b-8d82-4130-bf3d-c5cc1e3dbc81"
+      }
+    ],
+    "37228888-8174-4561-9155-8099bd4e6dab": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "83ad2efc-038a-4e10-964f-dc5869e3d207"
+      }
+    ],
+    "37892389-4bac-42b6-951e-c886d2869725": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "605acc8d-a4a3-411e-96bf-27b9305169f3"
+      }
+    ],
+    "37b087be-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a61b8b60-ec60-43ab-bafd-7adbd812d5c1"
+      }
+    ],
+    "37c0dbd7-0baa-43af-aa69-14867737c9f6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1c3fade4-19a1-43b5-bae3-615d1817ee1f"
+      }
+    ],
+    "383c47b4-404a-4ef0-8afa-5bfefd23e931": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fac36796-3c97-49ab-b0b6-4a0bfcb74baa"
+      }
+    ],
+    "3850f571-07c3-4e1b-9e32-1afd7c5ea1a1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3fb74593-71dd-449d-99a7-99040e455ae4"
+      }
+    ],
+    "3872fd97-d68d-423d-960e-6589f2b3a206": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ca786f36-79df-4b66-bcdf-ae4db84826d0"
+      }
+    ],
+    "38e58f8a-4b90-453d-b945-d34cc3e7390f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dfe14936-4ae6-44c4-9d25-f02dbc1d483f"
+      }
+    ],
+    "38fa2349-d3cb-4f16-b06b-e3154419e060": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9da79c4b-72be-42fa-9d88-7afa79fdeb05"
+      }
+    ],
+    "39c61e41-1ff4-4674-8795-c2ec459ec15b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "14064598-b388-4f84-b8be-b8386f103692"
+      }
+    ],
+    "3a78b142-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0dcadf43-b343-4c44-ab3c-bbf845ee5097"
+      }
+    ],
+    "3ab37387-f0e9-4ade-b7a2-f440675ca0a7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fcffee78-d324-4f25-9ba2-51f22563fec3"
+      }
+    ],
+    "3afd8cbe-ab61-4530-bad4-f8d653580402": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "70210cd3-606c-4b7b-8d01-ea9b64b5f59a"
+      }
+    ],
+    "3b8fa41e-d6aa-47c9-8775-776b4641929b": [],
+    "3bb1d196-ad61-4a46-9ae7-4ec41391a9da": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7f0c4b18-a0d2-4b97-b6cb-c141a7c98491"
+      }
+    ],
+    "3bcedfbe-216f-44c6-82d7-d8dd77c77f0b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2b676b76-9ac0-4022-93e3-5281996e2164"
+      }
+    ],
+    "3c35dcda-8b19-4f51-a82c-d3a9344cf3d4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "57a6b33e-bdae-49f6-b71d-97dd2fc2f283"
+      }
+    ],
+    "3caa4ad6-6eda-4516-b68f-38f1292481f1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bd660245-09be-4739-af9a-6a92e2ad2348"
+      }
+    ],
+    "3ce00cd8-ebe9-4074-b2c4-18ae479e3816": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "337be0b7-ef2f-4d5c-9cbc-4f655694c626"
+      }
+    ],
+    "3cf8845c-db5b-4f03-9d9c-ebe6c3f275c9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f309c5c3-a469-4492-bc18-56ab9fc40f80"
+      }
+    ],
+    "3d0ef03c-31d2-4808-8515-49e77bb5e9f9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c42b5405-9463-443a-b8b5-b42479d39745"
+      }
+    ],
+    "3d545359-bc91-434e-b6e5-b8d9d595f7b5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fafdc2e7-ebee-4a51-85de-37d3f204dc9b"
+      }
+    ],
+    "3d5a2da3-5fe2-49a4-8c80-fca8f1899fbe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bd7a0919-ada0-4013-ac09-6a8ab79c3d68"
+      }
+    ],
+    "3d67b093-3b16-408a-a8fb-5a6025562d4a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f543c205-006f-4b19-8383-0115ce0968d4"
+      }
+    ],
+    "3d7700a8-ae1c-46b6-85e2-7da4ccd5d8d6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ed47591c-51a7-46bf-bcc2-d2d800d5aa2f"
+      }
+    ],
+    "3d99f3df-d9e9-4e11-b0e1-8bbf59693c77": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c96b1e0f-2b73-43ec-bd1d-d244016eb794"
+      }
+    ],
+    "3db21b36-e4f3-46cd-b36f-e2f52905d65f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "96d4a110-bd73-4556-9cd9-026dc7a7910b"
+      }
+    ],
+    "3e16cb07-aa58-43c8-b1ab-e4bb00848c74": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5b9125ce-663e-4674-833c-5958f3c6ad97"
+      }
+    ],
+    "3e3dbc14-2446-4abb-a418-e1df7a730fe8": [],
+    "3e8e3ee5-d98f-467c-9475-510335622299": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28cee6a2-c5a5-438d-a47b-139a63c17327"
+      }
+    ],
+    "3ea4fe92-43be-4629-a37e-9ca401be2dc0": [],
+    "3eb99a61-3a90-493c-82ba-fbd0d2071736": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fe61dc5c-5366-4869-9f45-8b68cf5c52b1"
+      }
+    ],
+    "3f06fec6-3b0c-4fc8-8044-5d5f808f9120": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2f9ea2e0-beab-45bf-a77d-dca003cf5a10"
+      }
+    ],
+    "3f11faa6-2826-4282-8f43-fd400d0113cd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2dbb8044-dfa9-4604-aee7-e4692e78b5d4"
+      }
+    ],
+    "3f28c0bb-3bdb-46e6-bbca-ae3bf932312c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ca94d22d-17a7-4611-9ef7-08b904cb62a3"
+      }
+    ],
+    "3f719f5c-dba6-49da-9132-5db35f4c9b42": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e51f4507-b783-4a26-ac04-447f9addd453"
+      }
+    ],
+    "400f08cb-5d4e-4108-95d2-eba6cb3fb855": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "26ccc802-fd91-4bf5-b4d1-078ff9ae23b9"
+      }
+    ],
+    "4017837a-d1c7-470e-a0da-1a39bd8a078b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4aaa2302-185d-4fe7-8307-f9c288a64f08"
+      }
+    ],
+    "4019df1d-6e18-4442-9430-9bf95e48a7f2": [],
+    "40fc5536-56d8-4a79-97f1-c88f87895e23": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e338a0af-3933-4696-b3bd-3b84cb53ccf6"
+      }
+    ],
+    "410cb22a-010e-4832-9a6d-950a055f7904": [],
+    "4129994c-b2be-4634-bf1b-7dffe8a2364c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "44c73bf9-9db0-4f03-b6fa-1c68767f19d4"
+      }
+    ],
+    "41b38e92-b8fb-4a2d-884e-6293233708cd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f4e2eaa5-3948-48f4-b09e-713df6fdb025"
+      }
+    ],
+    "41d29634-d329-46a7-80ee-2dd0dc0c8526": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cde771c6-92da-41ec-9f27-bae0edaa9300"
+      }
+    ],
+    "41e86b23-3ad6-4469-b48e-5dc95fab7953": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "27f76447-4aa1-4a2f-a092-c9c1ad7f98f4"
+      }
+    ],
+    "4246ed6c-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4aa6491d-f398-4d7c-a573-481f0cc17e54"
+      }
+    ],
+    "434b7f6b-74fe-4a69-94d3-f0c50a1dcbe6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "923d51ab-5643-4902-a790-ea24c29fe66d"
+      }
+    ],
+    "436269a0-5a39-41ee-b06b-4b0945343979": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f70ee36c-eaa5-4afc-bc1a-01efba83fb64"
+      }
+    ],
+    "44421ce2-8b22-4164-96eb-aa6d2b47e0fd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c19f27d-1acb-4499-8147-c879fbe3af4e"
+      }
+    ],
+    "44472669-14af-4c2d-9c7a-819012ceea4a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "38d11867-ad96-4cbd-84fb-0dfde289f9a4"
+      }
+    ],
+    "4467ea30-36b8-4e22-84cc-9bfc31700a56": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1d5145bd-2a49-4460-9a65-f7ba6a55ce61"
+      }
+    ],
+    "44d4a580-d36a-4a82-990c-d0f755a8f900": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4dd3efb6-1bdf-47f9-baf8-7867a23edc68"
+      }
+    ],
+    "4554243f-c935-4dd5-b662-32ad271c8b56": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e71fd8b3-e9a9-4029-a2ad-46caff4a002d"
+      }
+    ],
+    "455ac01d-81ac-4261-8c14-bd944e78571a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f5b969fc-fa02-42e5-91e4-c8b42bc1cf85"
+      }
+    ],
+    "45d30204-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "148380a2-0643-44b6-8642-7ac6af7117b3"
+      }
+    ],
+    "45f78694-456d-405e-be28-953cae5c9ef7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8dce6aba-551a-4009-bbf2-a103c09a7277"
+      }
+    ],
+    "464434e8-1487-4167-b6b1-674a93d971c1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "74cfa0a7-164e-4462-b060-b6e695e7e86c"
+      }
+    ],
+    "4653ede3-e18e-4ee6-9489-b15fbe4cd06e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4d3f7529-175d-42eb-aaf2-4379be1aad58"
+      }
+    ],
+    "469af5ab-bf65-4abd-a667-8158c0d063c6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9ae0cfe3-1ed4-4abc-a263-aa45cc6fd881"
+      }
+    ],
+    "46a25755-86af-43d8-8253-6f2a43bb4a80": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "93cd266d-c386-4c0d-a113-c809a591a64b"
+      }
+    ],
+    "46b48a49-a506-4013-b4ca-24a1bf168836": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0410c6a9-df66-4c67-b742-d099cc2de3d0"
+      }
+    ],
+    "46e4553b-6101-4b90-9b04-f7262d03a4e4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1e377782-18e0-42ad-8085-a34da20145ae"
+      }
+    ],
+    "473094ae-5ba7-4680-9638-9774d61f2e0b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8a43d005-3ef3-40d5-99bd-c227d2142425"
+      }
+    ],
+    "47c9b38a-f4a0-4f3f-820b-866775b8ccae": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "eeac465d-c6bd-48e7-8681-a929dc5802bb"
+      }
+    ],
+    "47cc9b08-4ab2-484f-8883-5131c0e93983": [],
+    "4861f839-c5fa-4f94-b283-d80135a13e6a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e4d92f6b-6da8-4db8-9a74-ef45c94bf140"
+      }
+    ],
+    "486967bd-19fa-4b7d-8f4a-bbd1fe15de0e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8dbd28e2-e51a-4113-a70f-713084b227b5"
+      }
+    ],
+    "48a4cdd9-ccad-4969-8758-040b95107563": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b28d73ae-bbb5-4e61-a27e-80d3be455f7f"
+      }
+    ],
+    "4918a34c-1337-4d87-86f5-fa62cc997300": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4d41c59e-7d14-4ee0-a805-8374290721a1"
+      },
+      {
+        "date": "2026-07-06",
+        "amount": 1000000.0,
+        "description": "内部充值",
+        "id": "e2f6b1e5-3ed9-4c2e-ba2d-9d556733445b"
+      }
+    ],
+    "49209a89-d865-4d83-9764-8634fc235fcd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28b91ca4-83d5-4b5f-950f-88192b4bdee0"
+      }
+    ],
+    "4992ce0a-f954-411e-bf28-1986361206b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5df22c63-222d-44c6-beed-69ecf133443f"
+      }
+    ],
+    "49cc7cec-25b7-4e44-af8d-7ef739db5d23": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b8032367-9cf4-4fd4-92cd-11a331d6389e"
+      }
+    ],
+    "4a24d07a-5a72-492e-b96c-f35710e55544": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a3414950-5ec2-4090-8e09-a630ff4bdc76"
+      }
+    ],
+    "4a5e3d72-74d8-45a5-ac3d-a8da882d56b7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "37f413ce-f011-42c5-8a7f-b125224b587d"
+      }
+    ],
+    "4b3c58b8-ac08-4d7a-b0fa-6b47049256af": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "02a3b3a1-939a-4cd9-8359-75205152f0f7"
+      }
+    ],
+    "4b74f1b3-0240-499b-bc8f-d432f328e5c5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c26045a-e591-4d24-a6f2-d5095639a4d1"
+      }
+    ],
+    "4b85e7ff-fa02-4391-ae45-025b58b1c19a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "48b8d700-4c6b-46ec-8fed-2349daac9468"
+      }
+    ],
+    "4bb56460-0feb-11ed-b91a-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8bab699a-6c7b-4172-bec3-280f389e189a"
+      }
+    ],
+    "4bda8020-d13b-4fa9-8094-29b9b9881729": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c88663c7-949d-4ac7-9cbd-517cc6159df2"
+      }
+    ],
+    "4cd231a2-647d-4572-8d03-8bff5170e03b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "321fd8a5-ccc1-4abd-a8e9-0406e93fc313"
+      }
+    ],
+    "4d59efb7-e9a5-450d-a8e5-6e91a47fdc73": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "129dd531-939a-4868-9455-bbcab39dd12b"
+      }
+    ],
+    "4d5c8960-5521-41b9-9fc9-ada82bf61dab": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "75d9a05e-0802-4f54-b2a1-54b9117a7346"
+      }
+    ],
+    "4d653f04-3df8-497d-be50-864dbc4dbb8a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0cf85f1d-9d5f-4566-a64f-dfa0c09c3b43"
+      }
+    ],
+    "4e4f0940-0261-4cfc-81e3-06c999d546ef": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "10b044dc-7441-464b-ba9f-7688b766dc63"
+      }
+    ],
+    "4e9c1362-1bf0-42c7-9fc2-c8f726007ad0": [],
+    "4ee88319-1327-4b18-8c8a-c7875e7275fe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "975ccc8e-6d7a-4052-8aa4-ad8372821f59"
+      }
+    ],
+    "4f89b99b-bf6f-4642-b9bd-98518296332f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dd84b4dc-9262-49ce-9001-41548515ae6a"
+      }
+    ],
+    "50196792-6319-49d0-9f61-f06a39fb4e58": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2c98fb31-8b8d-4bb6-aad8-473242ca55e9"
+      }
+    ],
+    "518c3890-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "05ba15de-13a7-4e20-ae7c-c29bfe4cc3f1"
+      }
+    ],
+    "51cd552a-ed50-448e-91f9-1a6ceeacc718": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "352644ae-a509-4be5-a765-ceece6f5dc6d"
+      }
+    ],
+    "520b696a-ba62-49a5-b93d-bad9f3ac92c8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "93f61381-9353-42db-8be9-c6a7b20505d3"
+      }
+    ],
+    "520c8139-afc6-4c8c-948d-ab23cfea7b6d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b3856fc3-7491-48b8-9a69-e48ec46b0779"
+      }
+    ],
+    "52a12278-7def-4e90-9003-fbede2f9e825": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6b137d4a-a46f-4f16-b8e9-d73f277bc440"
+      }
+    ],
+    "53184b6f-c4ff-42cd-87a9-8115da51b9df": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "411d6737-d99e-4482-8022-26eae7311f8a"
+      }
+    ],
+    "5346af7a-3ac3-4d11-9bbe-c0a0ec4d7b14": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "648650ba-7f07-4c65-9ad0-6a6c8636d1cb"
+      }
+    ],
+    "53e58d24-eb97-4216-a04e-d2292d0988ae": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5da0c612-f441-456e-845a-0db1637742c5"
+      }
+    ],
+    "53ff4b2c-4190-4c89-992c-5ca194903672": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cfede136-8f39-4cf2-a7fe-653266f7872d"
+      }
+    ],
+    "5514229f-7a73-42b7-bd7b-63a9bd8112d0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c5cbd7f5-a316-4523-aa6e-024c3200f8c2"
+      }
+    ],
+    "558076e2-01e4-4c58-b271-7e8eef8a0c5b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "83f59cd6-a12e-4af1-b8b6-e32640f35570"
+      }
+    ],
+    "55fe60a4-19d5-4303-81b5-ac3782364b82": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "144ddb93-8fde-45a5-9918-18aef84c674a"
+      }
+    ],
+    "562aba8b-3804-49be-b036-3d3678825fc2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6284422c-cf64-4cfd-b116-c1e8e46642ee"
+      }
+    ],
+    "5697e711-2aa9-485c-baae-37ec9dc60753": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9a3c24b1-6589-4fb0-b149-17e7bc80305d"
+      }
+    ],
+    "56d09546-719c-4e2d-9bf2-310e0cf789c1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8ec8da9f-ede9-4d70-84dd-18578c881417"
+      }
+    ],
+    "56f8ede4-d607-48f1-ab33-38fe5730e593": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8a97673b-2b92-4140-8237-c81227ebf073"
+      }
+    ],
+    "5789c4c0-6e8b-47f6-a230-40f8025b78d7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "07214be9-07a2-42f5-8f5c-fd2fdb3ed91b"
+      }
+    ],
+    "578d0bf7-9300-4621-98a7-9f6b73388700": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2b44389e-87cc-4c3e-8e57-2fcc6cb050b6"
+      }
+    ],
+    "57c3f523-32db-44bf-a261-ea0576838d0a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b381c10e-acfc-4e76-9b67-604a406ac25e"
+      }
+    ],
+    "57d58463-0768-4094-96ce-a7f2083fa768": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ca64aaac-6c4c-4758-b3ea-8cbd4869e65c"
+      }
+    ],
+    "583e3d27-7fcc-40bd-b78f-e57fcbf2d7c1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e4f9ee4f-a3b8-4486-88c9-0da08a940a77"
+      }
+    ],
+    "5848f600-0f38-11ed-93bb-da75731aa77c": [],
+    "5981fd77-ee01-4b9c-9dcf-c6af5be8c594": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6f1fb6c1-4cdb-4913-a6fe-a384a0e07af3"
+      }
+    ],
+    "5998547c-79f8-4abd-bf38-30ed2e599b73": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e28b1958-14bd-4c70-b554-55f1c038f001"
+      }
+    ],
+    "59bfacdc-2d58-405d-9afb-d2d15ee32c71": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b5f290ca-1a84-43c9-817e-dc319093c744"
+      }
+    ],
+    "59c614d2-57b6-48dd-b12f-aefad86eec26": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "38ea7e17-af0a-433a-afe9-77bde98d86f2"
+      }
+    ],
+    "59c9746a-4f2b-44af-8fbf-61b9224c8392": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "219cc6d9-f57c-4e34-b59e-981fa08eee12"
+      }
+    ],
+    "59d208d1-2373-4c80-a496-f9ca5d83de7f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bfdd182e-b89a-4c75-a21f-8915af815690"
+      }
+    ],
+    "5a0f4a4f-b2d0-4711-b639-3bce99dc6314": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4b45fbfe-cb92-4e17-a81b-ea82bdc2c66c"
+      }
+    ],
+    "5a1b5a42-36f9-4c8b-8560-bc365029f2f4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a61d2378-8838-476d-bbb9-8e41b25a48a0"
+      }
+    ],
+    "5a2912c3-6a8c-44c3-adcc-d5188f59c883": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bcbe2411-1607-4ce6-96ff-7776261d2748"
+      }
+    ],
+    "5ac177bd-8720-4c51-93ad-ab80f4609fa9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "162f0a3b-1954-40fe-beed-009ba884b99a"
+      }
+    ],
+    "5b34f939-329a-4fde-a37c-c93b91ba2727": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "99afbf9e-7241-45f6-9cb7-15bea104aa4d"
+      }
+    ],
+    "5b8677c5-7258-4df5-aa0c-39f2586c3467": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5475a49e-bbd6-4227-a85d-117adc55c6fb"
+      }
+    ],
+    "5bb8bcf4-da26-4202-aa77-08af633a3a33": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a8850726-d45b-4ddf-bc0d-a14da4cef242"
+      }
+    ],
+    "5c1d5e05-fc07-4eed-8f60-2a7dc03ea9dc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fab2f0ca-6403-488e-b957-a94002ab53e4"
+      }
+    ],
+    "5c2d9811-82c9-48f6-989b-cbbf4cd288a9": [],
+    "5c37c825-0f4b-4309-b076-cbe8fe7d339b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "70d56dc4-8e78-41a4-bda2-d0dfdef14390"
+      }
+    ],
+    "5d216696-ce30-4354-b18e-488c5786ae70": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "58a9aa7f-0b4e-4516-8949-be383ab1a412"
+      }
+    ],
+    "5d3daa94-bf88-4399-9337-669677fa33db": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4b8405bb-16a4-45d7-a20f-569f7fc7e583"
+      }
+    ],
+    "5d6e2418-77c2-43bd-9953-5884d4faefbd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "43c4d107-c299-4c7a-bfce-edb337291b5b"
+      }
+    ],
+    "5d85f6cb-ca11-4677-867d-501172b9ca87": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6493268d-36c9-4a97-b1c2-9c018d8f181d"
+      }
+    ],
+    "5dbb0ed0-ac5e-4770-b4ef-e6a1a0973ea1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fb51b1aa-525c-44a4-b61a-6a66f93ab351"
+      }
+    ],
+    "5dcfcb99-c825-43b0-8b97-dda884f8e205": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "92f55abb-48e4-4438-93d3-5507de6ee663"
+      }
+    ],
+    "5dd35480-0f38-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "647b2bc1-d7f4-4663-973c-7b65e5b7add6"
+      },
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e3199d8c-3160-4056-afb0-ac36f23a920f"
+      }
+    ],
+    "5e267513-adb2-4d32-a491-0fc8d806db02": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4998f18c-9fc8-4a34-a6a4-8285a5959531"
+      }
+    ],
+    "5ec7423e-244a-4dc8-aa26-1a1e55ee0c65": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fcc254e9-8e89-45ce-846e-8ca3456619a2"
+      }
+    ],
+    "5ee512f3-cd0f-4bd9-9a51-842091af9ba2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d8e923e6-a44f-41e1-9591-0f05177a6aee"
+      }
+    ],
+    "5f20e2f1-5866-4fec-b260-b6646d3a1203": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a50642cd-7be9-4ea0-b9f8-36488d0fb0db"
+      }
+    ],
+    "5f407774-5967-49c5-8120-156188da29e5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "30ed7d6a-08d6-4c3f-8c3e-751aac7ed5f3"
+      }
+    ],
+    "5f6e12fc-8c9d-43ca-87af-f681298da8ed": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1d19cedc-a5b9-417e-b9fc-7c73cd67191f"
+      }
+    ],
+    "5fc18a93-f360-4175-a947-809e692868fb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "23382c6f-7a64-4455-b6d9-e62d38d4b8c0"
+      }
+    ],
+    "61334a9b-a6c1-481b-9dc9-f938c3791285": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "60dfb121-af49-4f94-9c7c-61853abaf647"
+      }
+    ],
+    "6252854c-8177-4ba6-a8c7-5051f0bc5d02": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8be4835a-172b-45fd-93c0-47f7b5998438"
+      }
+    ],
+    "629999bc-1cc2-492a-8e45-c2f5bd871e79": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "84c5d245-05b0-40c7-a94b-c16191e718aa"
+      }
+    ],
+    "6299b796-aeb1-4a5d-ab0e-52ac13cdf13a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "25b23c5e-7baf-49d0-b54b-60ec33e8e903"
+      }
+    ],
+    "62af6d11-8385-4b6d-b8f1-2f86724635a3": [],
+    "63107349-d660-420f-a9b1-8d53fcd74528": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8b696d45-5e47-440b-9230-f5d124108cba"
+      }
+    ],
+    "6319406d-39d4-4060-b27e-0438a0d0e793": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7fda5390-e91f-4bd2-8983-35cf319d145b"
+      }
+    ],
+    "632729aa-e1b6-4313-9f11-7120d99de1b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5966b5e9-163d-474a-803e-27125159ef53"
+      }
+    ],
+    "63fe872d-d3f2-4907-abeb-978b8a53ed15": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "be4601dc-27ae-4e1a-8e41-82b7f7c63c60"
+      }
+    ],
+    "640e7de9-036d-476a-9807-7d67d605ad7f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f77ef977-f87b-4c39-9fda-13beae702499"
+      }
+    ],
+    "6415506d-5ba6-4f04-b82d-0c924fa364fd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "38877de5-5572-4e49-864f-13b1c92ca0a9"
+      }
+    ],
+    "6460a280-1dae-41ea-b596-87667cf01f76": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "699b0124-289d-4500-a4dd-f5f09af84e67"
+      }
+    ],
+    "64794462-9f32-4c5f-bc9f-e53f27d72e57": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bc605482-d1b5-401b-8f5d-d616c50758ff"
+      }
+    ],
+    "64e6a358-4b07-42a3-8788-e108a3f0ebc4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "06fa32fb-9619-442f-95c3-3afe04a24aa5"
+      }
+    ],
+    "65094d5c-9400-473a-9e3c-fa4fbee3e659": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "933324c2-29c1-4db2-b6bd-eca26cb8dd98"
+      }
+    ],
+    "65839a6d-9722-4a66-b02d-08ef79a06f4d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ba2e6aae-b883-40d8-9787-c8a690c1bd69"
+      }
+    ],
+    "65af321a-e5b5-43b0-acc6-1103c98f8fa8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ce65902a-ad52-4514-8bfc-538cd4939a28"
+      }
+    ],
+    "661e3faa-8987-44d3-a22c-90a359ba1022": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "74055bf4-4adc-4e50-872d-dc937d385e4d"
+      }
+    ],
+    "663f3b1a-45cc-4f92-80f2-8b24c216f214": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "97460a7f-322f-4076-9dc7-31a8dfcb2657"
+      }
+    ],
+    "664c1a6d-76c0-4102-b300-3852aca555c0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "14a01700-ff8d-42fc-ac2b-db2bda1d7f63"
+      }
+    ],
+    "667cbe5e-f25d-4f3f-af19-52be313895ac": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "207a933a-4426-4cba-8be1-0afcc9b702ed"
+      }
+    ],
+    "66bbbf47-e309-4005-bd51-eba9f4da31f9": [],
+    "66d6322a-3494-4bfe-b0f8-a5639fd1e40d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "51326528-d882-4376-b3a0-462c60be1fe3"
+      }
+    ],
+    "671ab00d-fc57-4f38-a1f4-06fced024f8b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3e230cc3-c178-4f0a-87bf-f515a271f5e4"
+      }
+    ],
+    "672018be-35cc-4bd4-a473-27f1d5b893e1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a740a3e8-c9fc-4c6e-a35d-755cd4dd8f5f"
+      }
+    ],
+    "6725914b-e44a-40c6-aa08-48b83271c412": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "688ce3a3-ece0-4997-ba2b-98ed6d546472"
+      }
+    ],
+    "6729df4e-dbe7-49e3-84e0-330a4ed4effd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0f2c6717-7090-446a-ba46-ecba3e41ba70"
+      }
+    ],
+    "675a83ab-9ffa-4859-80f3-701739b1cf6f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6d1d2dcf-8e67-48ee-8360-1561bb35e437"
+      }
+    ],
+    "67ee32a8-46bc-446b-998f-cc7cdfbaedfa": [],
+    "67f8d792-8e63-4a3a-b4eb-326a96816df1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6300a558-bccc-4b98-a261-7b03bc944701"
+      }
+    ],
+    "681e877c-82fa-4abf-a303-321951aee56e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "11120345-de0f-4a79-ab99-13e7d48dd07d"
+      }
+    ],
+    "684dc64f-18aa-4d96-86dd-3af319e8c72a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "30026a17-6d7c-4750-b26e-f6a006ad6090"
+      }
+    ],
+    "6863d2bc-54de-4758-b3b1-5e546c8cf76d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "80b7e161-1ebe-4163-a39c-bf099bf7b800"
+      }
+    ],
+    "68742249-780f-4585-b70e-8afbc21cd6f1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "92a46b64-34d4-4015-8776-af4d7971c783"
+      }
+    ],
+    "68b6762b-81ee-49af-95f1-c8ebe2aba349": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8e83332f-ee13-466c-9b5f-e438b302e1e6"
+      }
+    ],
+    "69872fed-52d3-44bc-9b7a-983d6a82377e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "34f0879e-1ae0-4730-9ba7-2ee2e22727a3"
+      }
+    ],
+    "69b797d5-a21c-4f2f-9dc5-66dfdcb8c4b8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "70541dc2-1ece-4941-9efa-83dd1e32eee1"
+      }
+    ],
+    "69ba72bf-49c2-41b0-a913-61b2ad9dfe3d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5ba1a65b-8a5c-477d-bec3-c3380982a79e"
+      }
+    ],
+    "6a14a5e1-187c-47cf-b5bb-9107453f8aee": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b61ab952-eda9-4014-bbb9-912485c357a3"
+      }
+    ],
+    "6a8f0625-910c-44da-a856-ba433bc20429": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "94e4c95f-fd7d-4a9d-9cae-4c7034d72381"
+      }
+    ],
+    "6af3536a-b8fd-45e0-ade8-1aba4895e16d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8cfcf2fd-de6d-44b7-9cf6-05f924cbcbac"
+      }
+    ],
+    "6b1f10f2-54b7-42c9-8a05-1315b9a24086": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "043f3eb2-4d88-4305-98e5-2ff86e47b268"
+      }
+    ],
+    "6b6508db-2dcf-4e5d-b681-dd90daf0f472": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b252e387-8fe4-4e0d-bb13-0c6cdffa56ad"
+      }
+    ],
+    "6c8437ee-b0bd-465f-94ec-a1d0d820bdd2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7c5976c0-14ff-4c31-ba49-54424fa164ef"
+      }
+    ],
+    "6cb8da8a-aad1-4b5f-9426-a74adaf4f725": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "be347bd5-b28d-47b6-858b-5a9b7bdf07a7"
+      }
+    ],
+    "6cd1bda4-f565-4693-b8f7-f104ec9c865b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "52d205a6-02a4-44c7-b956-e98e263f99a7"
+      }
+    ],
+    "6d3845eb-19af-4e52-a409-dd3126d5fea2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fbd743f4-985b-4087-a3e4-be709d130d7c"
+      }
+    ],
+    "6da58526-4706-4264-9f11-895f409f324d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7dbdda51-30d3-4fb7-99e7-39dcd9eff978"
+      }
+    ],
+    "6e06eea9-a2a5-4700-b343-d35b69fa9d02": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4042c797-d60f-445e-be35-4f427299f724"
+      }
+    ],
+    "6e7da6f6-b207-4ecc-bc7a-3b17ce2dffb1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d112271d-31fe-49cb-af66-7d43b39ff297"
+      }
+    ],
+    "6eaa44fa-062e-40a2-9926-463b8b16ad93": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ecf6d93b-6407-460b-aa37-694527186e56"
+      }
+    ],
+    "6f2c133e-fd5c-4728-96a8-91b2ef724981": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f2f00a08-23b2-42cc-9e61-2b54da791542"
+      }
+    ],
+    "6f34d204-1f70-45a1-92e3-bb11fd50356b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0fee1d96-9244-4222-95aa-943f915adff5"
+      }
+    ],
+    "6f453745-5da6-40c8-a305-3da2706aeda7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9838acf7-e6f3-4a5a-b9a0-73574fb46f1d"
+      }
+    ],
+    "6f7c62f7-57ad-42f4-ad8d-ee8d28df9bad": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6772b717-a911-4331-816d-facdd6ee7d89"
+      }
+    ],
+    "6faa823c-c1ab-45ca-82f5-ac25e2ae217b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4c659bc2-e132-4189-8922-89ec03ee8184"
+      }
+    ],
+    "6fabb547-fe22-43bd-9b57-b2d2002c9a07": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "732f09ee-2487-4041-8ab4-ddee72fc9cbe"
+      }
+    ],
+    "704df69e-f141-4f7b-9f59-575e251b7a6a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "370f4519-1f01-4d9c-aa7f-08fc76dbb557"
+      }
+    ],
+    "709cd56f-b4dd-4a75-9cbb-942745a5503a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b270d16b-11e8-49f0-9593-3783b575c335"
+      }
+    ],
+    "70f9c45d-46f0-4e5c-a15b-1deb2fc9feb1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f5bc2563-762f-48b2-b465-99e8c5b57dbb"
+      }
+    ],
+    "7147cd44-f30c-4ebf-a860-e224a26e40df": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f7fcefc1-a75e-45de-8967-258bbe6af13d"
+      }
+    ],
+    "7155281c-d8d3-442e-9bf3-1e4988ffe198": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3eb41a21-93d7-4645-909a-d427bb3838ca"
+      }
+    ],
+    "71c56aca-e3e6-4014-9329-6e93cf63f4e7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c964e39-d937-48df-ae6d-0455aec9081b"
+      }
+    ],
+    "71e34d8a-4b92-4a81-b569-06432785ec42": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ca01df37-efd9-4fbe-b7f0-9bed3dccfb3b"
+      }
+    ],
+    "71f12fde-101c-4c83-be2f-285eb4eff763": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6d5a9e4f-4152-4cc7-90f0-15bf8d6c10e2"
+      }
+    ],
+    "7222e8fe-91c9-40a1-9fc9-610a96d08d05": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b21a7565-db2a-45ce-8a4c-2763ce69f9a7"
+      }
+    ],
+    "723568c1-ec36-4bf1-96f1-0eb4ebf6431e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c735b71-675e-44fb-86f5-ad4220b789a5"
+      }
+    ],
+    "726b655b-2c46-4f93-b1ad-179241bd75bd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a296b067-89a0-41fa-abfe-d00d130a049f"
+      }
+    ],
+    "72710f7d-a087-43c4-b1a2-e5af36a3febf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "026f20ad-2938-43a8-892e-834d7582f83b"
+      }
+    ],
+    "72cee427-0e89-4288-8ed7-0cc231742a84": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "34403302-03f6-4858-8b4f-c850d48e6a1d"
+      }
+    ],
+    "72f58a1e-93f8-4196-88cd-5a587b5c12be": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ed4279dc-2a34-49cb-bd74-9aaaacc7da05"
+      }
+    ],
+    "730b5851-9b25-4f6b-9e58-97f371552bbb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f7b3198-f5ae-43da-80e6-275eaf5be482"
+      }
+    ],
+    "7356b0db-ee2c-4bac-beaa-cd8ae1623558": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0de69597-c04f-4cb2-b4ee-14ebec09d062"
+      }
+    ],
+    "740c1742-de94-46d8-acdf-a80c84ee497f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f093de6a-9a3e-479a-ab35-09398d559646"
+      }
+    ],
+    "742d3733-95ff-480d-9b64-cda5acfd5fae": [],
+    "74e3ba83-784c-4aeb-87e0-1c2a3b77e815": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "52b5dcfc-e045-45e7-b7ff-1623168870ea"
+      }
+    ],
+    "75e52b61-b7c9-45a2-b368-db274cd221de": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8427c2c2-d6ff-4902-9af2-90249bb5f095"
+      }
+    ],
+    "75f189a3-30b5-4d1b-9db6-093e64ffa270": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b18ef964-e12f-45e1-87b6-e32cc57aadd1"
+      }
+    ],
+    "75fa6cbc-4506-40b6-9376-50486a01aa37": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5ec5f78a-87d1-4b69-b062-2554ea384109"
+      }
+    ],
+    "76778bc6-f6d8-4b49-8e26-c0cd4a095351": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c198832b-55a7-4f08-a394-1f706c2ef80a"
+      }
+    ],
+    "768a90dc-4348-44e8-8ab6-bf0d2727124a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28170ed0-83e1-48bc-a219-71d3a4c7bc98"
+      }
+    ],
+    "768d82cf-0fee-4b58-a7dd-692ef2d98e36": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b48fac5d-f5fc-4321-8958-47cce7a03ea8"
+      }
+    ],
+    "7700b1f8-5672-4b2d-a6f7-7facbf17e1ac": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4de4bce1-79e6-4b47-9af4-72082f49cbfe"
+      }
+    ],
+    "771c1abd-4f5d-4e33-bfcc-aedb2ccb5780": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f4e09e7c-0859-4c70-8bc7-29804316b546"
+      }
+    ],
+    "77cac53a-f03f-41b8-a914-316df092f319": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "58491f33-9b12-4710-ac42-3446b7e1221d"
+      }
+    ],
+    "77ed7159-6f01-4da9-82e1-6edf0647e45e": [],
+    "783a2f54-1c8e-4f8a-bdf4-06ab9c075cb0": [],
+    "78752eb1-9c3e-44ed-969e-102b300d1640": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "06ec673e-da56-494b-a290-63dfa1fd6a8e"
+      }
+    ],
+    "7889e162-ad53-4988-a9a4-b985d27f250e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3f58c404-721d-4bc9-91db-b1d0ca87c201"
+      }
+    ],
+    "78ba1692-b80a-4128-90df-5d774f922aa9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "de3b1be5-07ad-4164-94c1-66256c95e3e8"
+      }
+    ],
+    "79941e4c-812a-40ba-b2f2-d63eb9bb3c02": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "660ff47d-ed97-42bb-8c6b-cd7d4a7b79e1"
+      }
+    ],
+    "79d5b770-7701-4226-898a-e693334cea9a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "81c3ce3d-2c92-4326-b7f8-e597228e2653"
+      }
+    ],
+    "7a10151e-de55-443c-aecd-c3aa9144c4c2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f2db8fc0-c15c-48a6-a837-576babd35499"
+      }
+    ],
+    "7a513ff4-8275-49c6-86b2-e4f49bfcaa65": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3d33f019-d7f0-42e5-ba5f-ca03fb12c04c"
+      }
+    ],
+    "7af6eddd-edac-4256-af6c-3d68ded88632": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "02cd5885-a8cd-41db-9687-245f11ac460c"
+      }
+    ],
+    "7b7f97fb-aef2-48c5-8b94-c58c41449454": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f1746957-acb2-4fd6-ab83-8a187549ca3d"
+      }
+    ],
+    "7d00b593-ceec-4b48-91f4-46071c189c8f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d2190b0c-1fb4-4b32-afba-8d846a5609ce"
+      }
+    ],
+    "7d711068-1a78-42fe-8d28-38e055fc34f9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c6694e5f-382c-49f3-ba39-20902b05f7f4"
+      }
+    ],
+    "7d86c4d7-c110-4b00-81cd-1046c0fd1fbd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1a425507-e086-4852-a68a-e3380f403e03"
+      }
+    ],
+    "7da17889-804a-405a-b20b-9679b06c42da": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6b5606a8-2daf-4d7b-8fba-2b02c27db591"
+      }
+    ],
+    "7e2f562a-2084-413c-a502-a81c5caf29fe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f32dba2c-bd6f-47aa-b077-db6beb7b9eef"
+      }
+    ],
+    "7e81f60e-cd10-42ee-8e96-cae5a43ec4df": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6dcf8138-69ea-4e5d-b9ec-6aea396bc956"
+      }
+    ],
+    "7e8f55cc-7bbd-4bdb-9ff5-8141f882126f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7abd2ff8-f50f-4a07-a0a7-1e6979841fe2"
+      }
+    ],
+    "7ea6a3cd-8900-426d-a341-60230ba80525": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9f3972ce-e8cb-481c-9342-b48243a3cf04"
+      }
+    ],
+    "7eb47641-af20-407b-8da9-886c582683f4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c86d0fd0-75a0-4836-bc6a-99f6ecfc083e"
+      }
+    ],
+    "7f165876-c5b8-4245-8f5c-8fd1f94835e4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c2d1ce33-4fef-4121-9c55-19c210148595"
+      }
+    ],
+    "7f227856-844c-4935-be82-ea978d36cdd5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cb13db1d-1451-4858-b4f7-289a951131f0"
+      }
+    ],
+    "7f540462-7c39-4ee9-905c-2acb52927ef8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "16d4d197-9782-42fd-80b8-1141df877978"
+      }
+    ],
+    "7ff6c69e-1193-4072-9668-c36b54423fcb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fe153184-1fac-418a-a8b0-10f8bd14211c"
+      }
+    ],
+    "809c98f4-a5a3-4f37-9b8c-f72ab207f7aa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "82d69dbf-624a-4711-a714-83c547309ac5"
+      }
+    ],
+    "80f13cf6-05be-4d09-8b23-e2f07a7df70c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9aa3ffae-e294-4c90-a0f4-36959061a214"
+      }
+    ],
+    "829c88d4-f3cf-4d06-9dc0-ae31c4035119": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6816c74e-893b-44fb-abbb-201da44d84f9"
+      }
+    ],
+    "82df0d33-cda9-4b0e-847a-9aa57889a483": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c7d9266c-bf9f-4f95-a542-aacb50355de7"
+      }
+    ],
+    "831ed102-0f37-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f948290f-04b9-4058-8855-5ae529ccf17d"
+      }
+    ],
+    "838f1bd5-0732-49fa-ae20-0a81e93feccc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a50fb06d-e33b-4753-bb17-194af2c3e437"
+      }
+    ],
+    "8399bff7-7d77-4e00-9793-b81e3e53d341": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "343efd7d-d26e-4396-a026-fb06988b24d1"
+      }
+    ],
+    "83ba23bd-392f-4260-b718-301435c07c5b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a985c992-426b-4d7b-8a2a-32648386d7a9"
+      }
+    ],
+    "83cf5937-6a16-40f1-9f84-4cc60ae97950": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f22ef6f-f61e-474f-ae54-b5b8d8d2b7d9"
+      }
+    ],
+    "8458e1fb-f1a5-4623-a839-9efa51c81b67": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9d64128c-b5a1-4427-afa7-a1a82e208242"
+      }
+    ],
+    "8466f4b1-9c93-47e2-8686-9d3638b33717": [],
+    "847ed7c1-2d89-4c6d-acb9-93bdc50853b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bbf555df-ba4e-4609-988b-e85848238cc4"
+      }
+    ],
+    "849e6fc9-1e73-4da3-a46d-0cd71439aa33": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "792f2a02-91a6-4eab-a4b1-d37e46f6e8de"
+      }
+    ],
+    "84d2e81c-8e39-4ade-8f82-5c8aeb51ea69": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "50fcd114-1577-4672-9389-d69919776814"
+      }
+    ],
+    "84fcaf69-11be-4b9a-bd48-ff41999afa37": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "77ba5287-a20e-4eb4-9e56-90f7cee022a3"
+      }
+    ],
+    "85276558-dd5c-41f3-97bc-d0d99a67a681": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "17376888-d4f6-4ea2-8523-4304b025e4ad"
+      }
+    ],
+    "8536e983-c56f-464b-b864-188cb93e9957": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4809aae2-7c72-4116-801e-30db39299145"
+      }
+    ],
+    "8564009c-7c2d-464b-8ecd-c109004f1396": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ec1510dd-e5a5-449f-a0ea-ead61463b460"
+      }
+    ],
+    "8600aabb-7914-4000-9d6c-2755a5c22c27": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "95965db8-539b-45c8-a9ed-de50b7711034"
+      }
+    ],
+    "861188e9-a4bd-43e1-9079-697972f2fbc6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "19fa06b6-4222-4485-bfab-b8a6399312f4"
+      }
+    ],
+    "8630e161-dd13-4eaf-b789-af4b0970e0ad": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "72116510-afe2-4577-92a8-d991c71f85c3"
+      }
+    ],
+    "8637ae01-e12e-4ff0-8e44-57d96800de11": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9031a159-a7d5-4c93-8ecc-f43a28f42707"
+      }
+    ],
+    "86406dac-03a7-4031-b5c1-8959f263f47c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cb11ecfd-a56f-4083-9ccf-1cbeb0b4684b"
+      }
+    ],
+    "8680dfdf-5358-40f1-95ee-8460e5e3de4e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "368456b1-1e40-49b6-919f-a703b250eb0f"
+      }
+    ],
+    "86c8a6fc-0f37-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e167c48d-4a34-4d6e-a66b-c674415b2bf6"
+      }
+    ],
+    "86d7e8a2-0f33-431e-a3df-18832a4deaeb": [],
+    "870f8760-80b6-40ca-ada5-3cda63b35539": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e982672b-b7a4-40c5-8369-5e2f15ff13df"
+      }
+    ],
+    "8781a7f1-ad2b-4c9c-bea6-860cbd41432c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6d8f6e12-80e9-4b7c-bc66-6c3beadd5680"
+      }
+    ],
+    "878a9828-fa5f-4dd8-8fdc-21668f3f6386": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "15ed299d-eb67-4169-b26d-cc693f4a4ee1"
+      }
+    ],
+    "8854be8b-ded1-46e6-af32-89faaef582b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "171d9894-7b56-4f62-8215-33356081cad5"
+      }
+    ],
+    "889946a9-28d6-4e76-aaa7-06301b1ea032": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9551826b-7892-4233-8035-400526db418f"
+      }
+    ],
+    "88cf4bb6-3745-4e80-ba38-dc6a330ccf57": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "692020b5-20ac-42a3-ad40-a013d38e095a"
+      }
+    ],
+    "893a992e-a42a-4990-bc20-dc392292c3df": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "20426fb6-3e56-4de6-8c71-c24858830478"
+      }
+    ],
+    "894114a1-a006-4591-bbf1-35529905a8f6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f2721ea-aef8-4376-963d-da0d61e1eb61"
+      }
+    ],
+    "896e36e3-df0a-4208-a0cd-c698dc58767b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d63d4297-048c-4241-9096-9c818d25674f"
+      }
+    ],
+    "89b4969c-92ad-46af-861d-7803e7779c1d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "708e5c53-e7e6-48b9-a428-64f074bf156e"
+      }
+    ],
+    "89d036a1-ea49-4553-aebc-5aa379aebfa6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3ebaad94-bbf6-421b-ad06-4e7772bac99e"
+      }
+    ],
+    "89e3725f-2e7f-4864-8986-711dce3a55bc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ab9686cc-9fe1-491d-9442-19ba621d7a6b"
+      }
+    ],
+    "8b5cf6b1-73d4-4355-942b-ff16c8deb9fa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bbdde2b0-694f-4e12-b6fb-f6700b15dd18"
+      }
+    ],
+    "8b61edf4-0f37-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7910a0a4-e0f6-4211-906c-3913e91e5bb9"
+      }
+    ],
+    "8c07b908-c479-42ca-9e1d-7c7b52bc97b9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f64938c1-3eaf-4a3b-8093-e9d31309b16b"
+      }
+    ],
+    "8c38cacd-4107-413a-a07a-15c576257329": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "08ec5bab-232b-4913-a1b3-5d9478eb8ed9"
+      }
+    ],
+    "8c5412c6-4281-46ed-9f83-0260c9764aa8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f7b8ad52-9d4d-4646-98d3-45a295e77803"
+      }
+    ],
+    "8ca8211d-af94-4875-bc9e-42e8685992e6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "13d6b29a-62f1-41b9-9e07-394e15949848"
+      }
+    ],
+    "8ca883a7-30c2-4dfd-aa52-fae9778e5836": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "095c4742-7788-4c2b-aa45-7ad1c73b28fc"
+      }
+    ],
+    "8cc739a3-909e-4cae-ba43-639fb2b7ae70": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b6ca8d7b-a57e-46e8-8b14-a4fb67a76f95"
+      }
+    ],
+    "8d8a6766-8215-4639-b5f6-9b1825e6edac": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "51b79cd7-8e44-4e1c-a92e-076791787c5e"
+      }
+    ],
+    "8de94cbe-ae28-401b-8cc2-fb13a89c9804": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1e5db213-65b8-4086-924c-765505b4a574"
+      }
+    ],
+    "8e1eb231-a7c4-43c1-bc73-ebeed49eb816": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e32868e8-de97-4744-959b-7f1e3855b6a7"
+      }
+    ],
+    "8e5a9568-de70-48c8-a59b-dcc3c3a95d36": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "af9673f7-6528-40bc-8780-274d3d164ecb"
+      }
+    ],
+    "8fe484e2-8ac0-44eb-8427-b266d4a509e7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "761094d9-0349-48ca-82b4-c257cb58dd95"
+      }
+    ],
+    "8fe6c53c-d593-491c-8825-c5e0b3badd56": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b336e17f-3fde-4e08-b748-111cf64a4e00"
+      }
+    ],
+    "900b123d-0dec-4e22-8793-34e87c8ad34e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d8eceaf7-192e-4bb2-8792-ea0ab6e2c485"
+      }
+    ],
+    "9059556e-ee71-4729-9b62-e15f75389581": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8b2c5dec-15cc-412c-a50f-ca90eca409cc"
+      }
+    ],
+    "9083021b-63d9-4507-b98c-30c6dd928097": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fd71ee85-dad0-446a-a30a-3264402ff197"
+      }
+    ],
+    "908e4738-556f-458d-a3a3-3e6a0c4b4d59": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bd059609-b61f-42c0-a879-980b0a623997"
+      }
+    ],
+    "90ea9499-50e0-46cb-b50d-e3e049d64346": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b7794236-8b3e-49fb-a980-63c9f650fbc0"
+      }
+    ],
+    "91004bba-8f2e-43e0-bb08-abd3840babb6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1d964f12-6850-484d-a5a3-52a169389c0f"
+      }
+    ],
+    "913cfffc-ebf2-4244-b31d-152c8d3039fb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a5987e50-eeba-46f2-b3f3-78dfb27c3f01"
+      }
+    ],
+    "9181a053-a944-41e3-b628-51e5e6d8bfe4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5237295e-cdb7-4110-bc27-0a8e7aa6af7a"
+      }
+    ],
+    "91ad2ab3-3d7a-459d-9404-4e845a8c36c1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b8a356e7-db50-4293-ab8d-3877493bc23b"
+      }
+    ],
+    "92114ba7-9120-468c-99a8-46be590cb7b6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0165f00f-fa31-43b9-bc8d-8bb7f937ec65"
+      }
+    ],
+    "926f8101-778e-4927-b280-ef7d041261eb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f027c2d9-bf7f-456f-acc7-e5b041fd12ca"
+      }
+    ],
+    "92a66a9f-1073-4f3d-a541-7652407123a6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "37cae57f-582a-4a36-b010-53001f1101bd"
+      }
+    ],
+    "92e61fdf-c95b-4b4c-a3ac-a57caf608307": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "aaa613ac-fb38-436a-9737-c906be7f8a3e"
+      }
+    ],
+    "939aefe0-50d8-4358-9ebf-d47ba4865792": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c75f547d-7018-414f-a22b-f5074f229b75"
+      }
+    ],
+    "93b1d12a-61c5-432c-ad24-eb824159fe3c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5167a2ac-c1ff-45dd-b671-4630016d086c"
+      }
+    ],
+    "94b6ef22-45ec-46d8-9228-579c93cb7fb6": [],
+    "94e6bacd-136a-4846-8130-b7a6986c030e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ad6214ef-e0c7-483e-ac2e-d51ada20dad4"
+      }
+    ],
+    "9511004a-56cd-466f-8745-8fcfb0049448": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "547d51da-8bbc-45e2-b727-8129e65d7701"
+      }
+    ],
+    "9576ace2-1d0b-4b15-ae11-367544318849": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "24632acf-d3bc-4aaa-9eb1-43be16329a80"
+      }
+    ],
+    "95b5e066-f465-4335-a978-39648d579677": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0e249250-12b9-4a7b-a73c-fa84554f7263"
+      }
+    ],
+    "95be3d09-450a-40ce-8d8f-46a813b43ec3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "65417d0b-675b-4fd8-b743-8ca1b1276f04"
+      }
+    ],
+    "95c7271f-13c5-4912-ae45-2bd4c0528947": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0aed8e16-99cb-4d12-b942-bef6d9374248"
+      }
+    ],
+    "961114f3-a2ef-47d6-bbb1-c8530c0efc8a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a84624f7-52ea-4bf9-a011-746305007f97"
+      }
+    ],
+    "967492b1-db46-4fcb-9979-629bde68f80f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1481c9fe-71b2-4fcc-9624-2062d48c493b"
+      }
+    ],
+    "96fb3291-a19a-4c6c-872c-1032ee17a50b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e8acd6e2-e3f2-4ee1-9470-c06fd157829b"
+      }
+    ],
+    "97a1ec5e-8aea-420b-a034-0f740c45d7b7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7954e337-d6af-4275-bf05-50ff178f7128"
+      }
+    ],
+    "97fc6217-240c-4c1f-a54e-2978489f2c26": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e23f0fb3-2c24-4c83-9e6b-062214889edf"
+      }
+    ],
+    "98089b04-23bd-491f-8a87-7406aea5cff2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b0d29379-178c-4b8f-b212-505b1c193dda"
+      }
+    ],
+    "982bcde0-f835-4abe-b690-3079ad5587af": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b56fe74e-9240-460b-9745-0083db33668e"
+      }
+    ],
+    "9842118c-5c5e-45ab-98bc-5dd210f7614b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "49edcbbe-653c-44df-8cce-35ea4eff88fb"
+      }
+    ],
+    "984ed340-7d39-4a83-b93d-6d13b4334b35": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "18497483-6f4d-49b8-8627-f94dd549918e"
+      }
+    ],
+    "987998a2-bf30-4d64-88a9-48de7ef2ff15": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "40519971-d6c3-42bc-bddb-73dd2712701a"
+      }
+    ],
+    "990f0e40-2ac2-46a7-b010-a5590492d36e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5dd78c96-ae2f-4daa-81c5-da4fb543ddf3"
+      }
+    ],
+    "99484def-b29b-40cc-9e83-3777003d5ba2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6a6197ef-e27a-4c63-9620-05ae4cd0e72c"
+      }
+    ],
+    "99963cb2-cea6-40e4-be90-e0acebf53135": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "99b86569-0946-4ffa-9052-2fa0e0119d93"
+      }
+    ],
+    "99cb6721-8bb6-4e1a-9b9b-ad95cffc0e0a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3948e79d-aaeb-4b67-b4e7-e44838160a3d"
+      }
+    ],
+    "9a172d6a-5a91-41a1-a811-7d01aa2a55ea": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2d3f636f-ae9e-4539-954f-84dc04bec62d"
+      }
+    ],
+    "9acbeb71-bd97-4d3e-8877-a1fcb4c7d210": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "802b24bf-5383-4a2d-91f1-eaba16c96adf"
+      }
+    ],
+    "9b493f46-1234-4463-9fca-d5730eee5424": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4aa1a9cd-1988-4bd0-9e00-765f5b569df0"
+      }
+    ],
+    "9be9f771-f681-4727-9b82-00fe6e4562f6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7829c583-705b-4f0b-87b3-44a6e7646d83"
+      }
+    ],
+    "9c55881c-7d6f-4a97-9b92-362fb1429c67": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ba04decb-4247-4bb8-a735-afa202ae9f0c"
+      }
+    ],
+    "9c8bfff3-e06f-4a53-85b9-065d3d9981d1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7f1b9aab-8eb9-4fdd-8e1a-4c6ab5a8379f"
+      }
+    ],
+    "9cd34b99-62b4-4385-9171-20aaef483f8a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "52ef4551-f230-48cb-9703-6812610e4afb"
+      }
+    ],
+    "9cd7fccc-8ee9-46c8-8fbe-97e70b5d2ab7": [],
+    "9d7c0885-d9b9-4f32-b93d-840a518a4e59": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b498acc7-558b-4ba1-9882-075b9128e602"
+      }
+    ],
+    "9eb748bd-c910-4391-8a2f-a75e68472c27": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4154d51e-9c31-4c5f-88e2-be52f5f7f91a"
+      }
+    ],
+    "9ec9cd1d-bbbf-4ee1-a212-a84e717d5647": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c3f5a71c-451f-4b9c-9e36-8c0b91d603d3"
+      }
+    ],
+    "9fc1a071-acaf-44eb-9aab-8cbb5a07bcdf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "12d3aa66-b653-4c66-b4c6-76e70df7ec28"
+      }
+    ],
+    "9ff8ead8-0f37-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f0fc118a-c41f-4347-b247-227946c28474"
+      }
+    ],
+    "9ffa310f-4425-4871-af4b-4ede3f143917": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "703b8acc-9fed-46f1-b58b-e26d8f1455c4"
+      }
+    ],
+    "a023dd1e-d7b9-4389-9b2c-cb457eb20048": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "466ea273-6793-412e-96c8-e261cd4730dd"
+      }
+    ],
+    "a068105a-4779-481c-99b6-7d7fb06b357a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "430350af-d3d5-497d-a1d4-97686785e2eb"
+      }
+    ],
+    "a1d551fe-41eb-48dd-8f86-cd425969391c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e1e8d9f1-b0e7-4cef-8126-4971152f2711"
+      }
+    ],
+    "a2246204-442a-4c34-af6f-42e4ddef77a3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1807d4af-d85c-4b38-9448-8435e83378dc"
+      }
+    ],
+    "a2d1e346-2d90-459a-8cb5-39f0bc4fbf5a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f3790a0b-0e82-43de-8a9f-ee540418e0ea"
+      }
+    ],
+    "a2d8296a-2822-46bf-bdf4-946905f01d75": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f23593fa-2237-4761-a6e8-177aeecfd3c5"
+      }
+    ],
+    "a2dde4ef-ec02-431d-b1f8-3ab0d4c7c07c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28c6e1a9-8785-4f3c-953b-298ddfa49b13"
+      }
+    ],
+    "a2de0a19-8bf4-47de-92b3-869690cee930": [],
+    "a32b723f-d362-4f16-972f-c63214244686": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bdc3e6b0-495e-4260-a3de-7be647c4e31c"
+      }
+    ],
+    "a46e63e1-1889-4be1-91be-441def79b01a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "95f2b964-9229-465b-bbf5-95b9f7fdd95e"
+      }
+    ],
+    "a4a0d924-9919-4cbf-8fd8-817c05e366e5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "207132a8-c449-4172-bb86-96f0565d1ebe"
+      }
+    ],
+    "a4fd64f7-d5da-4ca2-a3eb-1fe8c260ce8d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ae1b97bd-f7d8-4de3-aadc-388438e5dec4"
+      }
+    ],
+    "a55dbaa6-f2bf-444a-8e5d-0677f46cf5ed": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fbfe0626-277a-406a-b9d2-6d96fa775741"
+      }
+    ],
+    "a61b9120-57ba-44ed-97b3-c6b00785a959": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2e7e0163-b083-4504-88b4-4bce9ea6133f"
+      }
+    ],
+    "a6a0062f-94b4-4afd-8471-3dc8460acf3c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6f651fe9-33d0-4913-ad09-d08e816b5409"
+      }
+    ],
+    "a6d7a8cd-b596-4f00-9155-807083d1665d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d1388754-c514-4a8a-bbbe-50c16874974f"
+      }
+    ],
+    "a6fcfabd-63ef-4e42-97c3-78afb92a30a0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e7b0cb3a-7ad6-490e-8b1c-99418bd78442"
+      }
+    ],
+    "a731887c-922f-4ee2-bb87-4646cd820ebd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c7d11fb5-c1f9-4190-9db8-63d296801f62"
+      }
+    ],
+    "a74315c6-6787-4231-b8ba-40cb6d5f742d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cf2670fa-a778-4638-a5bc-d69678d192dd"
+      }
+    ],
+    "a8d5b639-378e-4499-98f2-db2a013c7aac": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "82408f28-9791-4277-88dc-f58425b9e01c"
+      }
+    ],
+    "a95fab3a-e549-4463-b852-def16f72519b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "29a3fe1c-870f-4fea-a5f3-7f497533ed02"
+      }
+    ],
+    "a95fe710-8949-4e49-8fce-4ce39e176493": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bf23a6eb-b8c0-4578-be5f-f2f4d2689a43"
+      }
+    ],
+    "a970f714-ce75-41ff-8c86-3a6ee8da9af2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5c269ce8-ef3d-4f7b-9cf2-6e98b72718af"
+      }
+    ],
+    "a9b44766-e393-460c-8276-74bbaeb7161e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3aa4422c-3cc6-4563-bc76-7551bec7d306"
+      }
+    ],
+    "aa0a24cd-4a3e-4538-8a5d-b1d7b44dfcd7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "46739e81-dd1a-4cf9-99a5-4fe9bbd9ddba"
+      }
+    ],
+    "aa68352e-54f3-4d69-80e5-bb5b5bdc4ad2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b31b1cb0-ef08-47d3-846f-83791e4246a6"
+      }
+    ],
+    "aa75b130-18ae-4869-98f3-341d02e59247": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9ce683a6-1620-4121-aae0-e61ca1e302a6"
+      }
+    ],
+    "aae94e41-eda1-451e-a254-27cf9b4bd4cd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fcfd5b38-e75d-466f-876e-5e160b6e7360"
+      }
+    ],
+    "ab0978f1-84a4-48b7-8cb2-ae2ca7e7bbad": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4405bb6f-b000-4b19-a37f-7f40f9e9d68d"
+      }
+    ],
+    "ab664697-c0e5-4208-b4b6-f2a663ed361c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9ee5bb40-38bc-4681-a14b-70ec0b64af5b"
+      }
+    ],
+    "abbb277b-e79b-4958-aed3-75f4d7ed6e31": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2415cbef-a17a-4a71-b515-07f800af16a5"
+      }
+    ],
+    "ac0bd020-ccaf-4dd8-8f43-e43df70f6bfc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3853b483-87c3-4311-a653-4ac671f07cdb"
+      }
+    ],
+    "ac1bacad-2043-45a6-b275-4fb96130a753": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "80a53342-0828-4fd6-96d6-d4a9d0e59f2d"
+      }
+    ],
+    "ac6e9088-0087-495e-9eeb-eee4a95232e5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8dba84ad-33aa-4f44-ba63-eed38cdc4736"
+      }
+    ],
+    "ac8186e5-746b-4e90-b4a7-7a0fafdc438c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5de39b93-b590-4d2c-8bb8-b33025a4930a"
+      }
+    ],
+    "ad1b1e03-16fa-4186-9261-dc579a8baeaa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f058d5be-8afe-4af7-ac1c-323f73509153"
+      }
+    ],
+    "ad407f49-f05e-441a-aebe-252472795394": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "780818a6-bc4f-4055-abdc-46e3ae76dcdd"
+      }
+    ],
+    "ae08188d-54f6-46ab-86af-3ee7cb99b78a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "820f0ae5-d32c-4a77-9ded-a6c09d7678a4"
+      }
+    ],
+    "ae3fa680-d2ac-4f24-9e77-19277c3db3d3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9c5eb147-8055-467c-8dcf-6133b4f99c89"
+      }
+    ],
+    "aef23bec-ea0d-4d3c-b662-14f5e39a44a0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "eb34b5ba-3575-4add-917d-c32634b4ed52"
+      }
+    ],
+    "af01ac88-048e-478b-9161-312930cedfd7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7aee2706-fab3-4b05-a0dd-eb84ae50f690"
+      }
+    ],
+    "af5602f4-4495-459f-b9bc-e5cfaefb219a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7c8fa578-43ab-4234-95d3-16f54b077f4d"
+      }
+    ],
+    "af959c3a-2cc5-4ef8-991d-37d86f50217e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "813f4986-fe30-4c08-96e9-1b247a7b7400"
+      }
+    ],
+    "afab893b-a404-4f0a-9e29-a66eff952e6b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fd84e0f4-dd79-4e40-954e-83580d318eda"
+      }
+    ],
+    "afc2855a-ee31-4843-b7a3-1dc42824af10": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7fc1bca0-f3f2-4b84-a1f4-33ca8a9e5407"
+      }
+    ],
+    "b014ff7b-9079-4e51-b6bb-63a2dddb25af": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3811c2b2-0250-42ea-8a8e-d2b6c5a83a0d"
+      }
+    ],
+    "b027f668-397c-4ed1-a67b-c23bcb15d510": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4576729e-0abb-4988-b168-c32924edde84"
+      }
+    ],
+    "b03c18e6-bbba-4712-bd92-7618a8e7efcb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d802ebe5-5b85-44bb-a903-1071cd5db3d0"
+      }
+    ],
+    "b085930f-aadf-4fe5-9319-af75010c2056": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "07ab7ec6-d1d2-41ee-8fbe-50fcf484c0b7"
+      }
+    ],
+    "b1c2da1c-434d-4309-8d9d-85ec9667fa45": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ab79c777-fb3b-4662-a921-65289457ff4c"
+      }
+    ],
+    "b211391f-1080-44c7-bd1e-85f820efbe29": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b37cc6aa-8e0b-4b8a-bf83-5beb8a136dab"
+      }
+    ],
+    "b26c1fff-940c-4b2b-ace8-d1ed1014ae92": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "25185655-14ac-4216-b734-5bae4eb68ca0"
+      }
+    ],
+    "b2766434-06e0-45a4-a2e7-085c86d7c485": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1d7a7530-0922-4ca4-bdd8-8006a8761537"
+      }
+    ],
+    "b2b388bf-01a9-4b1b-8935-1c822b929225": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "29388dea-1e96-47ca-bbc5-dab2c7c98549"
+      }
+    ],
+    "b2c7b088-a0e3-4f6c-ae51-e430ca96d935": [],
+    "b3072f3e-ae7e-4267-b8cc-6e8eeba3ccaf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "66958309-b25c-43d8-afff-5d42c0340643"
+      }
+    ],
+    "b337eae7-ba20-4a53-be6d-62c336716b35": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c7985a1c-1e41-4e9f-a2cd-5ab59b45caad"
+      }
+    ],
+    "b3499ebc-7451-4515-9963-ae6b8d5b2e72": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ab4971a7-d628-49b0-83e9-646ee16f1323"
+      }
+    ],
+    "b37230af-b839-48f1-992e-3302cac088fb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d1eeced7-303f-4972-adfa-0993c4bf1e69"
+      }
+    ],
+    "b38f6666-f9ee-4008-90d6-37be0b8d5501": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "16c1e73d-14f4-44d7-b7c7-a0aad4a0069f"
+      }
+    ],
+    "b39aad8b-c178-40aa-905b-cf2abfead854": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3f8656a0-ae7c-421f-a7c3-216fca26a81f"
+      }
+    ],
+    "b3a61b29-e65b-4119-9d38-a5abee4e4543": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "52371887-e90f-4f40-baf6-681b883e6a68"
+      }
+    ],
+    "b3bf47f6-8f23-423d-b430-4c17af52d3bf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "17b5599a-a1f2-4752-b580-9054a916c413"
+      }
+    ],
+    "b3cae41e-6e48-4a3e-ad1b-4e5ab657a35f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5fce4cd6-e314-48cb-991e-d4d1c6fe19d5"
+      }
+    ],
+    "b3d71a65-c71b-4209-8f70-568471ae0fd6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e655cb4f-4b85-4452-88e3-11082a1ef940"
+      }
+    ],
+    "b3f5c3fb-e0dc-4783-a23a-5935e42d12fa": [],
+    "b4ba1ead-1c73-4675-befb-a85a444c68c7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0ba191f9-3bd2-4d91-b203-eb12f16b46c6"
+      }
+    ],
+    "b4ba2d81-f9fa-4358-87ec-c5a4f1c0e022": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "504b5960-7c44-4a41-a4ac-bd828e79fc45"
+      }
+    ],
+    "b4dc22c3-f25a-4cad-b9f0-a02293176e70": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5d8ca21e-f762-4940-be85-33a8b7f22312"
+      }
+    ],
+    "b546fea6-1afc-42c9-b4ef-7820aaad20c6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9c01f9ae-e434-43d8-a705-4df24b41fcd2"
+      }
+    ],
+    "b60c0308-92fe-4b6f-b1ab-be3db5751785": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2e6f5ce2-0371-4c22-86b6-8f6d577dc171"
+      }
+    ],
+    "b6c06a3a-bce7-40b4-b7de-b6d440ab8aac": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a3a6eb1f-cc33-4a71-b372-cdc0cf96423b"
+      }
+    ],
+    "b7008829-7582-4e5f-b362-9ebdec6e39ce": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f6f0ea4a-fdef-4dac-a968-ff24af51a115"
+      }
+    ],
+    "b757fdfd-3f2a-4687-aee8-a69cbd92a11c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "10f07429-fc44-4dec-a079-5c7a3f01c96c"
+      }
+    ],
+    "b7999059-9a75-48e6-9f5f-c375026b3f74": [],
+    "b7c7b86f-f339-4a78-8edf-750096d6c6a3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a4a6a66f-63e3-4790-821f-6175416280c6"
+      }
+    ],
+    "b7d5521b-0498-4158-b06d-4ab54aac7de2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c638ab9d-b677-4253-af01-43976f71425c"
+      }
+    ],
+    "b89a97e0-3372-440c-808a-8c03d6578b29": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "38ee7e96-70aa-4cf9-9dc2-0668628a88ec"
+      }
+    ],
+    "b8b23c7d-3dde-46de-a075-5b459b22e250": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a2ae63d4-3fdd-455f-b46e-526e2bbfc48e"
+      }
+    ],
+    "b8e0b29d-3d01-457d-afec-5bec8917598b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2353ae1f-2c27-4487-82cf-b173f7fc8b76"
+      }
+    ],
+    "b90b9d99-272b-4340-a2c9-79255ed064fc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "77506a2f-83df-437f-a479-74f19db60507"
+      }
+    ],
+    "b930d0a7-541a-4c6b-8b8b-99936f16b2e7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "190e814e-fa80-4f0a-ba7e-0f57bc14b62f"
+      }
+    ],
+    "b9a72d61-a8ee-42a1-beb0-4d74f934dc6b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b77a1d22-de7d-4dd8-b884-8d8340ad7c80"
+      }
+    ],
+    "b9c33c0f-37c6-4361-9e56-57b3b2446e6d": [],
+    "ba09c034-c4b7-4876-9f60-531939fbaa15": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "df24b6a8-d267-4748-9b54-9a3225072fd1"
+      }
+    ],
+    "ba4c50dd-2c01-4779-bc70-10bc1a959955": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "75891185-8669-437e-bdc4-2d8fcec9ec32"
+      }
+    ],
+    "ba5b2f80-8945-46ee-b53c-729d971a9aa5": [],
+    "ba67f9ab-27c4-4565-bb7d-68a840844884": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "873ac18a-1744-4fbb-9fdc-29d00d564fc2"
+      }
+    ],
+    "ba90a40f-15d5-4244-b267-3c941f18016e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f1a3f3d0-bc4b-4dc0-befa-ad31a8900c5a"
+      }
+    ],
+    "bb00d0d5-064b-4954-aa5a-d5dec4d20184": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3bd556d5-b5af-4e15-9bec-4736bc9ef12c"
+      }
+    ],
+    "bb56924e-b4c3-4031-83d1-a663c061ab9c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e2f31728-f6cd-49d7-89b7-696816d2d0bb"
+      }
+    ],
+    "bbc3af22-7eea-4180-868c-59e9001c5814": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "99f030cd-3373-49b2-a31f-dbfd275e04c1"
+      }
+    ],
+    "bc2917f2-33b3-4842-8b79-cf7d4ad06c03": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "88c057c7-264a-401f-a952-e7e17e3b74fb"
+      }
+    ],
+    "bc5ee141-8f85-4c29-a2d7-4088b872f3dd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3e437676-e5ff-4d35-9d6b-292b5879ed79"
+      }
+    ],
+    "bd1ab61e-b5de-4020-bc16-2cec42868ae8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0e9435ed-02f4-4bca-8152-2534084397b1"
+      }
+    ],
+    "bd35e644-7610-430a-8123-09b6f9924c66": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5b30c145-fcdf-42da-aa69-3d585f7b86ad"
+      }
+    ],
+    "bd9541cb-486f-4ca2-b575-907bccce61e0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0621ac34-34af-4099-82e6-701850e820a5"
+      }
+    ],
+    "bdd0fa13-2d46-46e9-93d1-0c26a29accca": [],
+    "bdec8d4a-657b-4a51-b7f2-d274e543577b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "295a654e-f2ea-4deb-b00d-94bdc69fae67"
+      }
+    ],
+    "be94f905-bb5a-44c0-a881-bf8973b13cfd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d2fffc29-7b39-4adc-b01f-0397dac84c33"
+      }
+    ],
+    "bee13ac0-365d-4d15-b2b4-f434ed72778c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fadf1b5f-e0ad-4f6d-9775-0ff12dd7bea1"
+      }
+    ],
+    "bf189f7a-fb52-40e2-ae6e-1dfb120b6382": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2b34881f-148e-4263-a02f-9a7eafe47e1e"
+      }
+    ],
+    "bf4b6d2e-8244-4ec0-afac-f57e71cf406f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3e2a9d2b-5a7e-411e-850b-1b0ce199e6da"
+      }
+    ],
+    "c03f4415-e295-45c1-b951-4196a907242f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "efd16d90-5231-4813-9dd9-30e39db580f0"
+      }
+    ],
+    "c06ac930-e3e5-4ee0-b05a-97ee0db4c893": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f3506fd5-2869-4ec4-83c2-63e06e82818a"
+      }
+    ],
+    "c091194e-9e20-4a6d-b967-8b8d2ddbe67f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c719104e-9229-4d21-9a73-0f165d00edff"
+      }
+    ],
+    "c0e8ab32-1467-48ec-8a19-22093ab9a53b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "63b81882-2879-426f-a3e7-10da6715237d"
+      }
+    ],
+    "c13faa88-fd1a-4d14-8579-275fad7079aa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4ab58b01-35c2-4a77-bccb-b8fcd56ec2ca"
+      }
+    ],
+    "c16cec1a-9577-450e-986c-26f72d7acc3c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2e1bca09-deea-49ac-8de5-53d0b794ad54"
+      }
+    ],
+    "c1bc8420-dac2-4771-aef3-b6fe8d75837a": [],
+    "c227676c-4919-4772-8068-2c069587c7d9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d5bf48fc-5084-4bca-af41-e4d86e91f9c8"
+      }
+    ],
+    "c23db14b-a917-45e8-a676-0a50827e375a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "85fcaae9-4956-417f-9a53-9093fa863832"
+      }
+    ],
+    "c314b59e-c888-44b9-bd16-b4e7beb97305": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ef0ace9b-4b46-4693-83bc-bc5b4c04eddb"
+      }
+    ],
+    "c375991c-b042-4a32-a570-181c9e9bb258": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b3558ab9-381e-422b-93f9-fd717be409b2"
+      }
+    ],
+    "c3b2d9a4-3a08-4e6f-9b6f-3fecefbd83fd": [],
+    "c4397510-6dcc-4e74-9399-c59808e40eaa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "054bdc60-7896-4962-a444-8012cf39b9d5"
+      }
+    ],
+    "c4625109-bf94-4030-a1bc-a2b51f45bf3e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "96241bf4-cdf8-4088-89a3-4fa42e02df7e"
+      }
+    ],
+    "c4727603-45c6-46d7-885c-3f083cfe5c2f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "57fac0ee-3c2c-40e8-b440-32f904e9e5ec"
+      }
+    ],
+    "c489445a-4837-4e08-b02f-3db2ec567b54": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5ade284a-4ba2-4637-b64c-8972f14da86f"
+      }
+    ],
+    "c4b5d7ea-141a-4183-8923-e39c3a33d21a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e7329c21-0765-42ac-acce-07069e61d579"
+      }
+    ],
+    "c4eb1c13-b267-4ac0-900d-214cf2fbdb42": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e257c979-7804-4fa7-bc42-b8ef39e7bcb9"
+      }
+    ],
+    "c59613bd-da44-4231-b21a-146a6862547f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8cf4c084-0d40-4188-91e3-bfe5fbc59d39"
+      }
+    ],
+    "c634f043-0718-4bcf-8330-21cfd2c9aae0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d66c3aaf-f524-4886-b375-9f7670d84312"
+      }
+    ],
+    "c6c6ae3f-8331-4ffe-b38d-d1d650c8edbd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6611fad4-0abf-4657-949a-cbb5d6dd1db2"
+      }
+    ],
+    "c72b1b82-0c1d-45f4-a927-025a87bd6c5a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3b268c2f-942d-4f66-a74a-ecc3e1325979"
+      }
+    ],
+    "c774d4bb-0c6c-44ff-ad9e-60bf55ce056d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c3e4a084-e62f-492f-ac07-93c2f52b828f"
+      }
+    ],
+    "c7ec9aec-c043-4519-9407-2218eb6bfc2a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "cfa9ef7f-c3b3-43b5-b14d-6030157ab13d"
+      }
+    ],
+    "c84439a0-7801-4588-959f-a74d99673be1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "75b65d06-9b56-4856-885c-eb12c8c322a9"
+      }
+    ],
+    "c853a355-109c-4b99-911d-14a912434e8b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a8411b7b-b527-42e4-989f-4a8ea90c3343"
+      }
+    ],
+    "c893c65e-29dc-455e-b7ae-a59148eabafc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f36d7f78-6820-43bd-b064-b46e1b4806fd"
+      }
+    ],
+    "c8dc38be-ccf7-4a4d-a3a5-eef52aa38366": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "15fe4cab-56b0-44a1-94c5-c954f7bb2136"
+      }
+    ],
+    "c8e53f05-c84a-4a99-beb2-5004ad5e42a9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b4aa6d24-6f0f-4c5c-b141-6a84930c46d6"
+      }
+    ],
+    "c91cac3b-d494-47c1-b30b-21c930d2c1b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "06a4cc2c-3c12-45c3-8c33-ee2c81c53fa7"
+      }
+    ],
+    "c986cb7a-b18e-4fea-86ac-aeca811b2520": [],
+    "c9dc5e2b-7bfc-4a10-9d4d-228f9ca42ea4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "78634097-1300-4c20-80bf-3f1c4e432a74"
+      }
+    ],
+    "ca31b8d4-7766-4051-bbf5-0583cbe59e05": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9ff0c114-b71b-42d9-a7ee-eaf013f2eb63"
+      }
+    ],
+    "ca36c304-1ff0-49b1-ab1c-32b687e76f1e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "49cb647f-1a91-47d5-bab1-51a24bd788c9"
+      }
+    ],
+    "cae4195a-34fe-4713-96f4-5966d9d05c11": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b4561660-940a-4db2-bb28-7afb751cacfc"
+      }
+    ],
+    "cb216ae3-3c76-4a7f-801a-0428270d27d0": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1c29b2f9-bb02-4e30-92b0-303b0584d907"
+      }
+    ],
+    "cb392eea-faf2-40fb-9900-cf437e24737e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "aeb12438-1dfc-4d5c-a6c2-4fa23e0c6bad"
+      }
+    ],
+    "cb4ad6c0-c539-474b-b36b-ca6ff97c59c4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ed277007-3b52-491b-a00f-075d176456dc"
+      }
+    ],
+    "cb9e5f93-8b4c-4c93-91d0-0758657d3d2b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "34fe26cd-4807-4e90-8f94-a4f6dda16cb7"
+      }
+    ],
+    "cba817da-6f17-47e3-9c68-842ca0bff239": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "daba5d6f-11ca-4d19-840e-fbc2797084d7"
+      }
+    ],
+    "cbf76be6-a593-4f94-8e10-62a839474c8e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "590b3f26-79c1-400a-aae8-0f2da3b30462"
+      }
+    ],
+    "cc695123-5f99-454b-aa06-96ec626ac812": [],
+    "cc7db7a3-16c6-4756-aa0a-c5d20022fdb7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fb4df939-8e2f-4037-9316-f40bb5ae4f6e"
+      }
+    ],
+    "cc939dd8-6441-4ad8-b7ac-d18b9e784ebd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "58704e51-6da7-4c7d-84fb-22a541dc2ae4"
+      }
+    ],
+    "cd861c64-08b5-4323-8008-c1b49e960511": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "57fd52d0-12ab-4b33-8ece-95680d243604"
+      }
+    ],
+    "cda0ae80-b465-496f-b493-aeb70fb2a2e6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8dfd0285-afe0-4e8a-bac4-f5dd2d988168"
+      }
+    ],
+    "cdda5c97-a0e1-488b-b65e-56b74b811494": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0f071a5c-07d7-4d17-8c83-186b7086516b"
+      }
+    ],
+    "ce124f4f-6c1f-458d-848c-aa16bf923de5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9c2c9d51-d4b8-47b4-8f86-da2a34228f12"
+      }
+    ],
+    "ce15207b-437e-4f61-8838-686208d16926": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5c3d38aa-72b2-4f27-9ce0-7cee95c3d384"
+      }
+    ],
+    "ceb03597-9ff2-4304-b100-0ae3d6d82f09": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6fe481bb-8120-48ba-b306-2d0fdadb8c16"
+      }
+    ],
+    "cf6e7997-104b-44c7-88c7-ded283f2ca37": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7db1846c-35bb-4bb9-9774-ec52718eadb4"
+      }
+    ],
+    "cf821d84-42ac-4da3-99d2-2b43ee813868": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9a108b91-cfc1-4794-91f5-70b0e21deb05"
+      }
+    ],
+    "cfc413e4-9b5d-4d08-8939-2fe505748d33": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2a9df147-c9de-4255-8436-b77878b6b749"
+      }
+    ],
+    "d0b5c011-5936-4bc6-afc9-f024328fd7ce": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5d6819bd-c356-475b-bfdd-0a6c29e2b584"
+      }
+    ],
+    "d0d9ea08-325d-4946-82dc-e057ab3d93e1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dc5904c5-4791-4b16-aacf-0c0f1daa3321"
+      }
+    ],
+    "d1011e6d-5b1c-4c01-a0cc-7818a424dfe7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5c021ff2-84e9-4d98-b0ab-767cd4938e7b"
+      }
+    ],
+    "d112ab0c-f230-4718-a992-65f31ad96662": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bb7bd1b8-8e0b-4a56-a88b-5ac21029dfb9"
+      }
+    ],
+    "d14051a2-56e0-4127-ae47-fd210bf25e9c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5d471ca7-6c94-4659-85d2-23007a435f04"
+      }
+    ],
+    "d149450a-b05c-4a55-bf34-fd6456424388": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9b14a216-eaff-4f41-8ec0-529681bbb2ec"
+      }
+    ],
+    "d25b2b86-ec33-4bc4-bf8c-7b175c9e3dcb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7d103d1a-7846-4d59-b120-9b9b8773840c"
+      }
+    ],
+    "d25dd69c-527c-4f7e-851f-5d519fdd255b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b2c20382-82a0-4645-99c2-c37da1826b53"
+      }
+    ],
+    "d2d8fe2b-6148-4286-b6dc-786ab1cfc037": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "31cf625c-c2d1-479f-b29a-c90750dccb0e"
+      }
+    ],
+    "d30bba74-dd99-4314-88e6-d00dedaed312": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "51132726-a374-41f6-9815-3e5fa1f9c957"
+      }
+    ],
+    "d30dc2a4-489a-4c6c-a0e8-d6e185ada27e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f56ac07-e4d8-4daa-bcc6-da711820e36b"
+      }
+    ],
+    "d36b39ba-30be-4cdf-b264-e9f571991d51": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c0dbd11d-7c9f-4b80-bc5b-4e8f2465127f"
+      }
+    ],
+    "d36c8331-fe81-49cb-aa58-0ebd1faf0efb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4fb1366f-81bc-4873-9ab6-a3d8e53f95e5"
+      }
+    ],
+    "d38bfa6c-9a02-4ac4-9351-b1af783223e8": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b2d20bab-8730-4bd6-876d-e9882ed4d9a0"
+      }
+    ],
+    "d3c19b9d-0dbb-4ef7-aee4-2f516cb42480": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2abfe823-f69f-4b42-b682-1abe20e51b4e"
+      }
+    ],
+    "d473c8ef-c77d-42f3-8bd9-56515cbf82af": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b397b607-3699-492c-b73a-f0b6b1f6ec30"
+      }
+    ],
+    "d5cc73ae-2c5b-4e4e-9cec-d104e7318f95": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f3b30640-1336-447e-bdf5-71aa99f09cad"
+      }
+    ],
+    "d629a5ab-10d7-4a9e-bb20-642178366d2b": [],
+    "d643f5eb-a079-4984-badb-b06fcf437f52": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f417ed83-298b-40e4-92e5-a5dd69203ec0"
+      }
+    ],
+    "d65d9635-890b-432e-9f0d-ca9bce4cfcb6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e369b7b1-5bb2-42c3-9a05-27abe584c0c7"
+      }
+    ],
+    "d6e9fb0b-98e1-440a-858f-6c0848810c91": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ae8f653e-b6d0-44cf-a9b9-e9c87736d42e"
+      }
+    ],
+    "d7355bfb-99e3-44f5-a752-ed73e4233320": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "99c2b5dd-8ee8-4096-a7b1-120288b1769b"
+      }
+    ],
+    "d757f7c6-0a8c-4ba8-a586-a53e11c77067": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1799a2ea-d37c-4f67-abbe-c07391ffefe7"
+      }
+    ],
+    "d786351d-0343-4dc3-be72-aa312ea41e37": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3742948b-6e59-4fde-958e-4ba0171ace1b"
+      }
+    ],
+    "d8036687-bb0a-4e8a-a5ba-0201a8c60cf9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c4d19850-9faa-45d5-ad02-059eb1596404"
+      }
+    ],
+    "d80637e7-57c4-484e-8c8a-65da2f323aaf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7c1a3fe3-bacf-4b5b-84be-0c6fcb1119d4"
+      }
+    ],
+    "d84bdd8d-88a7-4114-802a-093cd59e5cdb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7e16bc25-f74e-4150-94fb-1a0fe9d670dd"
+      }
+    ],
+    "d89fc649-4855-47b7-bb4f-2177c323d939": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3c878900-b058-4152-a7a7-cb789cfca635"
+      }
+    ],
+    "d8a0b4e8-beee-47c7-897f-d0f8c10523e4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d226f67a-c973-4bb7-83ba-110000f9284d"
+      }
+    ],
+    "d8c2b73f-5e69-446a-baf0-172ee1e8bd73": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e5874ec7-7234-4c7e-8f1b-2e0d986ba59e"
+      }
+    ],
+    "d8e081bc-20aa-4041-beaf-471d23fba63f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "10490c23-3dfe-4154-8be7-4e402aee7e04"
+      }
+    ],
+    "d8f33cca-a781-4496-9266-13d7dedd7140": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "51b97288-fc34-4b0e-bc84-191a16034dfb"
+      }
+    ],
+    "d97990f7-e947-4ee1-87d8-ba01a8535543": [],
+    "dae9badc-9c3b-4ce6-8285-38dcff1249d5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dc1c2f33-0660-4393-b747-90a7ddd4cdcb"
+      }
+    ],
+    "dbd88767-6803-4be6-96bd-284cda78a6db": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "58aa3c7f-6ae3-49d7-b33f-2c0e7eb74690"
+      }
+    ],
+    "dc330462-89f6-4b65-9c13-ff7b58aa921c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8e56c2cd-3b9b-4a99-a795-c318421beba3"
+      }
+    ],
+    "ddb655d7-8ac0-490e-b11c-fe077e23ebd6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3ef18f2d-ec83-4e9d-a255-2fb484ce0a80"
+      }
+    ],
+    "ddcd891a-5bd3-4252-ac0c-d8a77d029e18": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1881ab74-6575-4628-82bc-a543a54e0700"
+      }
+    ],
+    "de05e0cb-c899-4a4d-b436-2bf4bc07f4c2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6f496e97-822b-45d4-9f47-08ba34683a72"
+      }
+    ],
+    "de08b7b2-9cad-4409-aaae-e2c7eba1ace7": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "16707fdc-bbf8-4159-a1f1-8fabfb0be9a3"
+      }
+    ],
+    "de6f886f-a3a8-45c0-abd8-25b11fd369f2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3b4c8862-ecb2-4ea4-a8dd-f1edff992953"
+      }
+    ],
+    "de705684-0f37-11ed-93bb-da75731aa77c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0cf37f15-eb03-4c05-8bc4-55a61ff4736a"
+      }
+    ],
+    "de8d122a-2936-410f-943d-1bab9f24c2d3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "be10faa0-a30c-46e4-a506-1fa3ee32018f"
+      }
+    ],
+    "de982e23-330e-44f1-9ad1-8d130e4a8aa6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4b172228-d7ee-48e7-ad9b-7b0181130f5b"
+      }
+    ],
+    "decf0cee-5bbe-4062-9fca-35c7b8622b45": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3fe015da-5124-4f69-8faa-6153c549c691"
+      }
+    ],
+    "def9d779-8581-4f7f-a618-44128b0e40b5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "3a842cb1-a056-4aff-b95f-63a1b4e3b597"
+      }
+    ],
+    "df010c22-69d5-4218-bb22-9d212349929d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "32987d05-234c-49ae-98b6-2329fbb5ec94"
+      }
+    ],
+    "df1cf856-fb0e-4348-b462-0d4e229bbb88": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "78292727-27eb-41de-ada0-e474c7012ec3"
+      }
+    ],
+    "e03a045a-b9da-4320-bef5-d41833c37d2a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "aa05ee23-3bd8-4038-bedd-18bbf47c606e"
+      }
+    ],
+    "e0466098-228c-4af6-9746-f7eaa985972b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fc502b8b-5aa1-4d2a-8b86-162100fc9c27"
+      }
+    ],
+    "e0cc039d-435c-40bb-89a4-ea19eb71b37d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "440bbebe-0da1-43e1-b267-7c7699447eb1"
+      }
+    ],
+    "e0dd50d2-3d72-4416-b4b8-fe334ae20a88": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28291203-2686-49d2-9532-9acb9d8f0ea0"
+      }
+    ],
+    "e0ecf173-d14e-4d5e-a74d-579e65ba30ce": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0c0b4a50-2610-4a2b-9b3a-37386ecde7c1"
+      }
+    ],
+    "e17aed3b-56e5-415c-bb92-63bd77876f4d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "379bb122-eeb3-4579-9a31-0552f2b4639e"
+      }
+    ],
+    "e19dd1c9-3031-443f-9c87-7c67ad10b6a6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bb9ed535-9691-494a-ae0a-dd5ed799c31f"
+      }
+    ],
+    "e1b13b9a-d943-4fa9-9566-c5e040481000": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4ce73f89-b2c9-450a-8044-d7ec3865ab9d"
+      }
+    ],
+    "e2a8fdba-1a59-43be-953e-18627f117a10": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e86b4d9c-aa36-4d10-8992-4dcef860e801"
+      }
+    ],
+    "e2c38911-b760-4324-bbce-60e68a9aea68": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a5c3b1d3-e2bc-4fa0-b475-eb35e1550bee"
+      }
+    ],
+    "e2c4a5d1-6a83-4a4d-8435-dcadf5c20a9b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "068e9d14-e2ba-4d02-9cbe-7500d1f08618"
+      }
+    ],
+    "e2c53bb3-c6b4-45db-8a3f-d8be995ad3c9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "edeadce2-b6c0-4336-9394-897d630b59ce"
+      }
+    ],
+    "e3258e53-2833-4a13-8984-2e25aebd3186": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b1e22772-4e6d-48d4-b69f-3179ac0452d0"
+      }
+    ],
+    "e330b498-21c6-4c48-80e2-e6e1ddf546ea": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c54a9616-e273-4ce9-acbd-6403278f354b"
+      }
+    ],
+    "e3874ff1-c544-4148-8976-9749b2dc77b3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f682c4bc-8d70-4493-b6e3-c63085a3235e"
+      }
+    ],
+    "e3de77c2-cdb1-4d65-9942-2ad56c7bafa2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f6f52f7a-a3d6-42d2-a7b3-4371c4209a04"
+      }
+    ],
+    "e41a5816-53b7-4982-b5a1-1d994134a2f4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e530874a-7464-499f-a84c-8389bab2d9a3"
+      }
+    ],
+    "e45486f3-aad8-4a8f-a37b-ef65fb3d9f9b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "00c211e7-09ed-4473-975b-72b18633c7a4"
+      }
+    ],
+    "e4ca8277-4114-4b49-88ca-4966d4188a0a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "755bd0a4-e5dc-45f0-98f2-e64ee0eabc50"
+      }
+    ],
+    "e4d0e995-ccba-40bd-b2b2-9c0cd9115cd2": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ecf04dd0-fdef-4133-b3b2-4a8c5b258f1a"
+      }
+    ],
+    "e5cf0a93-ed1c-4112-99a2-944a404eeed4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "43fbb7e2-cd32-4ede-a0c8-5e17326f27b1"
+      }
+    ],
+    "e5dae5a8-ef6f-4837-86a2-7722efa77906": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6ba23ecd-480e-45a2-a0d5-106ae26ad866"
+      }
+    ],
+    "e5f17ec9-2cbc-4af3-bcb2-6970d2797b71": [],
+    "e6706c17-67e9-4e0c-8817-7d7140560319": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1f97487d-82e2-465b-a588-2d747b043928"
+      }
+    ],
+    "e6bb8ded-2446-4ac0-b169-6cc0e811c0fe": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "71ee1e13-2f2d-4904-b67b-75b76bdb8a4e"
+      }
+    ],
+    "e6d3c0a7-f105-4772-9066-43d23c5a3e18": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b693cfe6-80f5-4e86-80c2-d1f74ffdf7c5"
+      }
+    ],
+    "e7288006-0657-4298-bb33-959b093fa1a4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "298defdb-0074-46a4-9e8d-67ae10192a0a"
+      }
+    ],
+    "e738eed4-6d7a-4bcf-ad74-145dc059bf96": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4e6cba5b-c346-42dc-869c-bd59092f9969"
+      }
+    ],
+    "e7b31ac9-c7ce-4fab-94ee-08c05c1e4e60": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "026a6078-9929-4d3f-bd5a-28639e26ff17"
+      }
+    ],
+    "e7d44308-ffe1-43a7-aa6e-821c30a7ea55": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2b6d2f74-fec8-4929-ac84-af5309b21b14"
+      }
+    ],
+    "e820d115-e064-4229-8d6f-20ccb75f1897": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0c9aad2d-1f68-4ef3-956a-f41ab056e21c"
+      }
+    ],
+    "e8423fd8-f2cd-43d2-a66f-5b5dfccc41cb": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f20a6bdd-0217-4ec6-a609-a561929e9fe2"
+      }
+    ],
+    "e89dc02a-5c12-4a10-a3bb-1f9e04e3198d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d09ffb0c-bf65-48c4-8dc1-8483759348c3"
+      }
+    ],
+    "e8e001d4-e602-4ab1-9129-cdfd07e20f1a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4989ac2a-5901-4b17-8fd7-44b7ba33238a"
+      }
+    ],
+    "e9a4fbf6-6573-43dc-8550-5684da73f2b4": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "dbc1f0fb-a9a3-4c35-9784-d60b521d3485"
+      }
+    ],
+    "e9c77d39-4208-45e4-9a3b-e51fcc388d0c": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f6c7b4ab-ca53-4acc-9130-462a70a02b5a"
+      }
+    ],
+    "e9d5a72c-4987-4bbc-82bd-b5529d73c6f5": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f87c0388-a039-4f5a-8911-5ae32abac572"
+      }
+    ],
+    "e9ee33fa-0378-46db-bd1c-dbdad5548341": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "bb40bd65-b625-4ad9-b591-3d24b6032e6a"
+      }
+    ],
+    "eaf85f6f-d90e-429e-8f5b-0f43df9a29c6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ec674bde-b192-4063-9324-4ec4aed271f9"
+      }
+    ],
+    "ed0b2d10-665b-48d7-8a91-bf371ba128fd": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ae5e25c4-e139-4743-bfe3-3f0ed5a98ce5"
+      }
+    ],
+    "ed37289c-e2a0-47be-9a74-7bd81985f0fc": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9d53d8ff-7b05-49dc-aaf8-5aa7bd4e3d91"
+      }
+    ],
+    "ed3ee34f-4b0a-44ce-8aed-049d585f0fea": [],
+    "edcee9e3-f496-4b72-9d13-aab9e971eead": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5a01e9fe-b77c-4fbb-91d8-7f234ae6b1bb"
+      }
+    ],
+    "ee1248a2-3288-481e-b2d8-7628e63f3029": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b395bfa6-35ae-4a50-99f3-2654d723071c"
+      }
+    ],
+    "ee52c8a1-6681-4fb1-88e5-080c11d1cac6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6b8b381e-b113-49be-82b9-fd1f0aa5eb09"
+      }
+    ],
+    "ee7cb269-9cc3-47dc-9a0b-87743925a468": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5e95648f-d1b6-46c0-97ec-f54e930753ce"
+      }
+    ],
+    "eedf851f-821e-417e-ad05-c6e611380ba1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4c07774d-5ff4-419d-80e7-a0528809f7b5"
+      }
+    ],
+    "eeee9104-de64-484e-b1db-7a0daf4ea7aa": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1729f6e4-2f63-46bb-851e-1fe3157de852"
+      }
+    ],
+    "eefe58bd-731b-4f9d-98b4-0000f7c27689": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4f7de441-38b4-465f-868d-ec8a07a68b37"
+      }
+    ],
+    "ef09187c-d671-4250-a3fa-9c2f308e04d9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e02c6dab-ccf9-4771-a32e-0ea30a782f27"
+      }
+    ],
+    "ef3be1f7-82f4-4b1a-bfd3-45794e44e7d6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "89acab70-8ae1-4c37-a2a8-9bf02c5a029d"
+      }
+    ],
+    "ef41f5c0-5fe6-4477-85cd-42b52150c36a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "0bcd7e15-55c7-4c98-b876-dd5ef7a7fce2"
+      }
+    ],
+    "f063d437-4552-4c59-aac4-f563025be584": [],
+    "f115ae65-f421-42e0-8a4c-276ae3751f5f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8641ba02-1b9f-4369-aef2-e429ae6fc9ac"
+      }
+    ],
+    "f16e1be6-6081-43ff-9793-d0e5075586d9": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "c262166d-0d4e-4a3c-b294-ace9353a272b"
+      }
+    ],
+    "f1741e17-e9fb-496d-9648-465d0aab6f40": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "7aadf25a-cd59-4a1a-939c-3949419544c0"
+      }
+    ],
+    "f186b551-ee15-42fb-af99-30cac7c63b39": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ae7e49d9-28e4-4bb1-855e-dd68329d68df"
+      }
+    ],
+    "f1adbe64-0dd1-4cc1-bd14-5abd151105ad": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "71c295eb-5bf8-4c59-9588-e4676e5b1e7c"
+      }
+    ],
+    "f1b02287-269d-494e-8bf4-330b92604e6b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8274b26c-5090-4bbe-abe4-b7271575b01d"
+      }
+    ],
+    "f244b2ed-17d3-4b8d-842a-8bab928122d3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "eab024b1-c16b-4505-9061-43c490a1904a"
+      }
+    ],
+    "f2702cb4-9546-46bf-9446-461331fd04d3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "fb8fd072-f7cf-4134-a6c5-9b514b15156b"
+      }
+    ],
+    "f2d4bb2b-64e3-4e09-bb4b-5d6da37f35cf": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "600e4438-d279-4351-b2e3-ce6919d372ba"
+      }
+    ],
+    "f39a20cc-b5d0-46d2-9d0f-94c027fb583f": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "76180939-1f12-442b-b2f4-5714b676fabb"
+      }
+    ],
+    "f3bd3b28-40fd-4934-a03e-e4eaa6e2f537": [],
+    "f3d5ada5-0a50-441e-b9af-07805f0e7260": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "02919905-7b28-46b7-89ba-4bd02ab6a8ec"
+      }
+    ],
+    "f3ffa92a-c539-474a-94cd-1eee63930740": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e25a14c0-72f7-43f2-b9d3-6243a42c4a12"
+      }
+    ],
+    "f40ed755-e07f-40d4-a47f-7a8abe732cec": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e9bb6c49-e157-48a7-bf74-dc94d76ca5be"
+      }
+    ],
+    "f4b59081-df7d-4835-ae1a-40abd1c39ea8": [],
+    "f4f6a857-0eef-4c53-af55-a5b890b856d1": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "736cb801-5659-4dec-9995-2b70c5b74b2f"
+      }
+    ],
+    "f5864f97-f167-4950-a6b2-d97cab48cc10": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "23fe3b2e-73ad-4de2-854d-7579446d4062"
+      }
+    ],
+    "f5991f1d-4c46-4f8c-87b6-d3c05ce902c7": [],
+    "f63644ac-0c72-4a15-904f-4e0c705f2aa3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "701fb052-ce9e-47ee-802e-da4afc6a39eb"
+      }
+    ],
+    "f671c70e-f8d0-45e9-be25-d487abe057ab": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8de9eb16-5676-45cb-8d4b-293d7d677fe4"
+      }
+    ],
+    "f6a66eff-e80e-4df1-a4d4-c89f3a330227": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ecef4639-94e8-4faa-a202-fe9d09438d99"
+      }
+    ],
+    "f787a2ce-96ed-48ba-adcc-3c7791d3d769": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "41a03953-efd5-4634-8d29-c8cafab99624"
+      }
+    ],
+    "f79025f9-c4be-41c2-be77-e4347e476178": [],
+    "f8c42b39-6352-4fe1-a2fd-4ed87b369d7e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "4fbdc3db-0529-4c7d-91f6-a0a43d3397ae"
+      }
+    ],
+    "f8d26d3a-4320-4649-9a17-ee3555c46bd1": [],
+    "f8d757bb-8567-431a-98ab-d9491dfbc59e": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "2b0ff86d-8427-450d-ac00-d009fed5c1b5"
+      }
+    ],
+    "f8e63d4a-99e2-433f-998c-363d99c16141": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "5ce9828e-c6aa-4b7c-8906-cd230ac8aa3b"
+      }
+    ],
+    "f995c7d1-4031-4a9d-8ab6-8621f2ca15df": [],
+    "fa04378f-17a1-4a4c-9dd2-fb78f49b1231": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "601811e1-e86a-437d-9c8b-d6032603a116"
+      }
+    ],
+    "fa06f47d-31ab-4178-9c3f-fb82f4f29d9a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "19b49c52-6a93-420f-a6e3-3911f7672724"
+      }
+    ],
+    "fa0a2cd2-41ae-4ae1-9f72-ddebfb9dfd94": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8c1dbec4-3f72-4463-8a15-5ec05bfae471"
+      }
+    ],
+    "fa2a76c2-187d-41e8-8ecd-34ddeb87080d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "ba12cd59-bb49-4195-ac4f-1964c8b998ff"
+      }
+    ],
+    "fadb9d24-f329-4b71-ba01-f105f4c752f8": [],
+    "fb320d93-94df-47ae-a212-6bad415a39ab": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "a5a39adc-7a2c-49e1-a3f9-cf903ee98aab"
+      }
+    ],
+    "fb8b5f96-e13d-4287-a120-63a130446ae6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "9929b5c6-4886-4894-9276-abbd1ab143ca"
+      }
+    ],
+    "fbbc94d5-f6a1-4536-a05c-7a8ef5c3ec3b": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "6ea49923-93c6-4fdb-9324-eda7422dc7a1"
+      }
+    ],
+    "fc37f5d1-30ed-4619-a958-7ddb7fb40307": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "77b38827-99ff-46e9-885c-682730b8bd50"
+      }
+    ],
+    "fc46e3e9-ad35-47ad-b0cc-d2188d5bd09a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8ca09991-b987-4551-9f3f-1b431e18cb81"
+      }
+    ],
+    "fc93084c-abdb-49d7-af16-3ab1e9a04492": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "d81b2cc1-fa7f-497f-9c2b-e1294306675a"
+      }
+    ],
+    "fd010a86-04db-455b-b876-63519fb7d249": [],
+    "fd6e9a41-6008-4f65-8cac-701d4307d214": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "1751baa5-e97e-4a3f-879a-f28e775cbabc"
+      }
+    ],
+    "fdef861d-9a18-4845-9a97-94e5499b5459": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "f58a585a-c79b-4c06-8d94-5c35bc8818a1"
+      }
+    ],
+    "fe30f9ba-df92-4cde-b307-1577849e903a": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "28e86a74-dcd0-4ad0-9912-de674768f883"
+      }
+    ],
+    "fe8d2569-5e1a-4aaf-83d2-296318238bd3": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b4458435-fd88-41f1-8dab-81c87b1b4423"
+      }
+    ],
+    "fec3c8b6-1d72-4e7f-b7d3-6665caf4ff5d": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "b4adc4bd-f907-4275-b38a-bb4473215dfe"
+      }
+    ],
+    "fedd76c9-787f-4bcf-9b83-5c4e335dde56": [],
+    "fee0267f-3c7a-4d5b-b70c-d81d23c075a6": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "44c78a2b-bdf1-452c-ac59-c70b3e988436"
+      }
+    ],
+    "ff212a21-eb98-45ed-84d2-f6819dde2b13": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "83844e31-0498-45d8-a0ca-3c5b0c7917bf"
+      }
+    ],
+    "ff3622c6-8bb5-460d-a99d-c42c469f7255": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "8c824b91-5c0b-4b9c-8ac9-7c8dce6fe0b1"
+      }
+    ],
+    "ff770cf2-5f1a-4a00-80c2-7beeac6ef820": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "68c71010-0632-499d-b549-950dde2a4676"
+      }
+    ],
+    "ffa258c4-a56e-4803-88ba-44bec2ff3a76": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "e77e50f3-d5c4-4512-99ca-716b867b9c7d"
+      }
+    ],
+    "ffe6b1cf-65f2-4701-99d0-584dba4906ed": [
+      {
+        "date": "2026-07-01",
+        "amount": 5000.0,
+        "description": "内部充值",
+        "id": "73c6742e-b83c-4969-88cb-af4ca07ecfa0"
+      }
+    ]
+  }
+}
