@@ -1,27 +1,28 @@
 """每日得分摘要脚本。
 
-查询某场比赛所有用户的 submission，按用户聚合，生成 Markdown 格式的站内信内容。
-
-明细字段：A项得分、B项得分、最终得分，以及 A项详细分（ic_mean / ic_ir / sharpe_ratio / stress_ic_ir）。
-
-返回值：dict[user_id, markdown_content]
+查询某场比赛所有用户的 submission，按用户聚合，生成 Markdown 格式的站内信内容，
+并将每个用户的 markdown 保存到 files/daily_reports/<user_id>.md。
 
 分数数据来源：
   - leaderboard_final.csv     → a_score / b_score / final_score（以 id 对应 submission_id）
   - submissions_summary.csv   → ic_mean / ic_ir / sharpe_ratio / stress_ic_ir
 
 用法:
-    python daily_score_digest.py <比赛ID> [--leaderboard-dir <路径>]
-                                  [--base-url <url>] [--token <token>]
-                                  [--out <输出JSON路径>]
+    python daily_score_digest.py [competition_id]
 
-默认 leaderboard_dir:
-    /home/aiuser/work/workspace/BigAlpha/system/competitions/<competition_id>/leaderboard/
+    competition_id 默认: 76ad3f56-ec2b-431a-890e-139a7f4bbcba
+
+环境变量:
+    ALPHATHON_API_TOKEN      bigjwt token
+    ALPHATHON_JWT_FILE       token 文件路径
+    ALPHATHON_API_BASE_URL   API 地址
+
+输出:
+    每个用户的 markdown 写入 files/daily_reports/<user_id>.md
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import os
@@ -44,6 +45,7 @@ DEFAULT_LEADERBOARD_BASE = (
     "/home/aiuser/work/workspace/BigAlpha/system/competitions"
     "/{competition_id}/leaderboard"
 )
+DAILY_REPORTS_DIR = Path(_scripts_dir) / "files" / "daily_reports"
 
 
 # ---- 格式工具 ----------------------------------------------------------------
@@ -158,7 +160,6 @@ def build_user_markdown(
     total = len(submissions)
     done_subs = [s for s in submissions if s.get("status") == "done"]
 
-    # 最高最终得分（有则用 final_score，否则看 a_score）
     final_scores = [
         float(final_map[str(s["id"])]["final_score"])
         for s in done_subs
@@ -184,7 +185,6 @@ def build_user_markdown(
         "",
     ]
 
-    # 表头：基础列 + A项详细列
     detail_headers = " | ".join(_A_DETAIL_COLS.values())
     lines.append(f"| 序号 | Submission ID | 状态 | A项得分 | B项得分 | 最终得分 | {detail_headers} | 提交时间 |")
     sep_detail = " | ".join(["---"] * len(_A_DETAIL_COLS))
@@ -212,6 +212,15 @@ def build_user_markdown(
         "",
     ]
     return "\n".join(lines)
+
+
+def save_user_reports(digest: dict[str, str], reports_dir: Path) -> None:
+    """将每个用户的 markdown 保存到 reports_dir/<user_id>.md。"""
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    for user_id, content in digest.items():
+        out_path = reports_dir / f"{user_id}.md"
+        out_path.write_text(content, encoding="utf-8")
+    print(f"[{datetime.now():%H:%M:%S}] 报告已写入: {reports_dir}", file=sys.stderr)
 
 
 def build_daily_digest(
@@ -243,42 +252,16 @@ def build_daily_digest(
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(
-        description="生成每日得分摘要，返回 {user_id: markdown} 字典"
-    )
-    parser.add_argument(
-        "competition_id",
-        nargs="?",
-        default=DEFAULT_COMPETITION_ID,
-        help="比赛 ID",
-    )
-    parser.add_argument(
-        "--leaderboard-dir",
-        default=None,
-        help="榜单目录路径（默认 competitions/<id>/leaderboard）",
-    )
-    parser.add_argument("--base-url", default=None)
-    parser.add_argument("--token", default=None)
-    parser.add_argument("--out", default=None, help="输出 JSON 文件路径（默认打印到 stdout）")
-    args = parser.parse_args(argv)
+    competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
+    leaderboard_dir = DEFAULT_LEADERBOARD_BASE.format(competition_id=competition_id)
 
-    leaderboard_dir = args.leaderboard_dir or DEFAULT_LEADERBOARD_BASE.format(
-        competition_id=args.competition_id
-    )
+    client = AlphathonClient()
 
-    client = AlphathonClient(base_url=args.base_url, token=args.token)
-
-    print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {args.competition_id} 的所有提交...", file=sys.stderr)
-    digest = build_daily_digest(args.competition_id, leaderboard_dir, client)
+    print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id} 的所有提交...", file=sys.stderr)
+    digest = build_daily_digest(competition_id, leaderboard_dir, client)
     print(f"[{datetime.now():%H:%M:%S}] 共 {len(digest)} 位用户", file=sys.stderr)
 
-    output = json.dumps(digest, ensure_ascii=False, indent=2)
-
-    if args.out:
-        Path(args.out).write_text(output, encoding="utf-8")
-        print(f"结果已写入: {args.out}", file=sys.stderr)
-    else:
-        print(output)
+    save_user_reports(digest, DAILY_REPORTS_DIR)
 
     return 0
 
