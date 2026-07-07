@@ -42,9 +42,11 @@ from _client import AlphathonClient
 
 DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 DEFAULT_LEADERBOARD_BASE = (
-    "/home/aiuser/work/workspace/BigAlpha/system/competitions"
+    "/home/aiuser/work/workspace/BigAlpha/system/files"
     "/{competition_id}/leaderboard"
 )
+# 本地 fallback：脚本目录下的 files/leaderboard
+LOCAL_LEADERBOARD_FALLBACK = Path(_scripts_dir) / "files" / "leaderboard"
 DAILY_REPORTS_DIR = Path(_scripts_dir) / "files" / "daily_reports"
 
 
@@ -254,6 +256,13 @@ def build_daily_digest(
 def main(argv: list[str]) -> int:
     competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
     leaderboard_dir = DEFAULT_LEADERBOARD_BASE.format(competition_id=competition_id)
+    # 远端路径不存在时，fallback 到本地 files/leaderboard
+    if not os.path.isdir(leaderboard_dir):
+        print(
+            f"  [提示] 远端目录不存在，使用本地目录: {LOCAL_LEADERBOARD_FALLBACK}",
+            file=sys.stderr,
+        )
+        leaderboard_dir = str(LOCAL_LEADERBOARD_FALLBACK)
 
     client = AlphathonClient()
 
