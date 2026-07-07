@@ -30,7 +30,7 @@ USER_ID_FILE = Path(__file__).parent / "files" / "participants" / "user_id.json"
 SPACE_ID = "00000000-0000-0000-0000-000000000000"        # 主空间（全零 UUID）
 PRO_TYPE = "spro"                                         # 旗舰版 L1
 EXPIRE_AT = "2026-08-20"                                  # 权益到期日 YYYY-MM-DD
-DRY_RUN = True                                            # True 只预览；确认后改 False 真正写入
+DRY_RUN = False                                            # True 只预览；确认后改 False 真正写入
 
 # spro（旗舰版 L1）固定权益结构，见 skill references/users/management.md
 EQUITY = {
@@ -85,11 +85,23 @@ def get_privilege(token: str, server: str, user_id: str) -> dict | None:
         return None
 
 
-def has_spro(privilege: dict | None) -> bool:
-    """判断用户是否已持有 spro 权益（equity.specification == 'spro'，不校验过期）。"""
+def spro_expires_after_cutoff(privilege: dict | None, cutoff: str = EXPIRE_AT) -> bool:
+    """判断用户的 spro 到期日是否在 cutoff 之后（含当天），是则跳过不覆盖。"""
     if not privilege:
         return False
-    return privilege.get("equity", {}).get("specification") == PRO_TYPE
+    if privilege.get("equity", {}).get("specification") != PRO_TYPE:
+        return False
+    expire_at = (
+        privilege.get("expire_at")
+        or privilege.get("expireAt")
+        or privilege.get("equity", {}).get("expire_at")
+        or privilege.get("equity", {}).get("expireAt")
+        or ""
+    )
+    if not expire_at:
+        return False
+    # 只比较日期前缀 YYYY-MM-DD
+    return expire_at[:10] >= cutoff
 
 
 def set_privilege(token: str, server: str, user_id: str) -> dict:
@@ -142,17 +154,19 @@ def main() -> None:
     for i, uid in enumerate(user_ids, 1):
         if DRY_RUN:
             privilege = get_privilege(token, server, uid)
-            if has_spro(privilege):
-                print(f"  [dry-run][已有spro] [{i}/{len(user_ids)}] {uid}  -> 跳过")
+            if spro_expires_after_cutoff(privilege):
+                cur_expire = (privilege.get("expire_at") or privilege.get("expireAt") or "")[:10]
+                print(f"  [dry-run][到期日{cur_expire}>={EXPIRE_AT}，跳过] [{i}/{len(user_ids)}] {uid}")
             else:
                 print(f"  [dry-run] [{i}/{len(user_ids)}] {uid}  -> {PRO_TYPE} 至 {EXPIRE_AT}")
             continue
 
-        # 已有有效 spro 权益则跳过，不覆盖
+        # spro 到期日在 EXPIRE_AT 之后则跳过，否则写入（含无权益、已过期、到期更早的情况）
         privilege = get_privilege(token, server, uid)
-        if has_spro(privilege):
+        if spro_expires_after_cutoff(privilege):
             skip += 1
-            print(f"  [跳过][已有spro] [{i}/{len(user_ids)}] {uid}")
+            cur_expire = (privilege.get("expire_at") or privilege.get("expireAt") or "")[:10]
+            print(f"  [跳过][到期日{cur_expire}>={EXPIRE_AT}] [{i}/{len(user_ids)}] {uid}")
             continue
 
         try:
@@ -177,7 +191,7 @@ def main() -> None:
     if DRY_RUN:
         print(f"\n当前为预览模式(DRY_RUN=True)，共 {len(user_ids)} 人。确认无误后把 DRY_RUN 改成 False 再跑。")
     else:
-        print(f"\n=== 完成：成功 {ok}，跳过（已有spro） {skip}，失败 {fail} ===")
+        print(f"\n=== 完成：成功 {ok}，跳过（到期日>={EXPIRE_AT}) {skip}，失败 {fail} ===")
         if failures:
             print("失败明细：")
             for uid, reason in failures:
