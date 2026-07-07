@@ -159,6 +159,15 @@ class BigAlphaJudgeBase(JudgeBase):
         return os.path.join(self.leaderboard_dir, _with_suffix("factor_pool.parquet", self.mode_suffix))
 
     @property
+    def factor_pool_raw_path(self) -> str:
+        """因子池「原始因子数据」parquet 的绝对路径。
+
+        与 factor_pool_path 入池的因子集合一致，只是取每个提交的 raw_factor（未处理）
+        而非 process_factor，作为存档保留一份，不参与回归。
+        """
+        return os.path.join(self.leaderboard_dir, _with_suffix("factor_pool_raw.parquet", self.mode_suffix))
+
+    @property
     def submissions_summary_csv(self) -> str:
         """所有提交运行结果的汇总统计文件。"""
         return os.path.join(self.leaderboard_dir, _with_suffix("submissions_summary.csv", self.mode_suffix))

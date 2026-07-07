@@ -45,6 +45,7 @@ class RegressionMixin:
                 "factor_name": sid,
                 "score": sfa_scores.get(sid, float("nan")),
                 "path": pf_path,
+                "raw_path": os.path.join(sub_dir, self.raw_factor_file),
             })
 
         if not records:
@@ -59,6 +60,7 @@ class RegressionMixin:
         kept = meta[meta["rank_in_group"] <= self.FACTOR_POOL_TOP_N]
 
         pool = None
+        raw_pool = None  # 与 pool 入池因子一致，取每个提交的 raw_factor（未处理）作存档
         for _, r in kept.iterrows():
             try:
                 fdf = pd.read_parquet(r["path"])
@@ -72,6 +74,20 @@ class RegressionMixin:
             fdf = fdf[["date", "instrument", "factor"]].rename(columns={"factor": name})
             pool = fdf if pool is None else pool.merge(fdf, how="outer", on=["date", "instrument"])
 
+            # 同步把该因子的原始数据并入 raw_pool；原始数据缺失/格式不符不影响正常因子池落盘
+            raw_path = r["raw_path"]
+            if not os.path.exists(raw_path):
+                continue
+            try:
+                rdf = pd.read_parquet(raw_path)
+            except Exception as e:
+                self.log.error("pool.raw_read_failed", submission_id=r["sid"], error=str(e), msg="无法读取原始因子数据")
+                continue
+            if not {"date", "instrument", "factor"}.issubset(rdf.columns):
+                continue
+            rdf = rdf[["date", "instrument", "factor"]].rename(columns={"factor": name})
+            raw_pool = rdf if raw_pool is None else raw_pool.merge(rdf, how="outer", on=["date", "instrument"])
+
         factor_cols = [] if pool is None else [c for c in pool.columns if c not in ("date", "instrument")]
         # 因子池回归要求至少 2 个因子，否则没有意义
         if pool is None or len(factor_cols) < 2:
@@ -81,6 +97,13 @@ class RegressionMixin:
         os.makedirs(os.path.dirname(self.factor_pool_path), exist_ok=True)
         pool.to_parquet(self.factor_pool_path)
         self.log.debug("pool.saved", factors=len(factor_cols), msg="保存因子池数据")
+
+        # 原始因子池只作存档，不参与回归；有多少存多少，失败不影响主流程
+        if raw_pool is not None:
+            raw_cols = [c for c in raw_pool.columns if c not in ("date", "instrument")]
+            raw_pool.to_parquet(self.factor_pool_raw_path)
+            self.log.debug("pool.raw_saved", factors=len(raw_cols), msg="保存原始因子池数据")
+
         return len(factor_cols)
 
     # ---- 因子池回归 -------------------------------------------------------
