@@ -162,14 +162,6 @@ def build_user_markdown(
     total = len(submissions)
     done_subs = [s for s in submissions if s.get("status") == "done"]
 
-    final_scores = [
-        float(final_map[str(s["id"])]["final_score"])
-        for s in done_subs
-        if str(s.get("id")) in final_map
-        and final_map[str(s["id"])]["final_score"] is not None
-    ]
-    best_final = _fmt(max(final_scores)) if final_scores else "N/A"
-
     lines: list[str] = [
         f"# {date_str} 每日得分日报",
         "",
@@ -180,8 +172,7 @@ def build_user_markdown(
         "| 项目 | 值 |",
         "|---|---|",
         f"| 总提交数 | {total} |",
-        f"| 已完成评测 | {len(done_subs)} |",
-        f"| 最高最终得分 | {best_final} |",
+        f"| 成功运行 | {len(done_subs)} |",
         "",
         "## 提交明细",
         "",
@@ -209,7 +200,7 @@ def build_user_markdown(
 
     lines += [
         "",
-        "> A项得分基于单因子评测指标（IC均值、IC IR、Sharpe、压力IC IR等）加权合成；B项得分由专家评审给出；最终得分 = 0.3×A + 0.7×B。",
+        "> A项得分基于单因子评测指标（IC均值、IC IR、Sharpe、压力IC IR等）加权合成；B项得分由回归系统决定；最终得分 = 0.3×A + 0.7×B。",
         "> 如有疑问请联系比赛管理员。",
         "",
     ]
