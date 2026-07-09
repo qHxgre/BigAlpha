@@ -207,6 +207,97 @@ def build_user_markdown(
     return "\n".join(lines)
 
 
+# 站内信正文长度上限（字符数）。超出则精简模式会自适应减少明细行数。
+NOTICE_MAX_CHARS = 1024
+
+
+def build_user_markdown_concise(
+    user_id: str,
+    submissions: list[dict],
+    competition_id: str,
+    now: datetime,
+    final_map: dict[str, dict],
+    detail_map: dict[str, dict],
+    max_chars: int = NOTICE_MAX_CHARS,
+) -> str:
+    """为单个用户生成精简版 Markdown，控制在 max_chars 字符以内，供站内信发送。
+
+    相比完整版的压缩手段：
+      - 去掉 4 个 IC 明细列（IC均值/IC IR/Sharpe/压力IC IR），引导用户到平台查看；
+      - Submission ID 只显示前 8 位；
+      - 提交时间精简为 MM-DD HH:MM；
+      - 明细按最终得分降序，突出最优提交；
+      - 自适应行数：若仍超限，整行删减（不破坏表格、不截断中文），
+        并在脚注注明「仅显示分数最高的 N 条，共 M 条」。
+    """
+    date_str = now.strftime("%Y-%m-%d")
+    total = len(submissions)
+    done_subs = [s for s in submissions if s.get("status") == "done"]
+
+    # 计算每条提交的最终得分，用于排序和摘要
+    def final_score_of(sub: dict) -> float | None:
+        sid = str(sub.get("id") or "")
+        return _safe(final_map.get(sid, {}).get("final_score"))
+
+    ranked = sorted(
+        submissions,
+        key=lambda s: (final_score_of(s) is not None, final_score_of(s) or 0.0),
+        reverse=True,
+    )
+    best_score = next((final_score_of(s) for s in ranked if final_score_of(s) is not None), None)
+
+    header = [
+        f"# {date_str} 每日得分日报",
+        "",
+        f"您好，以下是您在比赛 `{competition_id}` 中截至 **{date_str}** 的提交得分汇总。",
+        "",
+        "## 摘要",
+        "",
+        "| 项目 | 值 |",
+        "|---|---|",
+        f"| 总提交数 | {total} |",
+        f"| 成功运行 | {len(done_subs)} |",
+        f"| 最高最终得分 | {_fmt(best_score)} |",
+        "",
+        "## 提交明细（按最终得分排序）",
+        "",
+        "| 序号 | Submission | 状态 | A项 | B项 | 最终 | 提交时间 |",
+        "|---|---|---|---|---|---|---|",
+    ]
+
+    def detail_row(idx: int, sub: dict) -> str:
+        sid = str(sub.get("id") or "")
+        status = _status_label(sub)
+        created = (sub.get("created_at") or "")[:16].replace("T", " ")[5:]  # MM-DD HH:MM
+        scores = final_map.get(sid, {})
+        a = _fmt(scores.get("a_score"))
+        b = _fmt(scores.get("b_score"))
+        fs = _fmt(scores.get("final_score"))
+        return f"| {idx} | `{sid[:8]}` | {status} | {a} | {b} | {fs} | {created} |"
+
+    def footer(shown: int) -> list[str]:
+        note = ""
+        if shown < total:
+            note = f"> 仅显示分数最高的 {shown} 条，共 {total} 条，完整明细请登录平台查看。\n"
+        return [
+            "",
+            f"{note}> 最终得分 = 0.3×A + 0.7×B；IC 均值、Sharpe 等详细指标请登录平台查看。",
+            "> 如有疑问请联系比赛管理员。",
+            "",
+        ]
+
+    # 从全部明细开始，超限则每次砍掉分数最低的一行
+    for shown in range(len(ranked), 0, -1):
+        rows = [detail_row(i, sub) for i, sub in enumerate(ranked[:shown], start=1)]
+        content = "\n".join(header + rows + footer(shown))
+        if len(content) <= max_chars:
+            return content
+
+    # 一行明细都放不下（极端情况）：只保留摘要
+    content = "\n".join(header[:-2] + footer(0))
+    return content[:max_chars]
+
+
 def save_user_reports(digest: dict[str, str], reports_dir: Path) -> None:
     """将每个用户的 markdown 保存到 reports_dir/<user_id>.md。"""
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -220,8 +311,13 @@ def build_daily_digest(
     competition_id: str,
     leaderboard_dir: str,
     client: AlphathonClient,
+    concise: bool = False,
 ) -> dict[str, str]:
-    """拉取比赛所有 submission，返回 {user_id: markdown_content}。"""
+    """拉取比赛所有 submission，返回 {user_id: markdown_content}。
+
+    concise=True 时生成精简版（正文控制在 1024 字符内，供站内信发送）；
+    默认 False 生成完整版报告。
+    """
     now = datetime.now()
 
     submissions = client.list_submissions(
@@ -235,8 +331,9 @@ def build_daily_digest(
     final_map, detail_map = _load_score_tables(leaderboard_dir)
     grouped = group_submissions_by_user(submissions)
 
+    builder = build_user_markdown_concise if concise else build_user_markdown
     return {
-        uid: build_user_markdown(uid, subs, competition_id, now, final_map, detail_map)
+        uid: builder(uid, subs, competition_id, now, final_map, detail_map)
         for uid, subs in grouped.items()
     }
 
@@ -245,7 +342,23 @@ def build_daily_digest(
 
 
 def main(argv: list[str]) -> int:
-    competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
+    import argparse
+
+    parser = argparse.ArgumentParser(description="生成每日得分日报（每用户一份 Markdown）。")
+    parser.add_argument(
+        "competition_id",
+        nargs="?",
+        default=DEFAULT_COMPETITION_ID,
+        help=f"比赛 ID（默认: {DEFAULT_COMPETITION_ID}）",
+    )
+    parser.add_argument(
+        "--concise",
+        action="store_true",
+        help="生成精简版（正文压缩到 1024 字符内，供站内信发送）；不加则生成完整报告。",
+    )
+    args = parser.parse_args(argv)
+
+    competition_id = args.competition_id
     leaderboard_dir = DEFAULT_LEADERBOARD_BASE.format(competition_id=competition_id)
     # 远端路径不存在时，fallback 到本地 files/leaderboard
     if not os.path.isdir(leaderboard_dir):
@@ -257,9 +370,17 @@ def main(argv: list[str]) -> int:
 
     client = AlphathonClient()
 
-    print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id} 的所有提交...", file=sys.stderr)
-    digest = build_daily_digest(competition_id, leaderboard_dir, client)
+    mode = "精简版(≤1024字符)" if args.concise else "完整版"
+    print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id} 的所有提交（{mode}）...", file=sys.stderr)
+    digest = build_daily_digest(competition_id, leaderboard_dir, client, concise=args.concise)
     print(f"[{datetime.now():%H:%M:%S}] 共 {len(digest)} 位用户", file=sys.stderr)
+
+    if args.concise:
+        over = [uid for uid, c in digest.items() if len(c) > NOTICE_MAX_CHARS]
+        if over:
+            print(f"  [警告] 仍有 {len(over)} 份超过 {NOTICE_MAX_CHARS} 字符", file=sys.stderr)
+        else:
+            print(f"  [OK] 全部 {len(digest)} 份均在 {NOTICE_MAX_CHARS} 字符内", file=sys.stderr)
 
     save_user_reports(digest, DAILY_REPORTS_DIR)
 
