@@ -8,7 +8,7 @@
 
 用法：
     python3 select_top30.py
-    生成 files/reward_coins/candidates_top30_<key>_<date>.json，
+    生成 reward_coins 目录下 candidates_top30_<key>_<date>.json，
     再在 reward_coins.py 的 TASKS 里用 candidates_file 引用它们。
 """
 
@@ -16,7 +16,11 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.paths import LEADERBOARD_CRAWL_DIR, REWARD_COINS_DIR
 
 # ===== 配置 =================================================================
 SNAPSHOT_DATE = "20260708"     # 快照日期目录
@@ -29,9 +33,8 @@ CIDS: dict[str, tuple[str, int, str]] = {
     "523f9302-5b4b-42bd-bce1-f232e7c74316": ("e2e", 13920, "赛道二·端到端AI量化模型"),
 }
 
-FILES_DIR = Path(__file__).parent / "files"
-CRAWL_DIR = FILES_DIR / "leaderboard_crawl" / SNAPSHOT_DATE
-OUT_DIR = FILES_DIR / "reward_coins"
+CRAWL_DIR = LEADERBOARD_CRAWL_DIR / SNAPSHOT_DATE
+OUT_DIR = REWARD_COINS_DIR
 # ===========================================================================
 
 

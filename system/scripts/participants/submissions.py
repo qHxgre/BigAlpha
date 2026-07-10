@@ -11,7 +11,11 @@
 
 from __future__ import annotations
 
-from _client import AlphathonClient
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.client import AlphathonClient
 
 # ===== 配置：把要查的 submission id 填这里 ==================================
 SUBMISSION_IDS = [

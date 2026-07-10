@@ -4,7 +4,8 @@
     需求一（factor_portrait）：前 10 因子画像（BARRA 风格暴露 + 行业 IC）；
     需求三（index_strategy）  ：中证 1000 指数增强策略跟踪（相对超额指标 + 收益曲线）。
 
-两个需求各自的图表 / CSV 与合并后的 Markdown 都落在 files/weekly_disclosure/ 下，
+两个需求各自的图表 / CSV 与合并后的 Markdown 都落在 weekly_disclosure 输出目录下
+（common.paths.OUTPUT_DIR：system/files/scripts/weekly_disclosure），
 图片以相对文件名内嵌，便于整目录一起分发。
 
 用法：
@@ -12,7 +13,7 @@
 
     competition_id 默认：76ad3f56-ec2b-431a-890e-139a7f4bbcba
 
-输出（files/weekly_disclosure/）：
+输出（weekly_disclosure 输出目录，见 common.paths.OUTPUT_DIR）：
     factor_style_exposure_<date>.csv / .png    需求一：风格暴露
     factor_industry_ic_<date>.csv / .png       需求一：行业 IC
     excess_curve_<date>.png                     需求三：收益曲线
@@ -26,14 +27,15 @@ from __future__ import annotations
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 
+# 先把本目录加入 sys.path，保证能 import 同目录的需求脚本；再把 scripts 根加入以用 common
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import factor_portrait
 import index_strategy
-from _disclosure_common import (
-    DEFAULT_COMPETITION_ID,
-    OUTPUT_DIR,
-    resolve_leaderboard_dir,
-)
+from common.disclosure import DEFAULT_COMPETITION_ID
+from common.paths import OUTPUT_DIR, resolve_leaderboard_dir
 
 
 def _run_section(name: str, fn) -> str:

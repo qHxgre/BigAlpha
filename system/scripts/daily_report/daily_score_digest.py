@@ -1,7 +1,8 @@
 """每日得分摘要脚本。
 
 查询某场比赛所有用户的 submission，按用户聚合，生成 Markdown 格式的站内信内容，
-并将每个用户的 markdown 保存到 files/daily_reports/<user_id>.md。
+并将每个用户的 markdown 保存到 daily_reports 目录下的 <user_id>.md
+（system/files/scripts/daily_reports，见 common.paths.DAILY_REPORTS_DIR）。
 
 分数数据来源：
   - leaderboard_final.csv     → a_score / b_score / final_score（以 id 对应 submission_id）
@@ -18,7 +19,7 @@
     ALPHATHON_API_BASE_URL   API 地址
 
 输出:
-    每个用户的 markdown 写入 files/daily_reports/<user_id>.md
+    每个用户的 markdown 写入 daily_reports 目录下的 <user_id>.md
 """
 
 from __future__ import annotations
@@ -34,20 +35,16 @@ from typing import Any
 
 import pandas as pd
 
-_scripts_dir = os.path.dirname(os.path.abspath(__file__))
-if _scripts_dir not in sys.path:
-    sys.path.insert(0, _scripts_dir)
-
-from _client import AlphathonClient
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.client import AlphathonClient
+from common.paths import DAILY_REPORTS_DIR, resolve_leaderboard_dir
 
 DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-DEFAULT_LEADERBOARD_BASE = (
-    "/home/aiuser/work/workspace/BigAlpha/system/files"
-    "/{competition_id}/leaderboard"
-)
-# 本地 fallback：脚本目录下的 files/leaderboard
-LOCAL_LEADERBOARD_FALLBACK = Path(_scripts_dir) / "files" / "leaderboard"
-DAILY_REPORTS_DIR = Path(_scripts_dir) / "files" / "daily_reports"
+
+# 是否生成精简版报告：
+#   True  -> 正文压缩到 1024 字符内，供站内信发送
+#   False -> 生成完整版报告
+CONCISE = True
 
 
 # ---- 格式工具 ----------------------------------------------------------------
@@ -222,15 +219,16 @@ def build_user_markdown_concise(
 ) -> str:
     """为单个用户生成精简版 Markdown，控制在 max_chars 字符以内，供站内信发送。
 
-    相比完整版的压缩手段：
-      - 去掉 4 个 IC 明细列（IC均值/IC IR/Sharpe/压力IC IR），引导用户到平台查看；
-      - Submission ID 只显示前 8 位；
-      - 提交时间精简为 MM-DD HH:MM；
+    尽量压缩固定开销，把字符预算留给明细行：
+      - 标题精简为 `### 得分日报 MM-DD`，去掉含比赛 UUID 的问候语；
+      - 摘要压成一行（提交 N · 成功 M · 最高 X）；
+      - 保留 A 项细分指标（IC均值/IC IR/Sharpe/压力IC IR），用短列名省字符；
+      - Submission ID 只显示前 8 位，提交时间精简为 MM-DD HH:MM；
       - 明细按最终得分降序，突出最优提交；
       - 自适应行数：若仍超限，整行删减（不破坏表格、不截断中文），
         并在脚注注明「仅显示分数最高的 N 条，共 M 条」。
     """
-    date_str = now.strftime("%Y-%m-%d")
+    date_str = now.strftime("%m-%d")
     total = len(submissions)
     done_subs = [s for s in submissions if s.get("status") == "done"]
 
@@ -247,22 +245,12 @@ def build_user_markdown_concise(
     best_score = next((final_score_of(s) for s in ranked if final_score_of(s) is not None), None)
 
     header = [
-        f"# {date_str} 每日得分日报",
+        f"### 得分日报 {date_str}",
         "",
-        f"您好，以下是您在比赛 `{competition_id}` 中截至 **{date_str}** 的提交得分汇总。",
+        f"提交 {total} · 成功 {len(done_subs)} · 最高 {_fmt(best_score)}",
         "",
-        "## 摘要",
-        "",
-        "| 项目 | 值 |",
-        "|---|---|",
-        f"| 总提交数 | {total} |",
-        f"| 成功运行 | {len(done_subs)} |",
-        f"| 最高最终得分 | {_fmt(best_score)} |",
-        "",
-        "## 提交明细（按最终得分排序）",
-        "",
-        "| 序号 | Submission | 状态 | A项 | B项 | 最终 | 提交时间 |",
-        "|---|---|---|---|---|---|---|",
+        "| # | ID | 状态 | A | B | 最终 | IC | ICIR | Sharpe | 压力IR | 时间 |",
+        "|--|--|--|--|--|--|--|--|--|--|--|",
     ]
 
     def detail_row(idx: int, sub: dict) -> str:
@@ -273,17 +261,20 @@ def build_user_markdown_concise(
         a = _fmt(scores.get("a_score"))
         b = _fmt(scores.get("b_score"))
         fs = _fmt(scores.get("final_score"))
-        return f"| {idx} | `{sid[:8]}` | {status} | {a} | {b} | {fs} | {created} |"
+        detail = detail_map.get(sid, {})
+        ic = _fmt(detail.get("ic_mean"))
+        icir = _fmt(detail.get("ic_ir"))
+        sharpe = _fmt(detail.get("sharpe_ratio"))
+        stress = _fmt(detail.get("stress_ic_ir"))
+        return f"| {idx} | `{sid[:8]}` | {status} | {a} | {b} | {fs} | {ic} | {icir} | {sharpe} | {stress} | {created} |"
 
     def footer(shown: int) -> list[str]:
         note = ""
         if shown < total:
-            note = f"> 仅显示分数最高的 {shown} 条，共 {total} 条，完整明细请登录平台查看。\n"
+            note = f"> 仅显示分数最高的 {shown}/{total} 条，完整明细见平台。\n"
         return [
             "",
-            f"{note}> 最终得分 = 0.3×A + 0.7×B；IC 均值、Sharpe 等详细指标请登录平台查看。",
-            "> 如有疑问请联系比赛管理员。",
-            "",
+            f"{note}> 最终=0.3A+0.7B（A 由 IC/ICIR/Sharpe/压力IR 合成，B 由回归系统决定）。",
         ]
 
     # 从全部明细开始，超限则每次砍掉分数最低的一行
@@ -342,40 +333,18 @@ def build_daily_digest(
 
 
 def main(argv: list[str]) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(description="生成每日得分日报（每用户一份 Markdown）。")
-    parser.add_argument(
-        "competition_id",
-        nargs="?",
-        default=DEFAULT_COMPETITION_ID,
-        help=f"比赛 ID（默认: {DEFAULT_COMPETITION_ID}）",
-    )
-    parser.add_argument(
-        "--concise",
-        action="store_true",
-        help="生成精简版（正文压缩到 1024 字符内，供站内信发送）；不加则生成完整报告。",
-    )
-    args = parser.parse_args(argv)
-
-    competition_id = args.competition_id
-    leaderboard_dir = DEFAULT_LEADERBOARD_BASE.format(competition_id=competition_id)
-    # 远端路径不存在时，fallback 到本地 files/leaderboard
-    if not os.path.isdir(leaderboard_dir):
-        print(
-            f"  [提示] 远端目录不存在，使用本地目录: {LOCAL_LEADERBOARD_FALLBACK}",
-            file=sys.stderr,
-        )
-        leaderboard_dir = str(LOCAL_LEADERBOARD_FALLBACK)
+    competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
+    # 榜单目录：优先云端评测目录，缺失时回退到本地（见 common.paths）
+    leaderboard_dir = resolve_leaderboard_dir(competition_id)
 
     client = AlphathonClient()
 
-    mode = "精简版(≤1024字符)" if args.concise else "完整版"
+    mode = "精简版(≤1024字符)" if CONCISE else "完整版"
     print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id} 的所有提交（{mode}）...", file=sys.stderr)
-    digest = build_daily_digest(competition_id, leaderboard_dir, client, concise=args.concise)
+    digest = build_daily_digest(competition_id, leaderboard_dir, client, concise=CONCISE)
     print(f"[{datetime.now():%H:%M:%S}] 共 {len(digest)} 位用户", file=sys.stderr)
 
-    if args.concise:
+    if CONCISE:
         over = [uid for uid, c in digest.items() if len(c) > NOTICE_MAX_CHARS]
         if over:
             print(f"  [警告] 仍有 {len(over)} 份超过 {NOTICE_MAX_CHARS} 字符", file=sys.stderr)

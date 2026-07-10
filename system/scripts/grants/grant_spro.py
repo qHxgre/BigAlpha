@@ -15,9 +15,13 @@ space_id 用主空间（全零 UUID）—— 主空间会同步更新数据权�
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.auth import load_auth
+from common.ids import load_id_list_json
+from common.paths import PARTICIPANTS_DIR
 
 try:
     import requests
@@ -26,7 +30,7 @@ except ImportError:
     sys.exit(1)
 
 # ===== 配置：改这里就行 =====================================================
-USER_ID_FILE = Path(__file__).parent / "files" / "participants" / "user_id.json"  # 用户 ID 列表（JSON 数组）
+USER_ID_FILE = PARTICIPANTS_DIR / "user_id.json"  # 用户 ID 列表（JSON 数组）
 SPACE_ID = "00000000-0000-0000-0000-000000000000"        # 主空间（全零 UUID）
 PRO_TYPE = "spro"                                         # 旗舰版 L1
 EXPIRE_AT = "2026-08-20"                                  # 权益到期日 YYYY-MM-DD
@@ -44,30 +48,6 @@ EQUITY = {
 # ===========================================================================
 
 API_BASE = "/bigapis/auth/v1"
-
-
-def load_auth() -> tuple[str, str]:
-    """返回 (token, server)。优先环境变量，否则读 ~/.bigquant/auth.json。"""
-    token = os.environ.get("BIGQUANT_TOKEN")
-    server = os.environ.get("BIGQUANT_SERVER", "").rstrip("/")
-
-    if not token:
-        auth_file = Path(
-            os.environ.get("BIGQUANT_AUTH_FILE", Path.home() / ".bigquant" / "auth.json")
-        )
-        try:
-            data = json.loads(auth_file.read_text())
-        except FileNotFoundError:
-            print(f"未找到认证文件: {auth_file}", file=sys.stderr)
-            sys.exit(1)
-        token = data.get("token")
-        if not token:
-            print("auth.json 中缺少 token 字段", file=sys.stderr)
-            sys.exit(1)
-        if not server:
-            server = data.get("server", "https://bigquant.com").rstrip("/")
-
-    return token, server or "https://bigquant.com"
 
 
 def get_privilege(token: str, server: str, user_id: str) -> dict | None:
@@ -118,28 +98,8 @@ def set_privilege(token: str, server: str, user_id: str) -> dict:
     return resp.json() if resp.content else {}
 
 
-def load_user_ids() -> list[str]:
-    try:
-        ids = json.loads(USER_ID_FILE.read_text())
-    except FileNotFoundError:
-        print(f"未找到用户列表: {USER_ID_FILE}", file=sys.stderr)
-        sys.exit(1)
-    if not isinstance(ids, list):
-        print(f"{USER_ID_FILE} 应为 JSON 数组", file=sys.stderr)
-        sys.exit(1)
-    # 去重 + 去空，保持顺序
-    seen: set[str] = set()
-    result: list[str] = []
-    for uid in ids:
-        uid = str(uid).strip()
-        if uid and uid not in seen:
-            seen.add(uid)
-            result.append(uid)
-    return result
-
-
 def main() -> None:
-    user_ids = load_user_ids()
+    user_ids = load_id_list_json(USER_ID_FILE)
     token, server = load_auth()
 
     print(f"=== 批量开通 {PRO_TYPE}（旗舰版 L1）===")

@@ -18,7 +18,11 @@ user_id (u["user_id"])，两者不是一回事，所以不能直接读那个 jso
 
 from __future__ import annotations
 
-from _client import AlphathonClient
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.client import AlphathonClient
 
 # ===== 配置：改这里就行 =====================================================
 COMPETITION_IDS = [

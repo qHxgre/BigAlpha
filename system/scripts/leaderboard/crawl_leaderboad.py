@@ -1,7 +1,8 @@
 """爬取比赛排行榜信息。
 
 直接请求公开接口 GET https://bigquant.com/bigapis/alphathon/v1/leaderboard/{competition_id}
-拉取整场比赛的排行榜条目（团队 + 个人），落两份文件到 files/leaderboard_crawl/：
+拉取整场比赛的排行榜条目（团队 + 个人），落两份文件到 leaderboard_crawl 目录
+（common.paths.LEADERBOARD_CRAWL_DIR：system/files/scripts/leaderboard_crawl）：
 
     leaderboard_<competition_id>.json   完整原始条目（含团队成员明细）
     leaderboard_<competition_id>.csv    扁平化后的榜单（每行一个团队/个人）
@@ -38,7 +39,8 @@ from typing import Any
 import pandas as pd
 import requests
 
-_scripts_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.paths import LEADERBOARD_CRAWL_DIR
 
 DEFAULT_BASE_URL = "https://bigquant.com/bigapis/alphathon/v1"
 
@@ -48,7 +50,7 @@ DEFAULT_COMPETITION_IDS = [
     "63dd885c-2488-4efd-9c61-9e3a536f172c",   # AI 开放创新
 ]
 
-OUT_DIR = Path(_scripts_dir) / "files" / "leaderboard_crawl"
+OUT_DIR = LEADERBOARD_CRAWL_DIR
 
 # 定时爬取窗口，可用环境变量覆盖
 CRAWL_START = os.getenv("ALPHATHON_CRAWL_START", "14:50")

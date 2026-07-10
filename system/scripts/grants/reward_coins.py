@@ -12,7 +12,7 @@
 认证：优先环境变量 BIGQUANT_TOKEN / BIGQUANT_SERVER，其次 ~/.bigquant/auth.json。
 
 用法：
-    1. 先把最新的 charge_records.csv 放到 files/reward_coins/。
+    1. 先把最新的 charge_records.csv 放到 reward_coins 目录（common.paths.REWARD_COINS_DIR）。
     2. 在 TASKS 里配置好所有活动任务。
     3. STEP="generate" 跑一遍，生成各任务的 charge_plan_*.csv。
     4. 人工用表格软件审核各计划文件，history_same_label>0 的行已自动置 0。
@@ -23,11 +23,15 @@ from __future__ import annotations
 
 import csv
 import json
-import os
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.auth import load_auth
+from common.ids import read_id_list
+from common.paths import PARTICIPANTS_DIR, REWARD_COINS_DIR
 
 try:
     import requests
@@ -42,7 +46,7 @@ CID_OPEN = "63dd885c-2488-4efd-9c61-9e3a536f172c"      # 赛道三 · AI 开放�
 
 # 任务定义：label 用于防重和统计，amounts 是各赛道的发放金额。
 # 不需要的任务直接注释掉即可。
-_CAND_DIR = Path(__file__).parent / "files" / "reward_coins"
+_CAND_DIR = REWARD_COINS_DIR
 TASKS: list[dict] = [
     {
         # 周榜前30%（20260708 快照）· 因子赛道。
@@ -103,14 +107,12 @@ TASKS: list[dict] = [
 ]
 # ===== 配置：改这里就行 =====================================================
 # 两步流程开关："generate"（生成待审核计划）或 "charge"（按审核后的计划发币）。
-STEP = "generate"
+STEP = "charge"
 
 # 主空间全零 UUID：发平台宽币用主空间；子空间发币换成对应 space_id。
 SPACE_ID = "00000000-0000-0000-0000-000000000000"
 
-FILES_DIR = Path(__file__).parent / "files"
-PARTICIPANTS_DIR = FILES_DIR / "participants"
-REWARD_DIR = FILES_DIR / "reward_coins"
+REWARD_DIR = REWARD_COINS_DIR
 
 # 真实充值流水 CSV（generate 步用来查历史；导出方式见 generate_sql.ipynb）。
 CHARGE_RECORDS_CSV = REWARD_DIR / "charge_records.csv"
@@ -135,44 +137,6 @@ TEST_USER_IDS: list[str] = ["5dd35480-0f38-11ed-93bb-da75731aa77c"]
 
 # 本批次启动时间戳，写入每条 notes，便于后期按批次聚合统计。
 _BATCH_TS = datetime.now(timezone.utc).astimezone().isoformat()
-
-
-def load_auth() -> tuple[str, str]:
-    """读认证：优先环境变量，其次 ~/.bigquant/auth.json。返回 (token, server)。"""
-    token = os.environ.get("BIGQUANT_TOKEN")
-    server = os.environ.get("BIGQUANT_SERVER", "").rstrip("/")
-    if not token:
-        auth_file = Path(
-            os.environ.get("BIGQUANT_AUTH_FILE", Path.home() / ".bigquant" / "auth.json")
-        )
-        try:
-            data = json.loads(auth_file.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            print(f"未找到认证文件: {auth_file}", file=sys.stderr)
-            sys.exit(1)
-        token = data.get("token")
-        if not token:
-            print("auth.json 中缺少 token 字段", file=sys.stderr)
-            sys.exit(1)
-        if not server:
-            server = str(data.get("server", "https://bigquant.com")).rstrip("/")
-    if not server:
-        server = "https://bigquant.com"
-    return token, server
-
-
-def read_id_list(path: Path) -> list[str]:
-    """读 user_id 名单：.json 数组或纯文本（一行一个），去空去重保序。"""
-    text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() == ".json":
-        arr = json.loads(text)
-        if not isinstance(arr, list):
-            print(f"{path} 应为 JSON 数组", file=sys.stderr)
-            sys.exit(1)
-        ids = [str(x).strip() for x in arr]
-    else:
-        ids = [ln.strip() for ln in text.splitlines()]
-    return list(dict.fromkeys(u for u in ids if u))
 
 
 def load_participants(cid: str) -> list[str]:

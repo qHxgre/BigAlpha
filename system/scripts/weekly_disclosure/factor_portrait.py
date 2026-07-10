@@ -31,12 +31,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from _disclosure_common import (
-    DEFAULT_COMPETITION_ID,
-    OUTPUT_DIR,
-    resolve_leaderboard_dir,
-    zscore,
-)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.disclosure import DEFAULT_COMPETITION_ID, zscore
+from common.paths import OUTPUT_DIR, resolve_leaderboard_dir
 
 try:
     import dai

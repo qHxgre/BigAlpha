@@ -25,9 +25,13 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.auth import load_auth
+from common.ids import dedup_keep_order, load_id_list_json
+from common.paths import PARTICIPANTS_DIR
 
 try:
     import requests
@@ -36,9 +40,9 @@ except ImportError:
     sys.exit(1)
 
 # ===== 配置：改这里就行 =====================================================
-# 用户列表：默认读同目录 user_id.json（JSON 数组）。
+# 用户列表：默认读 participants 目录下按赛道的 user_id_<cid>.json（JSON 数组）。
 # 也可以直接把用户 ID 写进下面的 USER_IDS 列表，非空时优先用它。
-USER_ID_FILE = Path(__file__).with_name("files") / "participants" / "user_id_523f9302-5b4b-42bd-bce1-f232e7c74316.json"
+USER_ID_FILE = PARTICIPANTS_DIR / "user_id_523f9302-5b4b-42bd-bce1-f232e7c74316.json"
 USER_IDS: list[str] = []  # 例如 ["uid1", "uid2"]；留空则读 USER_ID_FILE
 
 # 数据表列表（datasource_id）。这些表将以只读权限开给上面的用户。
@@ -57,29 +61,6 @@ DRY_RUN = False               # True 只预览；确认后改 False 真正写入
 SDK_BASE = "/bigapis/data/v1/sdk"
 SDK_LEVEL = "custom"         # 自定义表套餐
 ROLE_READONLY = 1            # 只读
-
-def load_auth() -> tuple[str, str]:
-    """返回 (token, server)。优先环境变量，否则读 ~/.bigquant/auth.json。"""
-    token = os.environ.get("BIGQUANT_TOKEN")
-    server = os.environ.get("BIGQUANT_SERVER", "").rstrip("/")
-
-    if not token:
-        auth_file = Path(
-            os.environ.get("BIGQUANT_AUTH_FILE", Path.home() / ".bigquant" / "auth.json")
-        )
-        try:
-            data = json.loads(auth_file.read_text())
-        except FileNotFoundError:
-            print(f"未找到认证文件: {auth_file}", file=sys.stderr)
-            sys.exit(1)
-        token = data.get("token")
-        if not token:
-            print("auth.json 中缺少 token 字段", file=sys.stderr)
-            sys.exit(1)
-        if not server:
-            server = data.get("server", "https://bigquant.com").rstrip("/")
-
-    return token, server or "https://bigquant.com"
 
 
 def _api(method: str, path: str, token: str, server: str, **kwargs) -> dict | None:
@@ -143,25 +124,8 @@ def grant_readonly(token: str, server: str, user_id: str) -> str:
 
 def load_user_ids() -> list[str]:
     if USER_IDS:
-        raw = USER_IDS
-    else:
-        try:
-            raw = json.loads(USER_ID_FILE.read_text())
-        except FileNotFoundError:
-            print(f"未找到用户列表: {USER_ID_FILE}", file=sys.stderr)
-            sys.exit(1)
-        if not isinstance(raw, list):
-            print(f"{USER_ID_FILE} 应为 JSON 数组", file=sys.stderr)
-            sys.exit(1)
-    # 去重 + 去空，保持顺序
-    seen: set[str] = set()
-    result: list[str] = []
-    for uid in raw:
-        uid = str(uid).strip()
-        if uid and uid not in seen:
-            seen.add(uid)
-            result.append(uid)
-    return result
+        return dedup_keep_order(USER_IDS)
+    return load_id_list_json(USER_ID_FILE)
 
 
 def main() -> None:
