@@ -48,27 +48,27 @@ CID_OPEN = "63dd885c-2488-4efd-9c61-9e3a536f172c"      # 赛道三 · AI 开放�
 # 不需要的任务直接注释掉即可。
 _CAND_DIR = REWARD_COINS_DIR
 TASKS: list[dict] = [
-    {
-        # 周榜前30%（20260708 快照）· 因子赛道。
-        # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
-        "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260708",
-        "task_key": "周榜前30%",
-        "amounts": {CID_FACTOR: 768},
-        "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260708.json"),
-    },
-    {
-        # 周榜前30%（20260708 快照）· 端到端赛道。金额较高，charge 前务必人工核对。
-        "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260708",
-        "task_key": "周榜前30%",
-        "amounts": {CID_E2E: 13920},
-        "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260708.json"),
-    },
-    # ↓ 历史任务，需要时再放开 ↓
     # {
-    #     "label": "BigAlpha2026报名宽币赠送",
-    #     "task_key": "初始礼包",
-    #     "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+    #     # 周榜前30%（20260708 快照）· 因子赛道。
+    #     # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260708",
+    #     "task_key": "周榜前30%",
+    #     "amounts": {CID_FACTOR: 768},
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260708.json"),
     # },
+    # {
+    #     # 周榜前30%（20260708 快照）· 端到端赛道。金额较高，charge 前务必人工核对。
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260708",
+    #     "task_key": "周榜前30%",
+    #     "amounts": {CID_E2E: 13920},
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260708.json"),
+    # },
+    # ↓ 历史任务，需要时再放开 ↓
+    {
+        "label": "BigAlpha2026报名宽币赠送",
+        "task_key": "初始礼包",
+        "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+    },
     # {
     #     "label": "BigAlpha2026首次提交宽币赠送",
     #     "task_key": "首次提交",

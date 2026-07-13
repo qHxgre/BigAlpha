@@ -51,31 +51,31 @@ API_BASE = "/bigapis/auth/v1"
 
 
 def get_privilege(token: str, server: str, user_id: str) -> dict | None:
-    """查询用户当前权益，返回权益 dict（items 第一条）；查不到或异常返回 None。"""
+    """查询用户当前权益，返回权益 dict（items 第一条）；确实查不到返回 None。
+
+    查询接口本身出错会抛异常，由调用方决定如何处理（不能当成“无权益”静默覆盖）。
+    """
     url = f"{server}{API_BASE}/user_equity/@query"
     params = {"constraints": json.dumps({"user_id": user_id}), "page": 1, "size": 1}
-    try:
-        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json() if resp.content else {}
-        items = data.get("data", {}).get("items") or data.get("items") or []
-        return items[0] if items else None
-    except Exception as e:
-        print(f"    [warn] 查询权益失败 {user_id}: {e}")
-        return None
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json() if resp.content else {}
+    items = (data.get("data") or {}).get("items") or data.get("items") or []
+    return items[0] if items else None
 
 
 def spro_expires_after_cutoff(privilege: dict | None, cutoff: str = EXPIRE_AT) -> bool:
     """判断用户的 spro 到期日是否在 cutoff 之后（含当天），是则跳过不覆盖。"""
     if not privilege:
         return False
-    if privilege.get("equity", {}).get("specification") != PRO_TYPE:
+    equity = privilege.get("equity") or {}
+    if equity.get("specification") != PRO_TYPE:
         return False
     expire_at = (
         privilege.get("expire_at")
         or privilege.get("expireAt")
-        or privilege.get("equity", {}).get("expire_at")
-        or privilege.get("equity", {}).get("expireAt")
+        or equity.get("expire_at")
+        or equity.get("expireAt")
         or ""
     )
     if not expire_at:
@@ -112,8 +112,22 @@ def main() -> None:
     failures: list[tuple[str, str]] = []
 
     for i, uid in enumerate(user_ids, 1):
-        if DRY_RUN:
+        # 先查当前权益；查询失败不能当成“无权益”静默覆盖，单独记为失败并打印 id
+        try:
             privilege = get_privilege(token, server, uid)
+        except Exception as e:  # noqa: BLE001 — 单条查询失败不影响其他人
+            detail = str(e)
+            if isinstance(e, requests.HTTPError) and e.response is not None:
+                try:
+                    detail = json.dumps(e.response.json(), ensure_ascii=False)
+                except Exception:
+                    detail = e.response.text
+            fail += 1
+            failures.append((uid, f"查询权益失败: {detail}"))
+            print(f"  [失败][查询权益] [{i}/{len(user_ids)}] {uid}: {detail}")
+            continue
+
+        if DRY_RUN:
             if spro_expires_after_cutoff(privilege):
                 cur_expire = (privilege.get("expire_at") or privilege.get("expireAt") or "")[:10]
                 print(f"  [dry-run][到期日{cur_expire}>={EXPIRE_AT}，跳过] [{i}/{len(user_ids)}] {uid}")
@@ -122,7 +136,6 @@ def main() -> None:
             continue
 
         # spro 到期日在 EXPIRE_AT 之后则跳过，否则写入（含无权益、已过期、到期更早的情况）
-        privilege = get_privilege(token, server, uid)
         if spro_expires_after_cutoff(privilege):
             skip += 1
             cur_expire = (privilege.get("expire_at") or privilege.get("expireAt") or "")[:10]
