@@ -44,11 +44,12 @@ LOG_TAIL_LINES = 80
 class MemoryLimitedUserRunner(LocalProcessUserRunner):
     """在框架 LocalProcessUserRunner 之上，给用户子进程加内存上限并识别 OOM。"""
 
-    # 单个用户子进程的虚拟内存（地址空间）上限。按 max_workers=1、给系统与 judge 主进程
-    # 留 ~56 GiB 估算。取值偏大是有意为之：RLIMIT_AS 限的是虚拟地址空间，torch/numpy
-    # 启动即 mmap 一大片虚拟地址（未必真占物理内存），设紧会误杀正常大库。
-    # 调大 max_workers 时需同步下调此值，保证 max_workers * MEM_LIMIT 稳稳小于 256 GiB。
-    MEM_LIMIT = 200 * 1024**3  # 200 GiB
+    # 单个用户子进程的虚拟内存（地址空间）上限。
+    # max_workers=2：2 × 100 GiB = 200 GiB，系统与 judge 主进程留 ~56 GiB 余量。
+    # 取值偏大是有意为之：RLIMIT_AS 限的是虚拟地址空间，torch/numpy 启动即 mmap
+    # 一大片虚拟地址（未必真占物理内存），设紧会误杀正常大库。
+    # 调整 max_workers 时需同步改此值，保证 max_workers * MEM_LIMIT 稳稳小于 256 GiB。
+    MEM_LIMIT = 100 * 1024**3  # 100 GiB
 
     def _read_log_tail(self, log_path: str, n: int = LOG_TAIL_LINES) -> str:
         """读取子进程 stdout 日志的末尾 n 行，供失败时留存 / 排查。读不出返回空串。"""

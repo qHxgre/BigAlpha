@@ -38,10 +38,11 @@ def _with_suffix(filename: str, suffix: str) -> str:
 class EndToEndJudgeBase(JudgeBase):
     """端到端模型赛道评测器的公共基类（不含具体阶段逻辑，逻辑在各 mixin 中）。"""
 
-    # 单机只有 1 张 A100：用户代码大概率上 GPU 推理，多个提交并行会抢同一张卡的 80G 显存导致
-    # 相互 OOM（内存上限只管主机内存、管不到显存）。故串行执行，GPU 独占。若要提高吞吐改为并行，
-    # 需同步下调 MemoryLimitedUserRunner.MEM_LIMIT，保证 max_workers * MEM_LIMIT 稳稳小于 256 GiB。
-    max_workers: int = 1
+    # 并行跑 2 个提交：runner.py 里的 MEM_LIMIT 已同步下调到 100 GiB，保证
+    # max_workers * MEM_LIMIT = 200 GiB，系统与 judge 主进程留 ~56 GiB 余量。
+    # 注意：单机只有 1 张 A100（80G 显存），两个子进程若都上 GPU 推理仍会抢显存相互 OOM；
+    # 此处假设实际并发时只有一个作业占用 GPU，或用户代码已做好显存管理。
+    max_workers: int = 2
 
     # ---- 子类必填的差异配置 ----------------------------------------------
     # 模型推理所用数据集表名映射与数据（验证集）时间区间，public / private 各不相同。
