@@ -370,7 +370,9 @@ def build_daily_digest(
 
 # ---- CLI 入口 ----------------------------------------------------------------
 
-COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"  # ← 在此修改目标比赛 ID
+# 523f9302-5b4b-42bd-bce1-f232e7c74316
+# 76ad3f56-ec2b-431a-890e-139a7f4bbcba
+COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"  # ← 在此修改目标比赛 ID
 
 
 def main(argv: list[str]) -> int:

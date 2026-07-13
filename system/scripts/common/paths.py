@@ -28,22 +28,16 @@ SQL_DIR = DATA_ROOT / "sql"
 WEEKLY_DISCLOSURE_DIR = DATA_ROOT / "weekly_disclosure"
 OUTPUT_DIR = WEEKLY_DISCLOSURE_DIR
 
-# 云端评测榜单目录（只读输入，由评测系统产出）；不在云端时回退到本地 DATA_ROOT/leaderboard。
-REMOTE_LEADERBOARD_BASE = (
-    "/home/aiuser/work/workspace/BigAlpha/system/files"
-    "/{competition_id}/leaderboard"
-)
+# 榜单目录（由评测系统产出，落在本地 DATA_ROOT/leaderboard/<competition_id>）。
 LOCAL_LEADERBOARD_BASE = DATA_ROOT / "leaderboard"
 # 兼容旧名
 LOCAL_LEADERBOARD_FALLBACK = LOCAL_LEADERBOARD_BASE
 
 
 def resolve_leaderboard_dir(competition_id: str) -> str:
-    """定位榜单目录：优先云端路径，缺失时回退到本地 DATA_ROOT/leaderboard/<competition_id>，
-    再回退到 DATA_ROOT/leaderboard（兼容旧布局）。"""
-    remote = REMOTE_LEADERBOARD_BASE.format(competition_id=competition_id)
-    if os.path.isdir(remote):
-        return remote
+    """定位榜单目录：使用 DATA_ROOT/leaderboard/<competition_id>，
+    子目录内若还有一层 leaderboard/ 则进入（新评测系统布局）；
+    缺失时回退到 DATA_ROOT/leaderboard（兼容旧布局）。"""
     local_by_id = LOCAL_LEADERBOARD_BASE / competition_id
     if os.path.isdir(local_by_id):
         # 子目录内若还有一层 leaderboard/ 则进入（新评测系统布局）
@@ -52,7 +46,7 @@ def resolve_leaderboard_dir(competition_id: str) -> str:
             return str(nested)
         return str(local_by_id)
     print(
-        f"  [提示] 云端及按ID本地目录均不存在，回退到: {LOCAL_LEADERBOARD_BASE}",
+        f"  [提示] 按ID本地目录不存在，回退到: {LOCAL_LEADERBOARD_BASE}",
         file=sys.stderr,
     )
     return str(LOCAL_LEADERBOARD_BASE)
