@@ -14,7 +14,6 @@ for path in paths:
 
 from bigalpha_judge import BigAlphaJudge
 
-
 class Judge(BigAlphaJudge):
     """公榜评测：用公开数据集与时间区间跑因子挖掘。"""
 
