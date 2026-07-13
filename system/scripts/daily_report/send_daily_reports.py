@@ -1,5 +1,5 @@
-"""把 daily_reports 目录下每个 <user_id>.md 作为站内信发给对应用户。
-（目录见 common.paths.DAILY_REPORTS_DIR：system/files/scripts/daily_reports）
+"""把某场比赛的 daily_reports 子目录下每个 <user_id>.md 作为站内信发给对应用户。
+（目录见 common.paths.resolve_daily_reports_dir：system/files/scripts/daily_reports/<competition_id>）
 
 对接消息通知接口 /bigapis/notify/v1/notice（POST），单用户 signal 通知：
 文件名（去掉 .md）即接收者 user_id，文件内容即通知正文。
@@ -7,12 +7,17 @@
 认证：优先环境变量 BIGQUANT_TOKEN / BIGQUANT_SERVER，其次 ~/.bigquant/auth.json，
 与 reward_coins.py 一致。
 
-防重：每次发送成功都会往 REPORTS_DIR/.sent_ledger.csv 追加一行
-(user_id, report_sha1, sent_at)。重跑时，正文内容未变（sha1 相同）的用户会被
-跳过，不会重复打扰；报告更新（sha1 变化）后会重新发送。
+防重：每次发送成功都会往「该比赛报告目录」/.sent_ledger.csv 追加一行
+(user_id, report_sha1, sent_at)。ledger 按比赛独立，互不影响。重跑时，正文内容未变
+（sha1 相同）的用户会被跳过，不会重复打扰；报告更新（sha1 变化）后会重新发送。
 
 用法：
-    1. 先跑 daily_score_digest.py 生成当天各用户的 <user_id>.md。
+    python send_daily_reports.py [competition_id]
+
+    competition_id 默认见下方 COMPETITION_ID；命令行传入可覆盖，控制发哪个比赛。
+
+流程：
+    1. 先跑 daily_score_digest.py <competition_id> 生成该比赛各用户的 <user_id>.md。
     2. DRY_RUN=True 跑一遍预览：确认接收人数、标题、正文长度都正常。
     3. 改 DRY_RUN=False 再跑，实际发送并回写 ledger。
 """
@@ -28,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
 from common.auth import load_auth
-from common.paths import DAILY_REPORTS_DIR
+from common.paths import resolve_daily_reports_dir
 
 try:
     import requests
@@ -37,6 +42,11 @@ except ImportError:
     sys.exit(1)
 
 # ===== 配置：改这里就行 =====================================================
+# 目标比赛 ID：控制发哪个比赛的站内信。命令行传入 argv[0] 可覆盖此默认值。
+#   523f9302-5b4b-42bd-bce1-f232e7c74316
+#   76ad3f56-ec2b-431a-890e-139a7f4bbcba
+COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+
 DRY_RUN = False                 # True 只预览，不发送、不回写 ledger；确认后改 False
 
 # 通知标题。{date} 会被替换成从正文里解析出的日期（解析不到则留空）。
@@ -56,11 +66,12 @@ MAX_CONTENT = 1024
 
 # 测试模式：只发给 TEST_USER_IDS 里列出的用户（对应文件需存在）。
 TEST_MODE = False
-TEST_USER_IDS: list[str] = []
+TEST_USER_IDS: list[str] = [
+    "5dd35480-0f38-11ed-93bb-da75731aa77c",
+]
 # ===========================================================================
 
-REPORTS_DIR = DAILY_REPORTS_DIR
-LEDGER_CSV = REPORTS_DIR / ".sent_ledger.csv"
+LEDGER_NAME = ".sent_ledger.csv"
 LEDGER_COLUMNS = ["user_id", "report_sha1", "sent_at"]
 
 
@@ -79,13 +90,13 @@ def make_title(content: str) -> str:
     return TITLE_TEMPLATE.format(date=date).strip()
 
 
-def collect_reports() -> list[tuple[str, str]]:
+def collect_reports(reports_dir: Path) -> list[tuple[str, str]]:
     """返回 [(user_id, content)]，按 user_id 排序。"""
-    if not REPORTS_DIR.exists():
-        print(f"未找到报告目录: {REPORTS_DIR}", file=sys.stderr)
+    if not reports_dir.exists():
+        print(f"未找到报告目录: {reports_dir}", file=sys.stderr)
         sys.exit(1)
     items: list[tuple[str, str]] = []
-    for md in sorted(REPORTS_DIR.glob("*.md")):
+    for md in sorted(reports_dir.glob("*.md")):
         user_id = md.stem.strip()
         if not user_id:
             continue
@@ -95,12 +106,12 @@ def collect_reports() -> list[tuple[str, str]]:
     return items
 
 
-def load_ledger() -> set[tuple[str, str]]:
+def load_ledger(ledger_csv: Path) -> set[tuple[str, str]]:
     """读已发台账，返回 {(user_id, report_sha1)} 集合。"""
     sent: set[tuple[str, str]] = set()
-    if not LEDGER_CSV.exists():
+    if not ledger_csv.exists():
         return sent
-    with LEDGER_CSV.open(newline="", encoding="utf-8") as f:
+    with ledger_csv.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             uid = (row.get("user_id") or "").strip()
             sha = (row.get("report_sha1") or "").strip()
@@ -109,9 +120,9 @@ def load_ledger() -> set[tuple[str, str]]:
     return sent
 
 
-def append_ledger(user_id: str, sha1: str) -> None:
-    exists = LEDGER_CSV.exists()
-    with LEDGER_CSV.open("a", newline="", encoding="utf-8") as f:
+def append_ledger(ledger_csv: Path, user_id: str, sha1: str) -> None:
+    exists = ledger_csv.exists()
+    with ledger_csv.open("a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=LEDGER_COLUMNS)
         if not exists:
             w.writeheader()
@@ -151,17 +162,22 @@ def send_one(token: str, server: str, user_id: str, title: str, content: str) ->
     return True, "OK"
 
 
-def main() -> None:
-    reports = collect_reports()
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    competition_id = argv[0] if argv else COMPETITION_ID
+    reports_dir = resolve_daily_reports_dir(competition_id)
+    ledger_csv = reports_dir / LEDGER_NAME
+
+    reports = collect_reports(reports_dir)
     if not reports:
-        print(f"在 {REPORTS_DIR} 下没有可发送的 <user_id>.md。", file=sys.stderr)
+        print(f"在 {reports_dir} 下没有可发送的 <user_id>.md。", file=sys.stderr)
         sys.exit(1)
 
-    sent = load_ledger()
+    sent = load_ledger(ledger_csv)
     _, server = load_auth()
-    print(f"=== 发送得分日报站内信 · channel={CHANNEL} · space_id={SPACE_ID or '(默认)'} ===")
+    print(f"=== 发送得分日报站内信 · competition={competition_id} · channel={CHANNEL} · space_id={SPACE_ID or '(默认)'} ===")
     print(f"接口: {server}/bigapis/notify/v1/notice")
-    print(f"报告目录: {REPORTS_DIR}（共 {len(reports)} 份）")
+    print(f"报告目录: {reports_dir}（共 {len(reports)} 份）")
     if DRY_RUN:
         print("当前为预览模式(DRY_RUN=True)，未调任何接口、未回写 ledger。\n")
 
@@ -193,7 +209,7 @@ def main() -> None:
         ok, msg = send_one(token, server, uid, title, content)
         if ok:
             ok_count += 1
-            append_ledger(uid, sha1)
+            append_ledger(ledger_csv, uid, sha1)
             print(f"[{i}/{len(reports)}] ✓ {uid}  «{title}»  {len(content)} 字符")
         else:
             fail_count += 1
