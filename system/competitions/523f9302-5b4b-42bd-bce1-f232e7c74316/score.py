@@ -14,13 +14,14 @@ import os
 
 import pandas as pd
 
-from judge.judgebase import LocalProcessUserRunner, UserCodeRunError, log_context, log_timer
+from judge.judgebase import UserCodeRunError, log_context, log_timer
 
 import scoring
 from constants import (
     STATUS_ENV_ERROR,
     STATUS_ERR_MSG,
     STATUS_FILE_ERROR,
+    STATUS_OOM,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
     STATUS_USER_ERROR,
@@ -28,6 +29,7 @@ from constants import (
     SubmissionFileError,
 )
 from fileio import read_json
+from runner import MemoryLimitedUserRunner
 
 
 class ScoreMixin:
@@ -35,7 +37,7 @@ class ScoreMixin:
 
     # ---- 运行用户/注入代码 -------------------------------------------------
 
-    def run_user_code(self, submission: dict, runner_code: str) -> LocalProcessUserRunner:
+    def run_user_code(self, submission: dict, runner_code: str) -> MemoryLimitedUserRunner:
         """拉取用户代码、注入 runner 模板，并在隔离子进程中执行。
 
         runner_code 由调用方传入（当前为 JUDGE_SCORE，跑模型推理 + 单因子分析）。
@@ -53,7 +55,9 @@ class ScoreMixin:
 
         injected = runner_code.replace("__USER_CODE__", user_code)
 
-        runner = LocalProcessUserRunner(
+        # 用带内存上限的 runner：给用户子进程设 RLIMIT_AS，超限只杀该子进程、不波及 judge；
+        # 内存溢出会以 reason="oom" 抛出，并带出 stdout 日志尾部。
+        runner = MemoryLimitedUserRunner(
             submission_id=sid,
             files={"judge_runner.py": injected},
             cmd=["python3", "-c", "from judge_runner import judge_runner_main; judge_runner_main()"],
@@ -143,8 +147,14 @@ class ScoreMixin:
                 self.log.info("submission.score_done", elapsed_ms=elapsed(), msg="模型评分完成")
                 self.write_score_status(submission, STATUS_SUCCESS, elapsed_ms=elapsed())
             except UserCodeRunError as e:
-                # 用户代码子进程异常退出，reason 区分「用户报错」与「超时」。两者都是终态。
-                status = STATUS_TIMEOUT if e.reason == "timeout" else STATUS_USER_ERROR
+                # 用户代码子进程异常退出，reason 区分「超时」「内存溢出」「用户报错」，三者都是终态。
+                # OOM 单独记状态并把子进程日志尾部（error 里带的 MemoryError 回溯）一并落盘，便于排查。
+                status = {
+                    "timeout": STATUS_TIMEOUT,
+                    "oom": STATUS_OOM,
+                }.get(e.reason, STATUS_USER_ERROR)
+                if status == STATUS_OOM:
+                    self.log.warning("submission.oom", error=str(e), return_code=e.return_code, msg="用户代码内存溢出")
                 self._fail_submission(submission, status, error=str(e), return_code=e.return_code)
                 return
             except SubmissionFileError as e:
