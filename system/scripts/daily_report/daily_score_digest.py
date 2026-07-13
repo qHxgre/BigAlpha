@@ -1,17 +1,19 @@
 """每日得分摘要脚本。
 
 查询某场比赛所有用户的 submission，按用户聚合，生成 Markdown 格式的站内信内容，
-并将每个用户的 markdown 保存到 daily_reports 目录下的 <user_id>.md
-（system/files/scripts/daily_reports，见 common.paths.DAILY_REPORTS_DIR）。
+并将每个用户的 markdown 保存到 daily_reports/<competition_id>/<user_id>.md
+（system/files/scripts/daily_reports，见 common.paths.resolve_daily_reports_dir）。
 
 分数数据来源：
-  - leaderboard_final.csv     → a_score / b_score / final_score（以 id 对应 submission_id）
+  - leaderboard_final.csv     → a_score / b_score / final_score（旧比赛）
+                               或 score（新比赛，无回归数据）
   - submissions_summary.csv   → ic_mean / ic_ir / sharpe_ratio / stress_ic_ir
 
 用法:
     python daily_score_digest.py [competition_id]
 
-    competition_id 默认: 76ad3f56-ec2b-431a-890e-139a7f4bbcba
+    competition_id 默认: 76ad3f56-ec2b-431a-890e-139a7f4bbcba（有回归数据）
+    新比赛（无回归）:      523f9302-5b4b-42bd-bce1-f232e7c74316
 
 环境变量:
     ALPHATHON_API_TOKEN      bigjwt token
@@ -19,7 +21,7 @@
     ALPHATHON_API_BASE_URL   API 地址
 
 输出:
-    每个用户的 markdown 写入 daily_reports 目录下的 <user_id>.md
+    每个用户的 markdown 写入 daily_reports/<competition_id>/<user_id>.md
 """
 
 from __future__ import annotations
@@ -37,9 +39,12 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
 from common.client import AlphathonClient
-from common.paths import DAILY_REPORTS_DIR, resolve_leaderboard_dir
+from common.paths import resolve_daily_reports_dir, resolve_leaderboard_dir
 
-DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+# 无回归数据的比赛 ID 集合（只有 A 项得分，最终分即 score 列）
+NO_REGRESSION_COMPETITIONS = {
+    "523f9302-5b4b-42bd-bce1-f232e7c74316",
+}
 
 # 是否生成精简版报告：
 #   True  -> 正文压缩到 1024 字符内，供站内信发送
@@ -90,10 +95,15 @@ _A_DETAIL_COLS: dict[str, str] = {
 
 
 def _load_score_tables(leaderboard_dir: str) -> tuple[
-    dict[str, dict],   # sid → {a_score, b_score, final_score}
+    dict[str, dict],   # sid → {a_score, b_score, final_score}  或  {score}（无回归）
     dict[str, dict],   # sid → {ic_mean, ic_ir, sharpe_ratio, stress_ic_ir}
 ]:
-    """从 leaderboard_dir 读取打分 CSV，返回两张以 submission_id 为键的查找表。"""
+    """从 leaderboard_dir 读取打分 CSV，返回两张以 submission_id 为键的查找表。
+
+    兼容两种 CSV 布局：
+      - 旧布局（有回归）：leaderboard_final.csv 含 id / a_score / b_score / final_score
+      - 新布局（无回归）：leaderboard_final.csv 含 id / score
+    """
 
     def read_csv(name: str) -> pd.DataFrame | None:
         path = os.path.join(leaderboard_dir, name)
@@ -105,17 +115,26 @@ def _load_score_tables(leaderboard_dir: str) -> tuple[
             print(f"  [警告] 无法读取 {path}: {e}", file=sys.stderr)
             return None
 
-    # leaderboard_final.csv — A/B/最终得分
+    # leaderboard_final.csv — 兼容新旧两种列结构
     final_map: dict[str, dict] = {}
     final_df = read_csv("leaderboard_final.csv")
     if final_df is not None and "id" in final_df.columns:
+        has_ab = "a_score" in final_df.columns and "b_score" in final_df.columns
         for _, row in final_df.iterrows():
             sid = str(row["id"])
-            final_map[sid] = {
-                "a_score":     _safe(row.get("a_score")),
-                "b_score":     _safe(row.get("b_score")),
-                "final_score": _safe(row.get("final_score")),
-            }
+            if has_ab:
+                final_map[sid] = {
+                    "a_score":     _safe(row.get("a_score")),
+                    "b_score":     _safe(row.get("b_score")),
+                    "final_score": _safe(row.get("final_score")),
+                }
+            else:
+                # 无回归比赛：只有 score 列，映射为 final_score
+                final_map[sid] = {
+                    "a_score":     None,
+                    "b_score":     None,
+                    "final_score": _safe(row.get("score")),
+                }
 
     # submissions_summary.csv — A项详细分
     detail_map: dict[str, dict] = {}
@@ -216,23 +235,16 @@ def build_user_markdown_concise(
     final_map: dict[str, dict],
     detail_map: dict[str, dict],
     max_chars: int = NOTICE_MAX_CHARS,
+    no_regression: bool = False,
 ) -> str:
     """为单个用户生成精简版 Markdown，控制在 max_chars 字符以内，供站内信发送。
 
-    尽量压缩固定开销，把字符预算留给明细行：
-      - 标题精简为 `### 得分日报 MM-DD`，去掉含比赛 UUID 的问候语；
-      - 摘要压成一行（提交 N · 成功 M · 最高 X）；
-      - 保留 A 项细分指标（IC均值/IC IR/Sharpe/压力IC IR），用短列名省字符；
-      - Submission ID 只显示前 8 位，提交时间精简为 MM-DD HH:MM；
-      - 明细按最终得分降序，突出最优提交；
-      - 自适应行数：若仍超限，整行删减（不破坏表格、不截断中文），
-        并在脚注注明「仅显示分数最高的 N 条，共 M 条」。
+    no_regression=True 时隐藏 A/B 列，只展示最终得分；适用于无回归数据的比赛。
     """
     date_str = now.strftime("%m-%d")
     total = len(submissions)
     done_subs = [s for s in submissions if s.get("status") == "done"]
 
-    # 计算每条提交的最终得分，用于排序和摘要
     def final_score_of(sub: dict) -> float | None:
         sid = str(sub.get("id") or "")
         return _safe(final_map.get(sid, {}).get("final_score"))
@@ -244,47 +256,66 @@ def build_user_markdown_concise(
     )
     best_score = next((final_score_of(s) for s in ranked if final_score_of(s) is not None), None)
 
-    header = [
-        f"### 得分日报 {date_str}",
-        "",
-        f"提交 {total} · 成功 {len(done_subs)} · 最高 {_fmt(best_score)}",
-        "",
-        "| # | ID | 状态 | A | B | 最终 | IC | ICIR | Sharpe | 压力IR | 时间 |",
-        "|--|--|--|--|--|--|--|--|--|--|--|",
-    ]
-
-    def detail_row(idx: int, sub: dict) -> str:
-        sid = str(sub.get("id") or "")
-        status = _status_label(sub)
-        created = (sub.get("created_at") or "")[:16].replace("T", " ")[5:]  # MM-DD HH:MM
-        scores = final_map.get(sid, {})
-        a = _fmt(scores.get("a_score"))
-        b = _fmt(scores.get("b_score"))
-        fs = _fmt(scores.get("final_score"))
-        detail = detail_map.get(sid, {})
-        ic = _fmt(detail.get("ic_mean"))
-        icir = _fmt(detail.get("ic_ir"))
-        sharpe = _fmt(detail.get("sharpe_ratio"))
-        stress = _fmt(detail.get("stress_ic_ir"))
-        return f"| {idx} | `{sid[:8]}` | {status} | {a} | {b} | {fs} | {ic} | {icir} | {sharpe} | {stress} | {created} |"
-
-    def footer(shown: int) -> list[str]:
-        note = ""
-        if shown < total:
-            note = f"> 仅显示分数最高的 {shown}/{total} 条，完整明细见平台。\n"
-        return [
+    if no_regression:
+        header = [
+            f"### 得分日报 {date_str}",
             "",
-            f"{note}> 最终=0.3A+0.7B（A 由 IC/ICIR/Sharpe/压力IR 合成，B 由回归系统决定）。",
+            f"提交 {total} · 成功 {len(done_subs)} · 最高 {_fmt(best_score)}",
+            "",
+            "| # | ID | 状态 | 得分 | IC | ICIR | Sharpe | 压力IR | 时间 |",
+            "|--|--|--|--|--|--|--|--|--|",
         ]
 
-    # 从全部明细开始，超限则每次砍掉分数最低的一行
+        def detail_row(idx: int, sub: dict) -> str:
+            sid = str(sub.get("id") or "")
+            status = _status_label(sub)
+            created = (sub.get("created_at") or "")[:16].replace("T", " ")[5:]
+            fs = _fmt(final_map.get(sid, {}).get("final_score"))
+            detail = detail_map.get(sid, {})
+            ic = _fmt(detail.get("ic_mean"))
+            icir = _fmt(detail.get("ic_ir"))
+            sharpe = _fmt(detail.get("sharpe_ratio"))
+            stress = _fmt(detail.get("stress_ic_ir"))
+            return f"| {idx} | `{sid[:8]}` | {status} | {fs} | {ic} | {icir} | {sharpe} | {stress} | {created} |"
+
+        def footer(shown: int) -> list[str]:
+            note = f"> 仅显示分数最高的 {shown}/{total} 条，完整明细见平台。\n" if shown < total else ""
+            return ["", f"{note}> 得分由 IC/ICIR/Sharpe/压力IR 等指标合成。"]
+    else:
+        header = [
+            f"### 得分日报 {date_str}",
+            "",
+            f"提交 {total} · 成功 {len(done_subs)} · 最高 {_fmt(best_score)}",
+            "",
+            "| # | ID | 状态 | A | B | 最终 | IC | ICIR | Sharpe | 压力IR | 时间 |",
+            "|--|--|--|--|--|--|--|--|--|--|--|",
+        ]
+
+        def detail_row(idx: int, sub: dict) -> str:
+            sid = str(sub.get("id") or "")
+            status = _status_label(sub)
+            created = (sub.get("created_at") or "")[:16].replace("T", " ")[5:]
+            scores = final_map.get(sid, {})
+            a = _fmt(scores.get("a_score"))
+            b = _fmt(scores.get("b_score"))
+            fs = _fmt(scores.get("final_score"))
+            detail = detail_map.get(sid, {})
+            ic = _fmt(detail.get("ic_mean"))
+            icir = _fmt(detail.get("ic_ir"))
+            sharpe = _fmt(detail.get("sharpe_ratio"))
+            stress = _fmt(detail.get("stress_ic_ir"))
+            return f"| {idx} | `{sid[:8]}` | {status} | {a} | {b} | {fs} | {ic} | {icir} | {sharpe} | {stress} | {created} |"
+
+        def footer(shown: int) -> list[str]:
+            note = f"> 仅显示分数最高的 {shown}/{total} 条，完整明细见平台。\n" if shown < total else ""
+            return ["", f"{note}> 最终=0.3A+0.7B（A 由 IC/ICIR/Sharpe/压力IR 合成，B 由回归系统决定）。"]
+
     for shown in range(len(ranked), 0, -1):
         rows = [detail_row(i, sub) for i, sub in enumerate(ranked[:shown], start=1)]
         content = "\n".join(header + rows + footer(shown))
         if len(content) <= max_chars:
             return content
 
-    # 一行明细都放不下（极端情况）：只保留摘要
     content = "\n".join(header[:-2] + footer(0))
     return content[:max_chars]
 
@@ -303,11 +334,12 @@ def build_daily_digest(
     leaderboard_dir: str,
     client: AlphathonClient,
     concise: bool = False,
+    no_regression: bool = False,
 ) -> dict[str, str]:
     """拉取比赛所有 submission，返回 {user_id: markdown_content}。
 
-    concise=True 时生成精简版（正文控制在 1024 字符内，供站内信发送）；
-    默认 False 生成完整版报告。
+    concise=True 时生成精简版（正文控制在 1024 字符内，供站内信发送）。
+    no_regression=True 时隐藏 A/B 列，适用于无回归数据的比赛。
     """
     now = datetime.now()
 
@@ -322,26 +354,43 @@ def build_daily_digest(
     final_map, detail_map = _load_score_tables(leaderboard_dir)
     grouped = group_submissions_by_user(submissions)
 
-    builder = build_user_markdown_concise if concise else build_user_markdown
+    if concise:
+        return {
+            uid: build_user_markdown_concise(
+                uid, subs, competition_id, now, final_map, detail_map,
+                no_regression=no_regression,
+            )
+            for uid, subs in grouped.items()
+        }
     return {
-        uid: builder(uid, subs, competition_id, now, final_map, detail_map)
+        uid: build_user_markdown(uid, subs, competition_id, now, final_map, detail_map)
         for uid, subs in grouped.items()
     }
 
 
 # ---- CLI 入口 ----------------------------------------------------------------
 
+COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"  # ← 在此修改目标比赛 ID
+
 
 def main(argv: list[str]) -> int:
-    competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
-    # 榜单目录：优先云端评测目录，缺失时回退到本地（见 common.paths）
+    competition_id = argv[0] if argv else COMPETITION_ID
     leaderboard_dir = resolve_leaderboard_dir(competition_id)
+    reports_dir = resolve_daily_reports_dir(competition_id)
+    no_regression = competition_id in NO_REGRESSION_COMPETITIONS
 
     client = AlphathonClient()
 
     mode = "精简版(≤1024字符)" if CONCISE else "完整版"
-    print(f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id} 的所有提交（{mode}）...", file=sys.stderr)
-    digest = build_daily_digest(competition_id, leaderboard_dir, client, concise=CONCISE)
+    reg_tag = "（无回归）" if no_regression else ""
+    print(
+        f"[{datetime.now():%H:%M:%S}] 拉取比赛 {competition_id}{reg_tag} 的所有提交（{mode}）...",
+        file=sys.stderr,
+    )
+    digest = build_daily_digest(
+        competition_id, leaderboard_dir, client,
+        concise=CONCISE, no_regression=no_regression,
+    )
     print(f"[{datetime.now():%H:%M:%S}] 共 {len(digest)} 位用户", file=sys.stderr)
 
     if CONCISE:
@@ -351,7 +400,7 @@ def main(argv: list[str]) -> int:
         else:
             print(f"  [OK] 全部 {len(digest)} 份均在 {NOTICE_MAX_CHARS} 字符内", file=sys.stderr)
 
-    save_user_reports(digest, DAILY_REPORTS_DIR)
+    save_user_reports(digest, reports_dir)
 
     return 0
 
