@@ -23,7 +23,7 @@ class EndToEndJudge(ScoreMixin, ScoringMixin, EndToEndJudgeBase):
     competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 
     def on_tick(self) -> None:
-        """每个 tick 统一评分：截面排名 -> 回写最终得分 -> 汇总运行结果。
+        """每个 tick 统一评分：截面排名 -> 分数池存档 -> 回写最终得分 -> 汇总运行结果。
 
         on_submission 只负责跑通用户代码并保留单因子分析结果，所有横向计算集中在此，
         保证每轮都用「全体已跑通提交」做一致的截面排名。
@@ -34,14 +34,20 @@ class EndToEndJudge(ScoreMixin, ScoringMixin, EndToEndJudgeBase):
         except Exception as e:
             self.log.error("score.failed", error=str(e), msg="模型分数排名失败")
 
-        # 第二步：回写最终得分
+        # 第二步：把全体已跑通提交的分数汇总成分数池存档（不参与打分）
+        try:
+            self.save_score_pool()
+        except Exception as e:
+            self.log.error("pool.failed", error=str(e), msg="构建分数池失败")
+
+        # 第三步：回写最终得分
         try:
             self.score_final()
             self.log.info("tick.refreshed", msg="刷新得分榜单并回写最终得分")
         except Exception as e:
             self.log.error("final.failed", error=str(e), msg="回写最终得分失败")
 
-        # 第三步：汇总各提交运行结果
+        # 第四步：汇总各提交运行结果
         try:
             self.summarize_submissions()
         except Exception as e:

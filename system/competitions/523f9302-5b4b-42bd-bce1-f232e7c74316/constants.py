@@ -13,6 +13,11 @@ RAW_SCORE_FILE = "raw_score.parquet"
 PROCESS_SCORE_FILE = "process_score.parquet"
 # 单因子分析结果（ic_mean / ic_ir / sharpe_ratio / stress_ic_ir 等）
 SCORE_ANALYZE_FILE = "score_analyze.json"
+# 分数池：把全体已跑通提交的分数按 date/instrument 合并成一张宽表存档（落在榜单目录下）。
+# 本赛道没有因子池回归，分数池纯作存档，不参与打分。
+# process_score：平台预处理后的分数；raw_score：模型推理的原始分数（与 process 入池集合一致）。
+SCORE_POOL_FILE = "score_pool.parquet"
+SCORE_POOL_RAW_FILE = "score_pool_raw.parquet"
 # 每个提交评分的运行状态记录文件：无论成功/失败都会落盘一份，
 # is_done() 据此判断该提交是否已跑过，避免进程重启后重复执行（尤其是注定失败的提交）。
 SCORE_STATUS_FILE = "score_status.json"

@@ -204,3 +204,64 @@ class ScoreMixin:
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         df.to_csv(self.leaderboard_score_csv, index=False)
         self.log.info("score.ranked", count=len(df), msg="模型分数截面排名完成")
+
+    # ---- 分数池（存档）---------------------------------------------------
+
+    def save_score_pool(self) -> int:
+        """汇总全体已跑通提交的分数，构建分数池 parquet 存档。
+
+        1. 遍历 submissions 目录读取处理后分数文件（process_score），因子名取该提交的 id；
+        2. 全部按 date / instrument 做 outer merge，落盘为 score_pool.parquet；
+        3. 同步把每个提交的原始分数（raw_score）并成 score_pool_raw.parquet 作存档。
+
+        本赛道没有回归环节，分数池纯作存档、不参与打分，因此不做 top-N 筛选，
+        所有产出了分数文件的提交都入池。返回入池提交数（供 on_tick 汇总成一行日志）；
+        未落盘时返回 0。
+        """
+        pool = None
+        raw_pool = None  # 与 pool 入池集合一致，取每个提交的 raw_score（未处理）作存档
+        count = 0
+        for sid, _submission, sub_dir in self._iter_submission_dirs():
+            pf_path = os.path.join(sub_dir, self.process_score_file)
+            if not os.path.exists(pf_path):
+                continue
+            try:
+                fdf = pd.read_parquet(pf_path)
+            except Exception as e:
+                self.log.error("pool.read_failed", submission_id=sid, error=str(e), msg="无法读取处理后分数数据")
+                continue
+            if not {"date", "instrument", "factor"}.issubset(fdf.columns):
+                continue
+
+            fdf = fdf[["date", "instrument", "factor"]].rename(columns={"factor": sid})
+            pool = fdf if pool is None else pool.merge(fdf, how="outer", on=["date", "instrument"])
+            count += 1
+
+            # 同步把该提交的原始分数并入 raw_pool；原始数据缺失/格式不符不影响正常分数池落盘
+            raw_path = os.path.join(sub_dir, self.raw_score_file)
+            if not os.path.exists(raw_path):
+                continue
+            try:
+                rdf = pd.read_parquet(raw_path)
+            except Exception as e:
+                self.log.error("pool.raw_read_failed", submission_id=sid, error=str(e), msg="无法读取原始分数数据")
+                continue
+            if not {"date", "instrument", "factor"}.issubset(rdf.columns):
+                continue
+            rdf = rdf[["date", "instrument", "factor"]].rename(columns={"factor": sid})
+            raw_pool = rdf if raw_pool is None else raw_pool.merge(rdf, how="outer", on=["date", "instrument"])
+
+        if pool is None:
+            self.log.warning("pool.empty", msg="没有任何分数数据")
+            return 0
+
+        os.makedirs(os.path.dirname(self.score_pool_path), exist_ok=True)
+        pool.to_parquet(self.score_pool_path)
+        self.log.debug("pool.saved", submissions=count, msg="保存分数池数据")
+
+        # 原始分数池只作存档；有多少存多少，失败不影响主流程
+        if raw_pool is not None:
+            raw_pool.to_parquet(self.score_pool_raw_path)
+            self.log.debug("pool.raw_saved", submissions=count, msg="保存原始分数池数据")
+
+        return count

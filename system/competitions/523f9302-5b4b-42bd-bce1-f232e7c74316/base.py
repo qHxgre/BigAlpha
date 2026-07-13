@@ -21,7 +21,7 @@ from judge.judgebase import JudgeBase
 
 import constants
 import templates
-from fileio import read_json
+from fileio import read_csv, read_json
 
 
 def _with_suffix(filename: str, suffix: str) -> str:
@@ -96,6 +96,23 @@ class EndToEndJudgeBase(JudgeBase):
         return os.path.join(self.leaderboard_dir, _with_suffix("leaderboard_final.csv", self.mode_suffix))
 
     @property
+    def score_pool_path(self) -> str:
+        """分数池 parquet 的绝对路径：全体已跑通提交的处理后分数按 date/instrument 合并成宽表。
+
+        本赛道没有回归环节，分数池纯作存档，不参与打分。
+        """
+        return os.path.join(self.leaderboard_dir, _with_suffix(constants.SCORE_POOL_FILE, self.mode_suffix))
+
+    @property
+    def score_pool_raw_path(self) -> str:
+        """分数池「原始分数」parquet 的绝对路径。
+
+        与 score_pool_path 入池的提交集合一致，只是取每个提交的 raw_score（未处理）
+        而非 process_score，作为存档保留一份。
+        """
+        return os.path.join(self.leaderboard_dir, _with_suffix(constants.SCORE_POOL_RAW_FILE, self.mode_suffix))
+
+    @property
     def submissions_summary_csv(self) -> str:
         """所有提交运行结果的汇总统计文件。"""
         return os.path.join(self.leaderboard_dir, _with_suffix("submissions_summary.csv", self.mode_suffix))
@@ -140,6 +157,28 @@ class EndToEndJudgeBase(JudgeBase):
         return self.alphathon_api.query_submissions(**self._query_submissions_kwargs())
 
     # ---- 共享小工具 -------------------------------------------------------
+    def heartbeat_fields(self) -> dict:
+        """给心跳日志附加运行进度：total / done / remaining / ok / failed。
+
+        - total：本场比赛当前提交总数，复用主循环每 tick 缓存的 _submission_total（不额外打 API）；
+        - done / ok / failed：取自上一个 tick 落盘的 submissions_summary.csv 的 status 分布，
+          done = 终态数（success/user_error/oom/timeout/file_error），ok = success，failed = done - ok；
+        - remaining = total - done，涵盖「刚提交还没建目录」与 env_error（会重试）的提交。
+
+        两个来源都最多滞后一个 tick；csv 尚未生成时只回退显示 total。
+        """
+        total = getattr(self, "_submission_total", None)
+        df = read_csv(self.submissions_summary_csv, logger=self.log)
+        if df is None or "status" not in df.columns:
+            return {"total": total} if total is not None else {}
+        counts = df["status"].value_counts().to_dict()
+        done = sum(counts.get(s, 0) for s in constants.TERMINAL_STATUSES)
+        ok = counts.get(constants.STATUS_SUCCESS, 0)
+        fields = {"total": total, "done": done, "ok": ok, "failed": done - ok}
+        if total is not None:
+            fields["remaining"] = total - done
+        return fields
+
     def score_status_path(self, submission: dict) -> str:
         """该提交评分状态文件的绝对路径。"""
         return os.path.join(self.submission_path(submission), self.score_status_file)
