@@ -128,7 +128,7 @@ PLAN_COLUMNS = [
 # 每次调用之间的间隔（秒），0 表示不限速。
 SLEEP_BETWEEN = 0.2
 
-DRY_RUN = False             # True 只预览；确认后改 False 真正写入
+DRY_RUN = True             # True 只预览；确认后改 False 真正写入
 
 # 测试模式：True 时只处理 TEST_USER_IDS，不读也不改任何 JSON 报名文件。
 TEST_MODE = False

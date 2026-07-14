@@ -17,6 +17,12 @@ from pathlib import Path
 _SYSTEM_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_ROOT = _SYSTEM_DIR / "files" / "scripts"
 
+# 评测系统产出的比赛文件根（与 scripts 数据平级）：system/files/{competition_id}。
+FILES_ROOT = _SYSTEM_DIR / "files"
+
+# 默认比赛 ID（放在无重依赖的 paths 里，disclosure 再从此处 re-export）。
+DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+
 # 各用途子目录（脚本产出/读取的本地数据都在这里）
 PARTICIPANTS_DIR = DATA_ROOT / "participants"
 REWARD_COINS_DIR = DATA_ROOT / "reward_coins"
@@ -55,3 +61,8 @@ def resolve_leaderboard_dir(competition_id: str) -> str:
 def resolve_daily_reports_dir(competition_id: str) -> Path:
     """每个比赛的报告输出到独立子目录 DATA_ROOT/daily_reports/<competition_id>/。"""
     return DATA_ROOT / "daily_reports" / competition_id
+
+
+def resolve_submissions_dir(competition_id: str) -> Path:
+    """评测系统产出的提交目录：system/files/{competition_id}/submissions。"""
+    return FILES_ROOT / competition_id / "submissions"

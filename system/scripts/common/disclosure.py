@@ -10,6 +10,8 @@ matplotlib.use("Agg")  # 无显示环境（云端）后端，import 后立刻设
 import numpy as np
 import pandas as pd
 
+from common.paths import DEFAULT_COMPETITION_ID  # 保持旧的 import 路径可用
+
 # 让 matplotlib 能渲染中文标签，找不到中文字体时静默退回默认字体
 for _cn_font in ["WenQuanYi Zen Hei", "Noto Sans CJK SC", "SimHei", "Microsoft YaHei", "Arial Unicode MS"]:
     if _cn_font in {f.name for f in matplotlib.font_manager.fontManager.ttflist}:
@@ -17,7 +19,6 @@ for _cn_font in ["WenQuanYi Zen Hei", "Noto Sans CJK SC", "SimHei", "Microsoft Y
         break
 matplotlib.rcParams["axes.unicode_minus"] = False
 
-DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 BENCHMARK = "000852.SH"  # 中证 1000
 
 
