@@ -254,16 +254,11 @@ class SFAMixin:
                 msg="截断复算检出疑似未来函数",
             )
             self._remove_submission_products(submission)
-            self._fail_submission(
-                submission,
-                STATUS_LOOKAHEAD,
-                cutoff=cutoff,
-                diff_ratio=result.get("diff_ratio"),
-                max_abs_dev=result.get("max_abs_dev"),
-                first_diff_date=result.get("first_diff_date"),
-                leak_horizon_days=result.get("leak_horizon_days"),
-                sample=result.get("sample"),
-            )
+            # 判定证据（diff_ratio/max_abs_dev/first_diff_date/leak_horizon_days/sample）
+            # 已在上面的 lookahead.detected 结构化日志里完整记录，供排查用；状态文件只保留核心
+            # 字段（与正常跑用户代码一致：submission_id/status/finished_at），不再重复落盘证据，
+            # 尤其是最多 50 行的 sample。summarize_submissions 也只读 status 等核心字段。
+            self._fail_submission(submission, STATUS_LOOKAHEAD)
             return True
 
         self.log.info("lookahead.passed", cutoff=cutoff, msg="截断复算检测通过，无未来函数")
