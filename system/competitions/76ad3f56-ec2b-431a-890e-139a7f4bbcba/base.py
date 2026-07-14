@@ -23,7 +23,7 @@ from judge.judgebase import JudgeBase
 import constants
 import templates
 from constants import STATUS_SUCCESS, TERMINAL_STATUSES
-from fileio import read_csv, read_json
+from fileio import read_json
 
 
 def _with_suffix(filename: str, suffix: str) -> str:
@@ -257,25 +257,70 @@ class BigAlphaJudgeBase(JudgeBase):
 
     # ---- 共享小工具 -------------------------------------------------------
     def heartbeat_fields(self) -> dict:
-        """给心跳日志附加运行进度：total / done / remaining / ok / failed。
+        """给心跳日志附加运行进度，分两块：
 
-        - total：本场比赛当前提交总数，复用主循环每 tick 缓存的 _submission_total（不额外打 API）；
-        - done / ok / failed：取自上一个 tick 落盘的 submissions_summary.csv 的 status 分布，
-          done = 终态数（success/user_error/timeout/file_error），ok = success，failed = done - ok；
-        - remaining = total - done，涵盖「刚提交还没建目录」与 env_error（会重试）的提交。
+        单因子分析（提交维度，实时）：
+          - total：本场比赛当前提交总数，复用主循环每 tick 缓存的 _submission_total（不额外打 API）；
+          - done / ok / failed：直接扫各提交目录的 sfa_status.json 现场统计。这些状态文件是
+            on_submission 里每跑完一个立刻写的，故随每个提交完成实时前进——不像旧实现读
+            submissions_summary.csv（每个 tick 才刷新一次，会滞后一整个 tick）。
+            done = 终态数（success/user_error/timeout/file_error/lookahead），ok = success，
+            failed = done - ok；
+          - remaining = total - done，涵盖「刚提交还没建目录」与 env_error（会重试）的提交。
 
-        两个来源都最多滞后一个 tick；csv 尚未生成时只回退显示 total。
+        tick 阶段（on_tick 维度，实时）：
+          - stage：主循环此刻所处阶段，用于区分「在跑单因子分析」还是「在跑 on_tick 里的
+            因子池回归」。取值：
+                sfa      —— on_tick 已跑完，主循环 sleep + 等线程池里的单因子分析任务
+                sfa_rank —— on_tick 正在做单因子截面排名（A 项）
+                pool     —— on_tick 正在构建因子池
+                regression—— on_tick 正在跑因子池回归（B 项来源）
+                final    —— on_tick 正在合成最终得分
+                summary  —— on_tick 正在汇总运行结果；
+          - tick：已进入 on_tick 的次数（第几个 tick）；
+          - pool：最近一次因子池入池因子数；
+          - reg：回归耗时。进行中显示 f"{已跑秒数}s"，空闲显示上次耗时 f"{_reg_last}s"。
+
+        字段均用 getattr 兜底，兼容进程刚启动、on_tick / 回归尚未跑过的情况。
         """
         total = getattr(self, "_submission_total", None)
-        df = read_csv(self.submissions_summary_csv, logger=self.log)
-        if df is None or "status" not in df.columns:
-            return {"total": total} if total is not None else {}
-        counts = df["status"].value_counts().to_dict()
-        done = sum(counts.get(s, 0) for s in TERMINAL_STATUSES)
-        ok = counts.get(STATUS_SUCCESS, 0)
-        fields = {"total": total, "done": done, "ok": ok, "failed": done - ok}
+
+        # done / ok / failed：现场扫 sfa_status.json（实时，不依赖每 tick 才刷新的 csv）
+        done = ok = 0
+        if os.path.isdir(self.submission_dir):
+            for sid in os.listdir(self.submission_dir):
+                status = read_json(
+                    os.path.join(self.submission_dir, sid, self.sfa_status_file),
+                    logger=self.log,
+                )
+                st = (status or {}).get("status")
+                if st in TERMINAL_STATUSES:
+                    done += 1
+                    if st == STATUS_SUCCESS:
+                        ok += 1
+
+        fields: dict = {
+            "total": total,
+            "done": done,
+            "ok": ok,
+            "failed": done - ok,
+        }
         if total is not None:
             fields["remaining"] = total - done
+
+        # tick 阶段块
+        fields["stage"] = getattr(self, "_stage", "init")
+        fields["tick"] = getattr(self, "_tick_seq", 0)
+        pool = getattr(self, "_pool_size", None)
+        if pool is not None:
+            fields["pool"] = pool
+        reg_start = getattr(self, "_reg_start", None)
+        if reg_start is not None:
+            fields["reg"] = f"{int(time.time() - reg_start)}s"  # 回归进行中，实时秒数
+        else:
+            reg_last = getattr(self, "_reg_last", None)
+            if reg_last is not None:
+                fields["reg"] = f"{reg_last}s"                  # 上次回归耗时
         return fields
 
     def query_constraints(self) -> dict:

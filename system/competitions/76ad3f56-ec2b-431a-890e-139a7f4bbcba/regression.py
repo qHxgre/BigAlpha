@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 import pandas as pd
 
@@ -122,8 +123,16 @@ class RegressionMixin:
             cmd=["python3", "-c", "from judge_runner import judge_runner_main; judge_runner_main()"],
             runner_dir=self.regression_runner_dir,
         )
-        with log_timer() as elapsed:
-            runner.run(_raise=True)
+        # 回归子进程在主循环线程里同步跑，可能耗时数十秒到几分钟。把起始时刻挂到 self，
+        # 心跳线程据此显示「回归已跑 N 秒」（实时进行中）；结束后清空 _reg_start 并把耗时
+        # 存入 _reg_last，心跳空闲时显示上次耗时。见 heartbeat_fields。
+        self._reg_start = time.time()
+        try:
+            with log_timer() as elapsed:
+                runner.run(_raise=True)
+        finally:
+            self._reg_last = round(time.time() - self._reg_start, 1)
+            self._reg_start = None
         self.log.debug("regression.done", elapsed_ms=elapsed(), msg="因子池回归完成")
         return elapsed() / 1000.0
 

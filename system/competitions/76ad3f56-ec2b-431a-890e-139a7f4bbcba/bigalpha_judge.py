@@ -23,6 +23,18 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
 
     competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 
+    # 主循环阶段标签：on_tick 各步骤前赋值，供心跳线程读出「此刻在跑单因子还是 on_tick 里
+    # 的哪一步」。主线程写、心跳线程读，CPython 下字符串/整数赋值原子，读到旧值也无害。
+    #   sfa       —— on_tick 已跑完，主循环在 sleep + 等线程池里的单因子分析任务
+    #   sfa_rank  —— on_tick 正在做单因子截面排名（A 项）
+    #   pool      —— on_tick 正在构建因子池
+    #   regression—— on_tick 正在跑因子池回归
+    #   final     —— on_tick 正在合成最终得分
+    #   summary   —— on_tick 正在汇总运行结果
+    _stage: str = "init"
+    _tick_seq: int = 0        # 已进入 on_tick 的次数（第几个 tick）
+    _pool_size: int | None = None  # 最近一次因子池入池因子数
+
     def on_tick(self) -> None:
         """每个 tick 统一评分：截面排名(A) -> 构建因子池 -> 因子池回归(B) -> 合成最终得分。
 
@@ -34,8 +46,10 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
         INFO 输出到终端（见 _emit_tick_summary）。阶段失败仍按 error 单独打，便于定位。
         """
         stats: dict = {}
+        self._tick_seq += 1  # 本进程进入 on_tick 的次数，供心跳显示当前第几个 tick
 
         # 第一步：单因子横向排名（A 项），刷新 leaderboard_sfa.csv
+        self._stage = "sfa_rank"
         try:
             stats["sfa"] = self.score_sfa()
         except Exception as e:
@@ -43,13 +57,16 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
 
         # 第二步：用排名靠前的因子拼出因子池，并跑一次因子池回归（产出 B 项所需的 ModelScore）
         try:
-            stats["pool"] = self.save_factor_pool()
+            self._stage = "pool"
+            stats["pool"] = self._pool_size = self.save_factor_pool()
             if os.path.exists(self.factor_pool_path):
+                self._stage = "regression"
                 stats["reg_s"] = self.run_regression()
         except Exception as e:
             self.log.error("regression.failed", error=str(e), msg="因子池回归失败")
 
         # 第三步：合成最终得分 0.3*A + 0.7*B 并回写
+        self._stage = "final"
         try:
             final = self.score_final()
             stats["final"] = final.get("count")
@@ -58,10 +75,14 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
             self.log.error("final.failed", error=str(e), msg="合成最终得分失败")
 
         # 第四步：汇总各提交运行结果
+        self._stage = "summary"
         try:
             self.summarize_submissions()
         except Exception as e:
             self.log.error("summary.failed", error=str(e), msg="汇总提交运行结果失败")
+
+        # on_tick 走完：主循环接下来 sleep + 等线程池跑单因子分析，阶段回到 sfa。
+        self._stage = "sfa"
 
         # 收尾：把本轮各阶段数字暂存，供汇总成一行日志。
         # 非自适应时由本方法直接输出；自适应时交给 base 的计时包装在算出下一轮间隔后输出，
