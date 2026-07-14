@@ -33,7 +33,7 @@ class Judge(BigAlphaJudge):
     # cutoff 落在评估区间内、早于 DATE_END，检测时用户代码即便自行放宽查询上界也取不到 cutoff
     # 之后的行，偷看未来的因子会在 cutoff 附近出现差异而被检出。
     # 注意：financial 维度未做截断表，通过财务数据偷看未来暂不覆盖。
-    LOOKAHEAD_CUTOFF = "2025-03-31"
+    LOOKAHEAD_CUTOFF = "2025-03-31 23:59:59"
     LOOKAHEAD_DATASETS = {
         "bar1m": "bigalpha_2026_stock_bar1m_cut",
     }
