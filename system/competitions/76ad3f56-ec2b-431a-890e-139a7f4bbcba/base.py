@@ -285,10 +285,16 @@ class BigAlphaJudgeBase(JudgeBase):
         """
         total = getattr(self, "_submission_total", None)
 
-        # done / ok / failed：现场扫 sfa_status.json（实时，不依赖每 tick 才刷新的 csv）
+        # done / ok / failed：现场扫 sfa_status.json（实时，不依赖每 tick 才刷新的 csv）。
+        # 只统计仍在当前提交列表里的 sid：提交被删除后其目录/状态文件不会被清掉，若把这些
+        # 残留也算进 done，会出现 done>total、remaining 为负。用主循环缓存的 _submission_ids
+        # 过滤（与 _iter_submission_dirs 口径一致）；集合尚未就绪（进程刚启动）时不过滤。
+        live_ids = getattr(self, "_submission_ids", None)
         done = ok = 0
         if os.path.isdir(self.submission_dir):
             for sid in os.listdir(self.submission_dir):
+                if live_ids is not None and sid not in live_ids:
+                    continue
                 status = read_json(
                     os.path.join(self.submission_dir, sid, self.sfa_status_file),
                     logger=self.log,

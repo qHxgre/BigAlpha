@@ -385,8 +385,13 @@ class JudgeBase:
                     competition_id=self.competition_id,
                     constraints=self.query_constraints(),
                 )
-                # 缓存本场比赛当前的提交总数，供心跳附加进度字段时复用（不额外打 API）
-                self._submission_total = len(submissions)
+                # 缓存本场比赛当前的提交总数与 id 集合，供心跳附加进度字段时复用（不额外打 API）。
+                # 缓存 id 集合而非仅总数：提交被删除后其磁盘目录/状态文件不会被清掉，心跳若直接
+                # 扫目录统计会把这些残留也算进 done，导致 done>total、remaining 变负。心跳按此集合
+                # 过滤磁盘残留，与 _iter_submission_dirs 口径一致。整体重新赋值一个新 set，读线程
+                # （心跳）拿到的引用要么是旧集合要么是新集合，各自自洽，无需加锁。
+                self._submission_ids = {str(s.get("id")) for s in submissions}
+                self._submission_total = len(self._submission_ids)
 
                 # 过滤掉本进程已派发过的，剩下的入队执行
                 pending = [s for s in submissions if s.get("id") not in dispatched]
