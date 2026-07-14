@@ -182,14 +182,19 @@ class SFAMixin:
     # ---- 未来函数切窗检测 -------------------------------------------------
 
     def _remove_submission_products(self, submission: dict) -> None:
-        """删除该提交的 A 项产物，使其既不进单因子排名、也不进因子池。
+        """删除该提交进排名/回归所需的产物，使其既不进单因子排名、也不进因子池；
+        但**保留 raw_factor.parquet 作存档**，方便事后核对疑似未来函数的因子原始数据。
 
         score_sfa() 依赖 factor_analyze.json 进 A 项排名，save_factor_pool() 依赖
-        process_factor.parquet 进因子池；一并删掉 raw_factor.parquet（存档）。删除失败不影响
-        主流程（判 -2 已足以剔除），只记一行日志。
+        process_factor.parquet 进因子池——删掉这两份即可把该提交彻底挡在 A/B 两项之外。
+        raw_factor.parquet 只在 save_factor_pool 里「作为已入池因子的原始存档」被顺带读取，
+        入池与否完全由 process_factor 是否存在决定；process_factor 既已删除，该提交不会进池，
+        raw_factor 自然也不会进回归，故可安全保留。删除失败不影响主流程（判 -2 已足以剔除），
+        只记一行日志。
         """
         sub_dir = self.submission_path(submission)
-        for fname in (self.factor_analyze_file, self.process_factor_file, self.raw_factor_file):
+        # 注意：不含 raw_factor_file——留档但不参与回归（见上）。
+        for fname in (self.factor_analyze_file, self.process_factor_file):
             path = os.path.join(sub_dir, fname)
             try:
                 if os.path.exists(path):
@@ -202,9 +207,9 @@ class SFAMixin:
         date<=cutoff 上逐格比对。
 
         复算子进程用截断数据集（lookahead_datasets）跑 main 并落盘 raw_cut；比对
-        （detect_lookahead）在本主进程做。检出泄漏即判定命中：删除 A 项产物（不进排名/因子池）、
-        写 lookahead 状态（附判定证据）、回写 -2 分与「疑似有未来函数」提示。命中返回 True，
-        否则 False。
+        （detect_lookahead）在本主进程做。检出泄漏即判定命中：删除 A/B 两项所需产物（不进排名/
+        因子池，但保留 raw_factor 存档）、写 lookahead 状态（附判定证据）、回写 -2 分与「疑似有
+        未来函数」提示。命中返回 True，否则 False。
 
         检测本身的基础设施异常（读全窗产物失败、复算崩溃等）不判用户，记日志后保守放行
         （返回 False）。

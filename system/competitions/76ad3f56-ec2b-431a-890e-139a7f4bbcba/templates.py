@@ -27,12 +27,15 @@ __USER_CODE__
 
 def judge_runner_main():
     import json
+    import time
     import pandas as pd
 
     # 日期区间是「评估输出区间」：要求该区间内每个官方交易日都产出因子值（缺整天会被判不通过）。
     # 时序因子（滚动窗口/动量等）须在 __DATE_START__ 之前自行向前多取 warmup 历史，
     # 使输出覆盖到区间第一个交易日，否则会因缺交易日而被拒。
+    _t0 = time.perf_counter()
     factor_data = main(__DATASETS__, "__DATE_START__", "__DATE_END__")
+    print(f"[judge_runner] main() 全窗耗时 {time.perf_counter() - _t0:.2f}s", flush=True)
 
     from bigmodule import M
     result = M.bigalpha_eval._latest(
@@ -90,8 +93,23 @@ _LOOKAHEAD_TEMPLATE = '''
 __USER_CODE__
 
 def judge_runner_main():
+    import time
+    import pandas as pd
+
     # 只改 end_date 为截断日，其余入参与全窗完全一致；不跑 eval，直接把因子输出落盘。
+    _t0 = time.perf_counter()
     raw_cut = main(__DATASETS__, "__DATE_START__", "__CUTOFF__")
+    print(f"[judge_runner] main() 截断窗耗时 {time.perf_counter() - _t0:.2f}s", flush=True)
+
+    # 强制把返回数据裁到目标检验窗口 [__DATE_START__, __CUTOFF__]：
+    # 用户 main 可能没按 end_date 严格过滤输出（如把查询上界放宽了 buffer、或压根没裁），
+    # 导致 raw_cut 含窗口外的行。检测只比对 date <= cutoff 的格子，窗口外的行是噪声，
+    # 且会让存档的校验数据超出「用截断表跑 March」的语义，故在此按 date 硬裁到目标窗口。
+    _date = pd.to_datetime(raw_cut["date"]).dt.normalize()
+    _lo = pd.Timestamp("__DATE_START__").normalize()
+    _hi = pd.Timestamp("__CUTOFF__").normalize()
+    raw_cut = raw_cut[(_date >= _lo) & (_date <= _hi)]
+
     raw_cut.to_parquet("__RAW_FACTOR_CUT_FILE__")
 '''
 
