@@ -69,20 +69,27 @@ TASKS: list[dict] = [
         "task_key": "初始礼包",
         "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
     },
+    # ↓ 提交里程碑：每天跑 select_submission_milestones.py，把它打印的 TASKS 片段粘到这里 ↓
+    #   —— 那个脚本会自动取最新快照、并按 charge_records.csv 剔除已发过的人，
+    #      只输出「本次新达标」的候选文件（candidates_<里程碑>_<key>_<date>.json）。
+    #   下面是各里程碑的模板（label 带 -<key> 后缀，与脚本产出对齐；candidates_file 每天更新）。
     # {
-    #     "label": "BigAlpha2026首次提交宽币赠送",
+    #     "label": "BigAlpha2026首次提交宽币赠送-factor",
     #     "task_key": "首次提交",
-    #     "amounts": {CID_FACTOR: 288, CID_E2E: 5000, CID_OPEN: 288},
+    #     "amounts": {CID_FACTOR: 288},
+    #     "candidates_file": str(_CAND_DIR / "candidates_first_submit_factor_20260708.json"),
     # },
     # {
-    #     "label": "BigAlpha2026累计第5次提交宽币赠送",
+    #     "label": "BigAlpha2026累计第5次提交宽币赠送-factor",
     #     "task_key": "累计第5次提交",
-    #     "amounts": {CID_FACTOR: 480, CID_OPEN: 288},
+    #     "amounts": {CID_FACTOR: 480},
+    #     "candidates_file": str(_CAND_DIR / "candidates_cum5_factor_20260708.json"),
     # },
     # {
-    #     "label": "BigAlpha2026累计第10次提交宽币赠送",
+    #     "label": "BigAlpha2026累计第10次提交宽币赠送-factor",
     #     "task_key": "累计第10次提交",
     #     "amounts": {CID_FACTOR: 480},
+    #     "candidates_file": str(_CAND_DIR / "candidates_cum10_factor_20260708.json"),
     # },
     # {
     #     "label": "BigAlpha2026周榜前30%宽币赠送",
