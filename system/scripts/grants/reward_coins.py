@@ -47,7 +47,17 @@ CID_OPEN = "63dd885c-2488-4efd-9c61-9e3a536f172c"      # 赛道三 · AI 开放�
 # 任务定义：label 用于防重和统计，amounts 是各赛道的发放金额。
 # 不需要的任务直接注释掉即可。
 _CAND_DIR = REWARD_COINS_DIR
+
+# 提交里程碑：先跑 select_submission_milestones.py 生成 submission_counts.json
+# （{cid: {user_id: 提交次数}}），下面的任务用 counts_file + threshold 从中筛出达标者。
+#   - threshold：提交次数达标阈值（首次=1 / 累计第5次=5 / 累计第10次=10）。
+#   - 每个赛道一个独立 task（单赛道 amounts），因为不同赛道阈值对应的金额不同。
+#   - 「每个里程碑每人只发一次」由 load_history 按 label 剔重保证（历史发过则 to_charge=0），
+#     所以每天重跑安全，无需在候选里预先剔重。
+_COUNTS_FILE = str(_CAND_DIR / "submission_counts.json")
 TASKS: list[dict] = [
+    # ↓ 周榜前30%：先跑 select_top30.py 生成 candidates_top30_<key>_<date>.json，
+    #   每个赛道一个独立 task（单赛道 amounts + 对应 candidates_file）。需要时放开。↓
     # {
     #     # 周榜前30%（20260708 快照）· 因子赛道。
     #     # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
@@ -63,54 +73,36 @@ TASKS: list[dict] = [
     #     "amounts": {CID_E2E: 13920},
     #     "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260708.json"),
     # },
-    # ↓ 历史任务，需要时再放开 ↓
+    # 每个里程碑合并成一个 task（多赛道 amounts）：同一 user 在多个赛道都达标时，
+    # collect_targets 用 put() 取最大金额、只发一次；load_history 按这一个 label 剔重，
+    # 保证每人每里程碑只发一次、不重复。
     {
-        "label": "BigAlpha2026报名宽币赠送",
-        "task_key": "初始礼包",
-        "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+        "label": "BigAlpha2026首次提交宽币赠送",
+        "task_key": "首次提交",
+        "amounts": {CID_FACTOR: 288, CID_E2E: 5000, CID_OPEN: 288},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 1,
     },
-    # ↓ 提交里程碑：每天跑 select_submission_milestones.py，把它打印的 TASKS 片段粘到这里 ↓
-    #   —— 那个脚本会自动取最新快照、并按 charge_records.csv 剔除已发过的人，
-    #      只输出「本次新达标」的候选文件（candidates_<里程碑>_<key>_<date>.json）。
-    #   下面是各里程碑的模板（label 带 -<key> 后缀，与脚本产出对齐；candidates_file 每天更新）。
+    {
+        "label": "BigAlpha2026累计第5次提交宽币赠送",
+        "task_key": "累计第5次提交",
+        "amounts": {CID_FACTOR: 480},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 5,
+    },
+    {
+        "label": "BigAlpha2026累计第10次提交宽币赠送",
+        "task_key": "累计第10次提交",
+        "amounts": {CID_FACTOR: 480},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 10,
+    },
+
     # {
-    #     "label": "BigAlpha2026首次提交宽币赠送-factor",
-    #     "task_key": "首次提交",
-    #     "amounts": {CID_FACTOR: 288},
-    #     "candidates_file": str(_CAND_DIR / "candidates_first_submit_factor_20260708.json"),
-    # },
-    # {
-    #     "label": "BigAlpha2026累计第5次提交宽币赠送-factor",
-    #     "task_key": "累计第5次提交",
-    #     "amounts": {CID_FACTOR: 480},
-    #     "candidates_file": str(_CAND_DIR / "candidates_cum5_factor_20260708.json"),
-    # },
-    # {
-    #     "label": "BigAlpha2026累计第10次提交宽币赠送-factor",
-    #     "task_key": "累计第10次提交",
-    #     "amounts": {CID_FACTOR: 480},
-    #     "candidates_file": str(_CAND_DIR / "candidates_cum10_factor_20260708.json"),
-    # },
-    # {
-    #     "label": "BigAlpha2026周榜前30%宽币赠送",
-    #     "task_key": "周榜前30%",
-    #     "amounts": {CID_FACTOR: 768, CID_E2E: 13920, CID_OPEN: 288},
-    # },
-    # {
-    #     "label": "BigAlpha2026端到端按周滚动宽币赠送",
-    #     "task_key": "端到端按周滚动",
-    #     "amounts": {CID_E2E: 10000},
-    # },
-    # {
-    #     "label": "BigAlpha2026进入决赛宽币赠送",
-    #     "task_key": "进入决赛",
-    #     "amounts": {CID_FACTOR: 960, CID_E2E: 17400, CID_OPEN: 288},
-    # },
-    # {
-    #     "label": "BigAlpha2026社媒发帖宽币赠送",
-    #     "task_key": "社媒发帖",
-    #     "amounts": {CID_FACTOR: 288, CID_E2E: 5000, CID_OPEN: 288},
-    # },
+    #     "label": "BigAlpha2026报名宽币赠送",
+    #     "task_key": "初始礼包",
+    #     "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+    # }
 ]
 # ===== 配置：改这里就行 =====================================================
 # 两步流程开关："generate"（生成待审核计划）或 "charge"（按审核后的计划发币）。
@@ -135,7 +127,7 @@ PLAN_COLUMNS = [
 # 每次调用之间的间隔（秒），0 表示不限速。
 SLEEP_BETWEEN = 0.2
 
-DRY_RUN = True             # True 只预览；确认后改 False 真正写入
+DRY_RUN = False             # True 只预览；确认后改 False 真正写入
 
 # 测试模式：True 时只处理 TEST_USER_IDS，不读也不改任何 JSON 报名文件。
 TEST_MODE = False
@@ -160,6 +152,38 @@ def load_participants(cid: str) -> list[str]:
         print(f"{path} 应为 JSON 数组", file=sys.stderr)
         sys.exit(1)
     return [str(u).strip() for u in raw if str(u).strip()]
+
+
+def load_submission_counts(counts_file: str) -> dict[str, dict[str, int]]:
+    """读 select_submission_milestones.py 产出的 submission_counts.json。
+
+    结构为 {competition_id: {user_id: 提交次数}}。
+    """
+    try:
+        data = json.loads(Path(counts_file).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(
+            f"未找到提交次数文件: {counts_file}\n"
+            f"请先跑 select_submission_milestones.py 生成 submission_counts.json。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"{counts_file} 应为 {{competition_id: {{user_id: count}}}} 结构", file=sys.stderr)
+        sys.exit(1)
+    return data
+
+
+def milestone_candidates(task: dict, cid: str) -> set[str]:
+    """里程碑任务：从提交次数文件里筛出该赛道 submission_count>=threshold 的 user_id。"""
+    counts = load_submission_counts(task["counts_file"])
+    threshold = int(task.get("threshold", 1))
+    cid_counts = counts.get(cid) or {}
+    return {
+        str(uid).strip()
+        for uid, c in cid_counts.items()
+        if str(uid).strip() and int(c) >= threshold
+    }
 
 
 def load_task_candidates(task: dict) -> set[str] | None:
@@ -193,10 +217,21 @@ def collect_targets(task: dict) -> dict[str, int]:
 
     amounts = task.get("amounts")
     if amounts:
-        candidates = load_task_candidates(task)
+        # 里程碑任务：候选按赛道从提交次数文件筛（submission_count>=threshold）。
+        # 普通任务：candidates_file/candidates 给全局候选集（None=全体报名者）。
+        is_milestone = task.get("counts_file") is not None
+        candidates = None if is_milestone else load_task_candidates(task)
         for cid, amount in amounts.items():
+            # TEST_MODE：不筛达标条件（load_participants 已只返回 TEST_USER_IDS），
+            # 直接让测试用户进入每个赛道，仍走 put() 取最大金额，便于验证发币流程。
+            if TEST_MODE:
+                allowed = None
+            elif is_milestone:
+                allowed = milestone_candidates(task, cid)
+            else:
+                allowed = candidates
             for uid in load_participants(cid):
-                if candidates is not None and uid not in candidates:
+                if allowed is not None and uid not in allowed:
                     continue
                 put(uid, amount)
         if not targets:
