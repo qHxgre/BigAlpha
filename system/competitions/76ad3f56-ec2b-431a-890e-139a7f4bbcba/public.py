@@ -28,6 +28,16 @@ class Judge(BigAlphaJudge):
     DATE_START = "2025-03-01 00:00:00"
     DATE_END = "2025-11-30 23:59:59"
 
+    # 未来函数检测：用截断到 cutoff 的物理表复算 bar1m 维度。
+    # bigalpha_2026_stock_bar1m_cut 内容为原表「同下界、上界砍到 2025-03-31」（保留 warmup 历史）。
+    # cutoff 落在评估区间内、早于 DATE_END，检测时用户代码即便自行放宽查询上界也取不到 cutoff
+    # 之后的行，偷看未来的因子会在 cutoff 附近出现差异而被检出。
+    # 注意：financial 维度未做截断表，通过财务数据偷看未来暂不覆盖。
+    LOOKAHEAD_CUTOFF = "2025-03-31"
+    LOOKAHEAD_DATASETS = {
+        "bar1m": "bigalpha_2026_stock_bar1m_cut",
+    }
+
     # 自适应评估间隔：Elastic Net 计算量随全局因子数增长，间隔按上一轮实测耗时自调。
     #     t_next = max(k * t_last_run, t_min)，k = 1.5，t_min = 1 小时。
     # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。

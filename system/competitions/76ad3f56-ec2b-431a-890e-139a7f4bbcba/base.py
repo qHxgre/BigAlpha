@@ -50,13 +50,23 @@ class BigAlphaJudgeBase(JudgeBase):
     # 每个队伍最多入选因子池的因子数量
     FACTOR_POOL_TOP_N = 50
 
-    # ---- 未来函数切窗检测 -------------------------------------------------
-    # 单因子分析跑通后，对每个提交再在若干「截断日」上复算一次因子并与全窗输出逐格比对：
-    # 无未来函数的因子在 date<=cutoff 上两次结果应完全一致；出现超容差差异即判为未来函数。
-    # 命中直接判 -2 并剔除产物（不进 A 项排名、不进因子池），前端提示「疑似有未来函数」。
+    # ---- 未来函数截断表复算检测 -------------------------------------------
+    # 单因子分析跑通后，用「只截到 cutoff 的物理表」把用户代码再复算一次，与全窗输出在
+    # date<=cutoff 上逐格比对：无未来函数的因子两次结果应完全一致；偷看 cutoff 之后数据的
+    # 因子，因截断表取不到未来行、尾部因子值变化（NaN/缺行），即被检出。命中直接判 -2 并剔除
+    # 产物（不进 A 项排名、不进因子池），前端提示「疑似有未来函数」。
+    #
+    # 为什么用截断物理表而非只改 end_date：用户代码常自行把查询上界放宽 buffer（如 end_date+7d）
+    # 再去查物理表，只改 end_date 参数根本砍不掉它偷看的未来行。把物理表本身截到 cutoff，
+    # 才是数据可见性的硬边界，buffer 再大也取不到未来数据。
     LOOKAHEAD_ENABLED = True
-    # 截断分位：从全窗因子输出的交易日序列里按分位取截断日（落在真实交易日上），默认 50%/75%。
-    LOOKAHEAD_CUTOFF_RATIOS = (0.5, 0.75)
+    # 固定截断日（cutoff）：须落在 [DATE_START, DATE_END] 内的真实交易日，且 < DATE_END。
+    # 检测复算时 end_date 设为它，并把数据表换成截断到该日的物理表（见 LOOKAHEAD_DATASETS）。
+    LOOKAHEAD_CUTOFF: str = ""
+    # 截断数据表映射：{逻辑名: 截断物理表名}，逻辑名须是 DATASETS 的子集。
+    # 截断表须与原表「同下界」（保留一致的 warmup 历史，避免正常时序因子头部因缺 warmup 被误判）、
+    # 「上界砍到 cutoff」。未在此列出的逻辑名沿用 DATASETS 原表（该表维度不做截断，其未来函数无法检出）。
+    LOOKAHEAD_DATASETS: dict[str, str] = {}
     # 浮点比对容差（语义同 numpy.isclose）与判为泄漏所需的最小差异格占比。
     LOOKAHEAD_RTOL = 1e-5
     LOOKAHEAD_ATOL = 1e-8
@@ -213,13 +223,22 @@ class BigAlphaJudgeBase(JudgeBase):
             factor_analyze_file=self.factor_analyze_file,
         )
 
+    def lookahead_datasets(self) -> dict[str, str]:
+        """检测复算用的数据集映射：在 DATASETS 基础上，把 LOOKAHEAD_DATASETS 里声明了截断表的
+        逻辑名替换成截断物理表名，其余逻辑名沿用原表。用户代码只认逻辑名，无需改动即可在截断
+        数据上复算。"""
+        merged = dict(self.DATASETS)
+        merged.update(self.LOOKAHEAD_DATASETS)
+        return merged
+
     def JUDGE_LOOKAHEAD(self, cutoff: str) -> str:
-        """切窗复算 runner 模板：与 JUDGE_SFA 同一份用户代码，只把 end_date 换成 cutoff、
-        不跑 eval，只落盘截断窗 raw factor（比对由主进程 check_lookahead 完成）。
-        cutoff 参数化，故为方法而非 property。仍保留 __USER_CODE__ 占位符，由调用方替换。"""
+        """截断表复算 runner 模板：与 JUDGE_SFA 同一份用户代码，把 end_date 换成 cutoff、
+        数据表换成截断到 cutoff 的物理表，不跑 eval，只落盘截断窗 raw factor（比对由主进程
+        check_lookahead 完成）。cutoff 参数化，故为方法而非 property。
+        仍保留 __USER_CODE__ 占位符，由调用方替换。"""
         assert self.DATASETS and self.DATE_START, "子类必须设置 DATASETS / DATE_START"
         return templates.build_lookahead_runner(
-            datasets=self.DATASETS,
+            datasets=self.lookahead_datasets(),
             date_start=self.DATE_START,
             cutoff=cutoff,
             raw_factor_cut_file=self.raw_factor_cut_file(cutoff),
