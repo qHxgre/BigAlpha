@@ -4,6 +4,9 @@
 RAW_FACTOR_FILE = "raw_factor.parquet"
 PROCESS_FACTOR_FILE = "process_factor.parquet"
 FACTOR_ANALYZE_FILE = "factor_analyze.json"
+# 未来函数切窗检测的截断窗 raw factor 产物（每个截断日一份，文件名带 cutoff 后缀）。
+# 由 build_lookahead_runner 落盘，check_lookahead 读进来与全窗 raw_factor 比对。
+RAW_FACTOR_CUT_FILE = "raw_factor_cut.parquet"
 # 每个提交单因子分析的运行状态记录文件：无论成功/失败都会落盘一份，
 # is_done() 据此判断该提交是否已跑过，避免进程重启后重复执行（尤其是注定失败的提交）。
 SFA_STATUS_FILE = "sfa_status.json"
@@ -15,10 +18,12 @@ STATUS_USER_ERROR = "user_error"    # 用户代码本身报错（子进程非 0 
 STATUS_TIMEOUT = "timeout"          # 运行超时（被 judge kill）
 STATUS_FILE_ERROR = "file_error"    # 用户提交的文件本身有问题（缺失/数量不对/无法解析）
 STATUS_ENV_ERROR = "env_error"      # 评测环境自身问题（拉取/落盘/注入失败等）
+STATUS_LOOKAHEAD = "lookahead"      # 切窗复算检出疑似未来函数（用户侧终态，判 -2 并剔除产物）
 
-# 这些终态视为「已完成、不再重跑」：成功是真完成，用户报错/超时/文件错误再跑也是同样结果。
+# 这些终态视为「已完成、不再重跑」：成功是真完成，用户报错/超时/文件错误再跑也是同样结果；
+# lookahead 是切窗复算得到的确定性判定，重跑同样命中，故一并列为终态。
 # 唯独 env_error 不在此列——多半是临时性问题，重启/下个 tick 应当重试。
-TERMINAL_STATUSES = {STATUS_SUCCESS, STATUS_USER_ERROR, STATUS_TIMEOUT, STATUS_FILE_ERROR}
+TERMINAL_STATUSES = {STATUS_SUCCESS, STATUS_USER_ERROR, STATUS_TIMEOUT, STATUS_FILE_ERROR, STATUS_LOOKAHEAD}
 
 # 各失败状态回写给前端的提示语（统一记 -2 分）。
 STATUS_ERR_MSG = {
@@ -26,6 +31,7 @@ STATUS_ERR_MSG = {
     STATUS_USER_ERROR: "run error: check your code / get code templates in [code] tab",
     STATUS_FILE_ERROR: "file error: check your submission file (exactly 1 valid .ipynb expected)",
     STATUS_ENV_ERROR: "evaluation system error, will retry automatically",
+    STATUS_LOOKAHEAD: "疑似有未来函数，请检查",
 }
 
 

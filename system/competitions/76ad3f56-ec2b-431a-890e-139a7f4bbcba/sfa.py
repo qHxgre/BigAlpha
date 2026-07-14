@@ -20,6 +20,7 @@ from constants import (
     STATUS_ENV_ERROR,
     STATUS_ERR_MSG,
     STATUS_FILE_ERROR,
+    STATUS_LOOKAHEAD,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
     STATUS_USER_ERROR,
@@ -27,6 +28,7 @@ from constants import (
     SubmissionFileError,
 )
 from fileio import read_json
+from lookahead import detect_lookahead, pick_cutoffs
 
 
 class SFAMixin:
@@ -146,6 +148,12 @@ class SFAMixin:
                     self.save_submission_files(submission)
                     self.run_user_code(submission, self.JUDGE_SFA)
                 self.log.info("submission.sfa_done", elapsed_ms=elapsed(), msg="单因子分析完成")
+
+                # 单因子分析跑通后做未来函数切窗检测：命中则 check_lookahead 内部已删产物 +
+                # 写 lookahead 状态 + 回写 -2，这里直接返回，不再覆盖成 SUCCESS。
+                if self.LOOKAHEAD_ENABLED and self.check_lookahead(submission):
+                    return
+
                 self.write_sfa_status(submission, STATUS_SUCCESS, elapsed_ms=elapsed())
             except UserCodeRunError as e:
                 # 用户代码子进程异常退出，reason 区分「用户报错」与「超时」。两者都是终态。
@@ -164,6 +172,91 @@ class SFAMixin:
 
             # 跑通即可，等待 on_tick 统一做截面排名、因子池回归与最终评分。
             # submission.sfa_done 已记录成功，这里不再重复一行。
+
+    # ---- 未来函数切窗检测 -------------------------------------------------
+
+    def _remove_submission_products(self, submission: dict) -> None:
+        """删除该提交的 A 项产物，使其既不进单因子排名、也不进因子池。
+
+        score_sfa() 依赖 factor_analyze.json 进 A 项排名，save_factor_pool() 依赖
+        process_factor.parquet 进因子池；一并删掉 raw_factor.parquet（存档）。删除失败不影响
+        主流程（判 -2 已足以剔除），只记一行日志。
+        """
+        sub_dir = self.submission_path(submission)
+        for fname in (self.factor_analyze_file, self.process_factor_file, self.raw_factor_file):
+            path = os.path.join(sub_dir, fname)
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                self.log.error("lookahead.cleanup_failed", file=fname, error=str(e), msg="删除产物失败")
+
+    def check_lookahead(self, submission: dict) -> bool:
+        """切窗复算检测未来函数：在若干截断日上重跑用户代码并与全窗 raw factor 逐格比对。
+
+        切窗子进程只负责在 cutoff 上重跑 main 并落盘 raw_cut；比对（detect_lookahead）在本
+        主进程做。任一截断日检出泄漏即判定命中：删除 A 项产物（不进排名/因子池）、写 lookahead
+        状态（附判定证据）、回写 -2 分与「疑似有未来函数」提示。命中返回 True，否则 False。
+
+        检测本身的基础设施异常（读全窗产物失败、某截断日复算崩溃等）不判用户，记日志后
+        对该截断日跳过；全部截断日都无法判定时保守放行（返回 False）。
+        """
+        sub_dir = self.submission_path(submission)
+        full_path = os.path.join(sub_dir, self.raw_factor_file)
+        if not os.path.exists(full_path):
+            self.log.warning("lookahead.no_full", msg="缺全窗 raw factor，跳过切窗检测")
+            return False
+        try:
+            raw_full = pd.read_parquet(full_path)
+        except Exception as e:
+            self.log.error("lookahead.read_full_failed", error=str(e), msg="读全窗 raw factor 失败，跳过检测")
+            return False
+
+        cutoffs = pick_cutoffs(raw_full["date"], ratios=self.LOOKAHEAD_CUTOFF_RATIOS)
+        if not cutoffs:
+            self.log.warning("lookahead.no_cutoff", msg="交易日过少，无法选截断日，跳过检测")
+            return False
+
+        for cutoff in cutoffs:
+            # 切窗子进程只跑 main 落盘 raw_cut，比对（detect_lookahead）在本主进程做。
+            try:
+                self.run_user_code(submission, self.JUDGE_LOOKAHEAD(cutoff))
+                raw_cut = pd.read_parquet(os.path.join(sub_dir, self.raw_factor_cut_file(cutoff)))
+                result = detect_lookahead(
+                    raw_full, raw_cut, cutoff,
+                    rtol=self.LOOKAHEAD_RTOL,
+                    atol=self.LOOKAHEAD_ATOL,
+                    min_diff_ratio=self.LOOKAHEAD_MIN_DIFF_RATIO,
+                )
+            except Exception as e:
+                # 某截断日复算/比对失败属检测侧问题，不判用户，跳过该截断日继续下一个
+                self.log.error("lookahead.cutoff_failed", cutoff=cutoff, error=str(e), msg="切窗复算失败，跳过该截断日")
+                continue
+            if result.get("leaked"):
+                self.log.warning(
+                    "lookahead.detected",
+                    cutoff=cutoff,
+                    diff_ratio=result.get("diff_ratio"),
+                    max_abs_dev=result.get("max_abs_dev"),
+                    first_diff_date=result.get("first_diff_date"),
+                    leak_horizon_days=result.get("leak_horizon_days"),
+                    msg="切窗复算检出疑似未来函数",
+                )
+                self._remove_submission_products(submission)
+                self._fail_submission(
+                    submission,
+                    STATUS_LOOKAHEAD,
+                    cutoff=cutoff,
+                    diff_ratio=result.get("diff_ratio"),
+                    max_abs_dev=result.get("max_abs_dev"),
+                    first_diff_date=result.get("first_diff_date"),
+                    leak_horizon_days=result.get("leak_horizon_days"),
+                    sample=result.get("sample"),
+                )
+                return True
+
+        self.log.info("lookahead.passed", cutoffs=cutoffs, msg="切窗检测通过，无未来函数")
+        return False
 
     # ---- 单因子排名 (A) ---------------------------------------------------
 

@@ -50,6 +50,18 @@ class BigAlphaJudgeBase(JudgeBase):
     # 每个队伍最多入选因子池的因子数量
     FACTOR_POOL_TOP_N = 50
 
+    # ---- 未来函数切窗检测 -------------------------------------------------
+    # 单因子分析跑通后，对每个提交再在若干「截断日」上复算一次因子并与全窗输出逐格比对：
+    # 无未来函数的因子在 date<=cutoff 上两次结果应完全一致；出现超容差差异即判为未来函数。
+    # 命中直接判 -2 并剔除产物（不进 A 项排名、不进因子池），前端提示「疑似有未来函数」。
+    LOOKAHEAD_ENABLED = True
+    # 截断分位：从全窗因子输出的交易日序列里按分位取截断日（落在真实交易日上），默认 50%/75%。
+    LOOKAHEAD_CUTOFF_RATIOS = (0.5, 0.75)
+    # 浮点比对容差（语义同 numpy.isclose）与判为泄漏所需的最小差异格占比。
+    LOOKAHEAD_RTOL = 1e-5
+    LOOKAHEAD_ATOL = 1e-8
+    LOOKAHEAD_MIN_DIFF_RATIO = 1e-4
+
     # ---- 只跑部分提交（调试 / 复测用）------------------------------------
     # SUBMISSION_IDS 非空时，整条流水线只处理这些 submission id：主循环只拉取它们来跑用户
     # 代码，截面排名 / 回归 / 汇总也只遍历它们。留空（默认）则跑全量。子类（public/private）
@@ -137,6 +149,16 @@ class BigAlphaJudgeBase(JudgeBase):
     def sfa_status_file(self) -> str:
         return _with_suffix(constants.SFA_STATUS_FILE, self.mode_suffix)
 
+    def raw_factor_cut_file(self, cutoff: str) -> str:
+        """某个截断日对应的截断窗 raw factor 产物文件名（带 cutoff 与 mode 后缀）。
+
+        多个截断日各落一份、互不覆盖：raw_factor_cut.parquet -> raw_factor_cut_2025-06-30.parquet
+        （private 再叠加 _private 后缀）。
+        """
+        tag = str(cutoff).replace(":", "").replace(" ", "_")
+        base_name = _with_suffix(constants.RAW_FACTOR_CUT_FILE, f"_{tag}")
+        return _with_suffix(base_name, self.mode_suffix)
+
     # ---- 榜单目录下的产物 -------------------------------------------------
     @property
     def leaderboard_reg_csv(self) -> str:
@@ -189,6 +211,18 @@ class BigAlphaJudgeBase(JudgeBase):
             raw_factor_file=self.raw_factor_file,
             process_factor_file=self.process_factor_file,
             factor_analyze_file=self.factor_analyze_file,
+        )
+
+    def JUDGE_LOOKAHEAD(self, cutoff: str) -> str:
+        """切窗复算 runner 模板：与 JUDGE_SFA 同一份用户代码，只把 end_date 换成 cutoff、
+        不跑 eval，只落盘截断窗 raw factor（比对由主进程 check_lookahead 完成）。
+        cutoff 参数化，故为方法而非 property。仍保留 __USER_CODE__ 占位符，由调用方替换。"""
+        assert self.DATASETS and self.DATE_START, "子类必须设置 DATASETS / DATE_START"
+        return templates.build_lookahead_runner(
+            datasets=self.DATASETS,
+            date_start=self.DATE_START,
+            cutoff=cutoff,
+            raw_factor_cut_file=self.raw_factor_cut_file(cutoff),
         )
 
     @property

@@ -81,6 +81,21 @@ def judge_runner_main():
 '''
 
 
+# 未来函数切窗检测：只把用户代码在「截断窗」上再跑一次并落盘 raw factor，不做任何评估/比对。
+# 起点与全窗一致（同一 __DATE_START__、同样的 warmup），只把 end_date 换成截断日 __CUTOFF__。
+# 与 _SFA_TEMPLATE 复用同一份 __USER_CODE__，保证「同一段用户代码、只改评估结束日」这个唯一变量。
+# 比对（detect_lookahead）由评测主进程 sfa.py 读全窗/截窗两份 parquet 完成，子进程只产数据，
+# 因此这里不 import 任何检测代码，也不依赖 bigalpha_eval。
+_LOOKAHEAD_TEMPLATE = '''
+__USER_CODE__
+
+def judge_runner_main():
+    # 只改 end_date 为截断日，其余入参与全窗完全一致；不跑 eval，直接把因子输出落盘。
+    raw_cut = main(__DATASETS__, "__DATE_START__", "__CUTOFF__")
+    raw_cut.to_parquet("__RAW_FACTOR_CUT_FILE__")
+'''
+
+
 def build_sfa_runner(
     *,
     datasets: dict[str, str],
@@ -127,4 +142,25 @@ def build_reg_runner(
         .replace("__DATE_END__", date_end)
         .replace("__FACTOR_POOL_FILE__", factor_pool_file)
         .replace("__FACTOR_REGRESSION_SCORE__", factor_regression_score)
+    )
+
+
+def build_lookahead_runner(
+    *,
+    datasets: dict[str, str],
+    date_start: str,
+    cutoff: str,
+    raw_factor_cut_file: str,
+) -> str:
+    """注入数据集映射/起始日/截断日/产物路径，返回切窗复算 runner 模板。
+
+    与 build_sfa_runner 用同一份 __USER_CODE__（由调用方替换），差别只在评估结束日改成 cutoff
+    且不跑 eval，只落盘截断窗 raw factor，供评测主进程与全窗 raw_factor 比对。
+    """
+    return (
+        _LOOKAHEAD_TEMPLATE
+        .replace("__DATASETS__", repr(datasets))
+        .replace("__DATE_START__", date_start)
+        .replace("__CUTOFF__", cutoff)
+        .replace("__RAW_FACTOR_CUT_FILE__", raw_factor_cut_file)
     )
