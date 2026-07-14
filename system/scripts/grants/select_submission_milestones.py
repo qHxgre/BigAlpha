@@ -1,20 +1,21 @@
-"""从爬取的排行榜快照筛选"提交里程碑"用户，输出可直接喂给 reward_coins.py 的候选 user_id 名单。
+"""按接口查询每个 user_id 的累计提交次数，筛出"提交里程碑"用户，输出可直接喂给
+reward_coins.py 的候选 user_id 名单。
 
-与「周榜前30%」不同：周榜是每周固定评一次，提交里程碑是**每天**按最新快照滚动赠送——
-用户哪天攒够提交数就在哪天发，且**每个里程碑每人只发一次**。因此本脚本：
-    1. 默认自动取最新快照（最近日期目录里时间最晚的一份），无需每天手改日期；
-    2. 读 charge_records.csv，把已经领过该里程碑赠送的用户剔掉，只输出「本次新达标」的人。
+与「周榜前30%」不同：周榜每周固定评一次，提交里程碑是**每天**滚动赠送——用户哪天
+攒够提交数就在哪天发，且**每个里程碑每人只发一次**。因此本脚本每天跑一遍即可：
+    1. 走 AlphathonClient.list_submissions 拉每个赛道的全部提交，按 user_id 计数，
+       落一份 submission_counts_<cid>_<date>.json 存档（每天覆盖当天那份）；
+    2. 读 charge_records.csv，把已领过该里程碑赠送的用户剔掉，只输出「本次新达标」的人。
+
+提交次数口径（已与运营确认）：
+    - 数据源 = 该赛道全部 submission 记录（走接口，不依赖榜单快照）。
+    - 计数 = 按提交人 user_id 各自累计，即「谁点的提交算谁的」。
+      团队不共享次数：同队里没亲自提交的成员，其提交次数为 0、不达标。
 
 里程碑（与运营奖励规则一致，见 docs/others/宽币赠送_*.md）：
     - 首次提交       submission_count >= 1
     - 累计第5次提交   submission_count >= 5
     - 累计第10次提交  submission_count >= 10
-
-口径（与 select_top30.py 保持一致）：
-    - 数据源 = 该赛道榜单快照里的条目（队伍/个人混合），字段 submission_count。
-    - 达标 = submission_count >= 该里程碑阈值。
-    - 展开 = team 行取 members[] 全体 user_id；individual 行取自身 user_id；去重保序。
-    - 里程碑按赛道各自计数（队伍成员共享队伍的 submission_count）。
 
 剔重（关键，保证每天重跑不重复发）：
     - 每个里程碑有一个稳定的 base_label（不带日期），既是 reward_coins 里该任务的 label
@@ -26,9 +27,9 @@
 
 与 reward_coins.py 的对接（关键）：
     reward_coins.py 里一个 task 的 candidates_file 会作用于该 task amounts 的所有赛道，
-    而提交里程碑是「按赛道分别计数」的，跨赛道共用一个名单会误发。因此本脚本沿用
-    select_top30.py 的做法：按「里程碑 × 赛道」各出一个候选文件，并让每个赛道成为
-    reward_coins.py 里独立的一个 task（单赛道 amounts + 对应 candidates_file）。
+    而提交里程碑是「按赛道分别计数」的，跨赛道共用一个名单会误发。因此本脚本按
+    「里程碑 × 赛道」各出一个候选文件，并让每个赛道成为 reward_coins.py 里独立的一个
+    task（单赛道 amounts + 对应 candidates_file）。
 
     脚本结束会打印可直接粘贴进 reward_coins.py TASKS 的任务片段。
 
@@ -43,17 +44,15 @@ from __future__ import annotations
 import csv
 import json
 import sys
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
-from common.paths import LEADERBOARD_CRAWL_DIR, REWARD_COINS_DIR
+from common.client import AlphathonClient
+from common.paths import REWARD_COINS_DIR
 
 # ===== 配置 =================================================================
-# 快照选择：默认自动取最新（最近日期目录里时间最晚的一份），适配每天滚动赠送。
-# 需要复现历史某次筛选时，把它们填成具体值即可（如 "20260708" / "1500"）。
-SNAPSHOT_DATE: str | None = None   # None=自动取最近的日期目录
-SNAPSHOT_TIME: str | None = None   # None=该日期目录里时间最晚的一份
-
 # 主空间全零 UUID（与 reward_coins.py 对齐；发平台宽币用主空间）。
 SPACE_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -96,70 +95,32 @@ OUT_DIR = REWARD_COINS_DIR
 # ===========================================================================
 
 
-def expand_uids(row: dict) -> list[str]:
-    """把一条榜单记录展开成 user_id 列表：team 取全体成员，individual 取自身。"""
-    members = row.get("members") or []
-    if members:
-        return [str(m.get("user_id")).strip() for m in members if m.get("user_id")]
-    uid = row.get("user_id")
-    return [str(uid).strip()] if uid else []
+def count_submissions(client: AlphathonClient, cid: str) -> dict[str, int]:
+    """走接口拉该赛道全部提交，按提交人 user_id 各自累计计数。
 
-
-def latest_date_dir() -> Path:
-    """最近的一个日期目录（目录名形如 20260708，按名字排序取最大）。"""
-    dirs = sorted(p for p in LEADERBOARD_CRAWL_DIR.iterdir() if p.is_dir())
-    if not dirs:
-        raise SystemExit(f"{LEADERBOARD_CRAWL_DIR} 下没有任何日期目录，请先跑爬虫。")
-    return dirs[-1]
-
-
-def resolve_snapshot(cid: str) -> tuple[Path, str, str]:
-    """定位某赛道要用的快照，返回 (文件路径, 日期, 时间)。
-
-    SNAPSHOT_DATE/TIME 有值就用指定的；否则自动取最近日期目录里时间最晚的一份。
+    口径：谁点的提交算谁的，团队不共享次数（同队没亲自提交的成员计数为 0）。
     """
-    date_dir = LEADERBOARD_CRAWL_DIR / SNAPSHOT_DATE if SNAPSHOT_DATE else latest_date_dir()
-    date = date_dir.name
-    if not date_dir.exists():
-        raise SystemExit(f"未找到快照目录: {date_dir}")
-
-    if SNAPSHOT_TIME:
-        snap = date_dir / f"leaderboard_{cid}_{date}_{SNAPSHOT_TIME}.json"
-        if not snap.exists():
-            raise SystemExit(f"未找到指定快照: {snap}")
-        return snap, date, SNAPSHOT_TIME
-
-    cands = sorted(date_dir.glob(f"leaderboard_{cid}_{date}_*.json"))
-    if not cands:
-        raise SystemExit(f"{date_dir} 下没有赛道 {cid} 的快照。")
-    snap = cands[-1]  # 文件名内时间戳递增，最后一个即最新
-    return snap, date, snap.stem.rsplit("_", 1)[-1]
+    counts: dict[str, int] = defaultdict(int)
+    for sub in client.list_submissions(cid):
+        uid = str(sub.get("user_id") or "").strip()
+        if uid:
+            counts[uid] += 1
+    return dict(counts)
 
 
-def select_one(rows: list[dict], min_count: int) -> tuple[list[str], dict]:
-    """从榜单条目里筛出 submission_count >= min_count 的用户，返回 (去重保序 user_id 列表, 摘要)。"""
-    hit = [r for r in rows if (r.get("submission_count") or 0) >= min_count]
+def save_counts(counts: dict[str, int], cid: str, date: str) -> Path:
+    """把某赛道的 {user_id: 提交次数} 存档，便于回溯与人工核对。"""
+    out = OUT_DIR / f"submission_counts_{cid}_{date}.json"
+    ordered = dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+    out.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
 
-    uids: list[str] = []
-    seen: set[str] = set()
-    team_cnt = ind_cnt = 0
-    for r in hit:
-        if r.get("type") == "team":
-            team_cnt += 1
-        else:
-            ind_cnt += 1
-        for u in expand_uids(r):
-            if u not in seen:
-                seen.add(u)
-                uids.append(u)
 
-    summary = {
-        "hit_entries": len(hit),
-        "team_entries": team_cnt,
-        "individual_entries": ind_cnt,
-        "unique_users": len(uids),
-    }
-    return uids, summary
+def select_one(counts: dict[str, int], min_count: int) -> list[str]:
+    """从提交次数表里筛出 submission_count >= min_count 的 user_id（保序按次数降序）。"""
+    hit = [(uid, c) for uid, c in counts.items() if c >= min_count]
+    hit.sort(key=lambda kv: (-kv[1], kv[0]))
+    return [uid for uid, _ in hit]
 
 
 def load_rewarded(remark: str) -> set[str]:
@@ -200,14 +161,18 @@ def cid_const_name(cid: str) -> str:
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    date = f"{datetime.now():%Y%m%d}"
+    client = AlphathonClient()
 
-    # 先按赛道定位并读一次快照，供各里程碑复用；顺便打印用的是哪一份。
-    snapshots: dict[str, tuple[list[dict], str, str]] = {}
-    print("=== 使用的快照 ===")
-    for cid in CIDS:
-        snap, date, time = resolve_snapshot(cid)
-        snapshots[cid] = (json.loads(snap.read_text(encoding="utf-8")), date, time)
-        print(f"  [{CIDS[cid][1]}] {snap.name}")
+    # 先按赛道走接口拉一次提交次数，供各里程碑复用，并存档一份便于核对。
+    counts_by_cid: dict[str, dict[str, int]] = {}
+    print("=== 各赛道提交次数（走接口 list_submissions，按提交人 user_id 计数）===")
+    for cid, (key, name) in CIDS.items():
+        counts = count_submissions(client, cid)
+        counts_by_cid[cid] = counts
+        out = save_counts(counts, cid, date)
+        total_subs = sum(counts.values())
+        print(f"  [{name}] 提交人 {len(counts)} 人，累计提交 {total_subs} 次 -> {out.name}")
 
     # 收集所有生成的 task 片段，最后统一打印，方便粘进 reward_coins.py。
     task_snippets: list[str] = []
@@ -221,8 +186,7 @@ def main() -> None:
 
         for cid, amount in ms["amounts"].items():
             key, name = CIDS[cid]
-            rows, date, _time = snapshots[cid]
-            uids, s = select_one(rows, min_count)
+            uids = select_one(counts_by_cid[cid], min_count)
 
             new_uids = [u for u in uids if u not in rewarded]
             skipped = len(uids) - len(new_uids)
@@ -235,9 +199,7 @@ def main() -> None:
             label = f"{base_label}-{key}"
             print(
                 f"  [{name}] 单价 {amount}："
-                f"命中 {s['hit_entries']} 条"
-                f"（team {s['team_entries']} / 个人 {s['individual_entries']}），"
-                f"展开去重 {s['unique_users']} 人，"
+                f"达标 {len(uids)} 人，"
                 f"已发过 {skipped} 人，本次新达标 {len(new_uids)} 人，"
                 f"预计发币 {len(new_uids) * amount}"
                 f" -> {out.name}"
