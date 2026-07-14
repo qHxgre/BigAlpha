@@ -36,11 +36,16 @@ class SFAMixin:
 
     # ---- 运行用户/注入代码 -------------------------------------------------
 
-    def run_user_code(self, submission: dict, runner_code: str) -> LocalProcessUserRunner:
+    def run_user_code(
+        self, submission: dict, runner_code: str, runner_dir: str = None
+    ) -> LocalProcessUserRunner:
         """拉取用户代码、注入 runner 模板，并在隔离子进程中执行。
 
         与基类不同：runner_code 由调用方传入（当前为 JUDGE_SFA，跑单因子分析）。
         因子池回归不依赖用户代码，已独立到 run_regression()，不再走这里。
+
+        runner_dir 缺省用提交目录（全窗分析用）；未来函数截窗复算传独立子目录，
+        避免注入代码 judge_runner.py 与运行日志 stdout 覆盖全窗那两份。
         """
         sid = submission["id"]
         # ipynb 会被转成 .py 字符串，便于注入到 runner 模板中。
@@ -59,8 +64,9 @@ class SFAMixin:
             submission_id=sid,
             files={"judge_runner.py": injected},
             cmd=["python3", "-c", "from judge_runner import judge_runner_main; judge_runner_main()"],
-            # 运行目录与原始文件同目录，所有产物（含 stdout 日志）都收在该提交的文件夹下
-            runner_dir=self.submission_path(submission),
+            # 运行目录默认与原始文件同目录，所有产物（含 stdout 日志）都收在该提交的文件夹下；
+            # 截窗复算传独立子目录，与全窗产物隔离。
+            runner_dir=runner_dir or self.submission_path(submission),
         )
         runner.run(_raise=True)
         return runner
@@ -220,9 +226,12 @@ class SFAMixin:
             return False
 
         # 复算子进程用截断数据集跑 main 落盘 raw_cut，比对（detect_lookahead）在本主进程做。
+        # 截窗跑在提交目录的 lookahead/ 子目录里：注入代码 judge_runner.py、运行日志 stdout、
+        # raw_cut 产物都落到该子目录，与全窗那三份完全隔离，互不覆盖。
+        lookahead_dir = os.path.join(sub_dir, "lookahead")
         try:
-            self.run_user_code(submission, self.JUDGE_LOOKAHEAD(cutoff))
-            raw_cut = pd.read_parquet(os.path.join(sub_dir, self.raw_factor_cut_file(cutoff)))
+            self.run_user_code(submission, self.JUDGE_LOOKAHEAD(cutoff), runner_dir=lookahead_dir)
+            raw_cut = pd.read_parquet(os.path.join(lookahead_dir, self.raw_factor_cut_file(cutoff)))
             result = detect_lookahead(
                 raw_full, raw_cut, cutoff,
                 rtol=self.LOOKAHEAD_RTOL,
