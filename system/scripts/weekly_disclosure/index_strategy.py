@@ -8,10 +8,10 @@
 因此对外只展示相对基准的超额与相对强弱曲线（X 轴用交易日序号进一步隐藏时间），绝对口径
 指标仅落盘到本地 CSV 供内部追踪。
 
-数据来源（云端评测榜单目录 + dai）：
-    leaderboard_reg.csv     每个因子的 model_score，据此加权合成信号；
-    factor_pool.parquet     入池因子（已预处理）的因子值，date/instrument + 各因子列；
-    cn_stock_index_weight   000852.SH 成分权重（倾斜基准，dai 查询）。
+数据来源（云端评测榜单目录 + dai，按赛道走不同文件名，见 common.paths.resolve_leaderboard_files）：
+    赛道一 factor：leaderboard_reg.csv（factor/model_score） + factor_pool.parquet；
+    赛道二 e2e   ：leaderboard_score.csv（id/score）        + score_pool.parquet；
+    据排名权重加权合成信号后，叠加 cn_stock_index_weight（000852.SH 成分权重，dai 查询）倾斜基准。
 
 以 run(competition_id, leaderboard_dir, output_dir, date_str) 供 weekly_disclosure 调用，
 返回本需求的 Markdown 片段；业绩图 / 指标历史 CSV 落到 output_dir。
@@ -31,7 +31,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
 from common.disclosure import BENCHMARK, DEFAULT_COMPETITION_ID, zscore
-from common.paths import OUTPUT_DIR, resolve_leaderboard_dir
+from common.paths import OUTPUT_DIR, resolve_leaderboard_dir, resolve_leaderboard_files
 
 try:
     import dai
@@ -56,22 +56,26 @@ TRADING_DAYS = 252          # 年化系数（日频）
 # ---- 数据加载 ----------------------------------------------------------------
 
 
-def load_factor_weights(leaderboard_dir: str, top_k: int = TOP_K) -> pd.Series:
-    """读取 leaderboard_reg.csv，返回 model_score 最高的前 top_k 因子权重（归一化）。"""
-    reg_path = os.path.join(leaderboard_dir, "leaderboard_reg.csv")
+def load_factor_weights(leaderboard_dir: str, files: dict[str, str], top_k: int = TOP_K) -> pd.Series:
+    """读取赛道排名 CSV（factor: leaderboard_reg.csv；e2e: leaderboard_score.csv），
+    返回排名分数最高的前 top_k 因子/提交权重（归一化）。"""
+    id_col, score_col = files["id_col"], files["score_col"]
+    reg_path = os.path.join(leaderboard_dir, files["rank_csv"])
     reg = pd.read_csv(reg_path)
-    if not {"factor", "model_score"}.issubset(reg.columns):
-        raise ValueError(f"{reg_path} 缺少 factor/model_score 列: {list(reg.columns)}")
-    reg = reg.dropna(subset=["model_score"])
-    reg = reg[reg["model_score"] > 0]
-    top = reg.sort_values("model_score", ascending=False).head(top_k)
-    weights = top.set_index("factor")["model_score"]
+    if not {id_col, score_col}.issubset(reg.columns):
+        raise ValueError(f"{reg_path} 缺少 {id_col}/{score_col} 列: {list(reg.columns)}")
+    reg = reg.dropna(subset=[score_col])
+    reg = reg[reg[score_col] > 0]
+    top = reg.sort_values(score_col, ascending=False).head(top_k)
+    weights = top.set_index(id_col)[score_col]
     return weights / weights.sum()
 
 
-def load_factor_pool(leaderboard_dir: str, factors: list[str]) -> tuple[pd.DataFrame, list[str]]:
-    """读取因子池（已预处理），只保留 date/instrument + 命中的因子列。"""
-    pool_path = os.path.join(leaderboard_dir, "factor_pool.parquet")
+def load_factor_pool(
+    leaderboard_dir: str, files: dict[str, str], factors: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
+    """读取因子池/得分池（已预处理），只保留 date/instrument + 命中的列。"""
+    pool_path = os.path.join(leaderboard_dir, files["pool"])
     pool = pd.read_parquet(pool_path)
 
     present = [f for f in factors if f in pool.columns]
@@ -474,11 +478,12 @@ def run(
 ) -> str:
     """执行需求三并把业绩图 / 指标历史落到 output_dir，返回本需求的 Markdown 片段。"""
     output_dir.mkdir(parents=True, exist_ok=True)
+    files = resolve_leaderboard_files(competition_id)
 
-    print(f"[{datetime.now():%H:%M:%S}] [需求三] 读取因子回归权重...", file=sys.stderr)
-    weights = load_factor_weights(leaderboard_dir)
+    print(f"[{datetime.now():%H:%M:%S}] [需求三] 读取因子/提交排名权重...", file=sys.stderr)
+    weights = load_factor_weights(leaderboard_dir, files)
 
-    factor_pool, factors = load_factor_pool(leaderboard_dir, list(weights.index))
+    factor_pool, factors = load_factor_pool(leaderboard_dir, files, list(weights.index))
     print(f"[{datetime.now():%H:%M:%S}] [需求三] 合成信号（{len(factors)} 个因子）...", file=sys.stderr)
     signal = build_signal(factor_pool, weights, factors)
 

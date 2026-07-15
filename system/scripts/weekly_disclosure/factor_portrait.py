@@ -9,10 +9,11 @@
 公布的是聚合特征，仅以排名（Top1..Top10）匿名标识因子，不涉及具体构造逻辑，
 也不披露因子归属，不影响知识产权保护。
 
-数据来源（云端评测榜单目录）：
-    leaderboard_reg.csv     ModelScore（因子池回归得分），据此取前 10 因子；
-    factor_pool_raw.parquet 入池因子（原始）的因子值，date/instrument + 各因子列；
-    bigalpha_2026_exposure  BARRA 风格暴露 + 行业哑变量 + 下一期收益 ret（dai 查询）。
+数据来源（云端评测榜单目录，按赛道走不同文件名，见 common.paths.resolve_leaderboard_files）：
+    赛道一 factor：leaderboard_reg.csv（factor/model_score）+ factor_pool_raw.parquet；
+    赛道二 e2e   ：leaderboard_score.csv（id/score） + score_pool_raw.parquet；
+    据排名取前 10 后，从对应池的宽表里取因子/得分列，
+    再拉 bigalpha_2026_exposure：BARRA 风格暴露 + 行业哑变量 + 下一期收益 ret（dai 查询）。
 
 以 run(competition_id, leaderboard_dir, output_dir, date_str) 供 weekly_disclosure 调用，
 返回本需求的 Markdown 片段；图表 / CSV 落到 output_dir。
@@ -33,7 +34,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
 from common.disclosure import DEFAULT_COMPETITION_ID, zscore
-from common.paths import OUTPUT_DIR, resolve_leaderboard_dir
+from common.paths import OUTPUT_DIR, resolve_leaderboard_dir, resolve_leaderboard_files
 
 try:
     import dai
@@ -74,25 +75,27 @@ STYLE_NAME_CN = {
 # ---- 数据加载 ----------------------------------------------------------------
 
 
-def load_top_factors(leaderboard_dir: str, top_n: int = TOP_N) -> list[str]:
-    """读取 leaderboard_reg.csv，返回 ModelScore 排名前 top_n 的因子 id。"""
-    reg_path = os.path.join(leaderboard_dir, "leaderboard_reg.csv")
+def load_top_factors(leaderboard_dir: str, files: dict[str, str], top_n: int = TOP_N) -> list[str]:
+    """读取赛道排名 CSV（factor: leaderboard_reg.csv；e2e: leaderboard_score.csv），
+    返回排名分数前 top_n 的因子/提交 id。"""
+    id_col, score_col = files["id_col"], files["score_col"]
+    reg_path = os.path.join(leaderboard_dir, files["rank_csv"])
     reg = pd.read_csv(reg_path)
-    if not {"factor", "model_score"}.issubset(reg.columns):
-        raise ValueError(f"{reg_path} 缺少 factor/model_score 列: {list(reg.columns)}")
-    reg = reg.dropna(subset=["model_score"])
-    return list(reg.sort_values("model_score", ascending=False)["factor"].astype(str).values[:top_n])
+    if not {id_col, score_col}.issubset(reg.columns):
+        raise ValueError(f"{reg_path} 缺少 {id_col}/{score_col} 列: {list(reg.columns)}")
+    reg = reg.dropna(subset=[score_col])
+    return list(reg.sort_values(score_col, ascending=False)[id_col].astype(str).values[:top_n])
 
 
 def load_factor_data(
-    leaderboard_dir: str, submission_ids: list[str]
+    leaderboard_dir: str, files: dict[str, str], submission_ids: list[str]
 ) -> tuple[pd.DataFrame, list[str]]:
-    """读取因子池（原始）的因子值，只保留 date/instrument + 命中的前 N 因子列。
+    """读取因子池/得分池（原始）的因子值，只保留 date/instrument + 命中的前 N 列。
 
-    factor_pool_raw.parquet 是各队伍入池因子的宽表；前 10 因子理应都在其中，但个别因子
-    若因回归产物与因子池不同步而缺列，这里跳过并告警，避免整脚本因 KeyError 中断。
+    因子池/得分池宽表是各队伍入池因子（或提交打分）的宽表；前 10 理应都在其中，但个别
+    若因回归产物与池不同步而缺列，这里跳过并告警，避免整脚本因 KeyError 中断。
     """
-    pool_path = os.path.join(leaderboard_dir, "factor_pool_raw.parquet")
+    pool_path = os.path.join(leaderboard_dir, files["raw_pool"])
     pool = pd.read_parquet(pool_path)
 
     present = [sid for sid in submission_ids if sid in pool.columns]
@@ -334,11 +337,12 @@ def run(
 ) -> str:
     """执行需求一并把 CSV / 热力图落到 output_dir，返回本需求的 Markdown 片段。"""
     output_dir.mkdir(parents=True, exist_ok=True)
+    files = resolve_leaderboard_files(competition_id)
 
-    print(f"[{datetime.now():%H:%M:%S}] [需求一] 读取 ModelScore 前 {TOP_N} 因子...", file=sys.stderr)
-    submission_ids = load_top_factors(leaderboard_dir)
+    print(f"[{datetime.now():%H:%M:%S}] [需求一] 读取排名前 {TOP_N} 因子...", file=sys.stderr)
+    submission_ids = load_top_factors(leaderboard_dir, files)
 
-    factor_data, submission_ids = load_factor_data(leaderboard_dir, submission_ids)
+    factor_data, submission_ids = load_factor_data(leaderboard_dir, files, submission_ids)
     print(f"[{datetime.now():%H:%M:%S}] [需求一] 拉取风格暴露表...", file=sys.stderr)
     exposure_df = load_exposure(factor_data)
 

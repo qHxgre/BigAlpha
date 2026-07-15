@@ -40,6 +40,32 @@ def resolve_track(competition_id: str) -> str:
         )
     return track
 
+
+# 各赛道的榜单文件名 / 列名映射（weekly_disclosure 用它读取排名与因子池/得分池）：
+#   factor（赛道一）：leaderboard_reg.csv 的 factor/model_score，因子池宽表按因子 id 分列；
+#   e2e（赛道二）    ：leaderboard_score.csv 的 id/score，得分池宽表按 submission id 分列。
+TRACK_LEADERBOARD_FILES: dict[str, dict[str, str]] = {
+    "factor": {
+        "rank_csv": "leaderboard_reg.csv",
+        "id_col": "factor",
+        "score_col": "model_score",
+        "raw_pool": "factor_pool_raw.parquet",
+        "pool": "factor_pool.parquet",
+    },
+    "e2e": {
+        "rank_csv": "leaderboard_score.csv",
+        "id_col": "id",
+        "score_col": "score",
+        "raw_pool": "score_pool_raw.parquet",
+        "pool": "score_pool.parquet",
+    },
+}
+
+
+def resolve_leaderboard_files(competition_id: str) -> dict[str, str]:
+    """按赛道返回该比赛榜单排名 CSV 与因子池/得分池 parquet 的文件名/列名映射。"""
+    return TRACK_LEADERBOARD_FILES[resolve_track(competition_id)]
+
 # 各用途子目录（脚本产出/读取的本地数据都在这里）
 PARTICIPANTS_DIR = DATA_ROOT / "participants"
 REWARD_COINS_DIR = DATA_ROOT / "reward_coins"
@@ -51,25 +77,33 @@ SQL_DIR = DATA_ROOT / "sql"
 WEEKLY_DISCLOSURE_DIR = DATA_ROOT / "weekly_disclosure"
 OUTPUT_DIR = WEEKLY_DISCLOSURE_DIR
 
-# 榜单目录（由评测系统产出，落在本地 DATA_ROOT/leaderboard/<competition_id>）。
+# 云端评测系统产出的榜单目录：system/files/<competition_id>/leaderboard（只读，与 scripts 数据平级）。
+REMOTE_LEADERBOARD_BASE = FILES_ROOT
+
+# 榜单目录（本地回归测试用，落在 DATA_ROOT/leaderboard/<competition_id>）。
 LOCAL_LEADERBOARD_BASE = DATA_ROOT / "leaderboard"
 # 兼容旧名
 LOCAL_LEADERBOARD_FALLBACK = LOCAL_LEADERBOARD_BASE
 
 
 def resolve_leaderboard_dir(competition_id: str) -> str:
-    """定位榜单目录：使用 DATA_ROOT/leaderboard/<competition_id>，
-    子目录内若还有一层 leaderboard/ 则进入（新评测系统布局）；
-    缺失时回退到 DATA_ROOT/leaderboard（兼容旧布局）。"""
+    """定位榜单目录，按优先级：
+    1) 云端评测系统产出：system/files/<competition_id>/leaderboard；
+    2) 本地回归测试：DATA_ROOT/leaderboard/<competition_id>
+       （子目录内若还有一层 leaderboard/ 则进入，兼容新评测系统布局）；
+    3) 均缺失时回退到 DATA_ROOT/leaderboard（兼容旧布局）。"""
+    remote_dir = REMOTE_LEADERBOARD_BASE / competition_id / "leaderboard"
+    if os.path.isdir(remote_dir):
+        return str(remote_dir)
+
     local_by_id = LOCAL_LEADERBOARD_BASE / competition_id
     if os.path.isdir(local_by_id):
-        # 子目录内若还有一层 leaderboard/ 则进入（新评测系统布局）
         nested = local_by_id / "leaderboard"
         if os.path.isdir(nested):
             return str(nested)
         return str(local_by_id)
     print(
-        f"  [提示] 按ID本地目录不存在，回退到: {LOCAL_LEADERBOARD_BASE}",
+        f"  [提示] 云端/本地按ID目录均不存在，回退到: {LOCAL_LEADERBOARD_BASE}",
         file=sys.stderr,
     )
     return str(LOCAL_LEADERBOARD_BASE)

@@ -11,7 +11,7 @@
 用法：
     python weekly_disclosure.py [competition_id]
 
-    competition_id 默认：76ad3f56-ec2b-431a-890e-139a7f4bbcba
+    competition_id 默认取本文件的 COMPETITION_ID 变量；不改代码也可命令行传参覆盖。
 
 输出（weekly_disclosure 输出目录，见 common.paths.OUTPUT_DIR）：
     factor_style_exposure_<date>.csv / .png    需求一：风格暴露
@@ -36,6 +36,10 @@ import factor_portrait
 import index_strategy
 from common.disclosure import DEFAULT_COMPETITION_ID
 from common.paths import OUTPUT_DIR, resolve_leaderboard_dir
+
+# 523f9302-5b4b-42bd-bce1-f232e7c74316  赛道二 · e2e
+# 76ad3f56-ec2b-431a-890e-139a7f4bbcba  赛道一 · factor
+COMPETITION_ID = DEFAULT_COMPETITION_ID  # ← 在此修改目标比赛 ID；命令行传参优先级更高
 
 
 def _run_section(name: str, fn) -> str:
@@ -63,7 +67,7 @@ def build_markdown(competition_id: str, date_str: str, sections: list[str]) -> s
 
 
 def main(argv: list[str]) -> int:
-    competition_id = argv[0] if argv else DEFAULT_COMPETITION_ID
+    competition_id = argv[0] if argv else COMPETITION_ID
     leaderboard_dir = resolve_leaderboard_dir(competition_id)
     date_str = datetime.now().strftime("%Y%m%d")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
