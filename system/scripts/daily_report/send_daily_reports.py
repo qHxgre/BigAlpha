@@ -45,8 +45,8 @@ except ImportError:
 # 目标比赛 ID：控制发哪个比赛的站内信。命令行传入 argv[0] 可覆盖此默认值。
 #   523f9302-5b4b-42bd-bce1-f232e7c74316
 #   76ad3f56-ec2b-431a-890e-139a7f4bbcba
-# COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
+COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+# COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 
 DRY_RUN = False                 # True 只预览，不发送、不回写 ledger；确认后改 False
 

@@ -98,11 +98,11 @@ TASKS: list[dict] = [
         "threshold": 10,
     },
 
-    # {
-    #     "label": "BigAlpha2026报名宽币赠送",
-    #     "task_key": "初始礼包",
-    #     "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
-    # }
+    {
+        "label": "BigAlpha2026报名宽币赠送",
+        "task_key": "初始礼包",
+        "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+    }
 ]
 # ===== 配置：改这里就行 =====================================================
 # 两步流程开关："generate"（生成待审核计划）或 "charge"（按审核后的计划发币）。

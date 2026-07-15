@@ -23,6 +23,23 @@ FILES_ROOT = _SYSTEM_DIR / "files"
 # 默认比赛 ID（放在无重依赖的 paths 里，disclosure 再从此处 re-export）。
 DEFAULT_COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 
+# 赛道标识：不同赛道的榜单文件名/列名不同（factor 用 leaderboard_reg.csv + factor/model_score，
+# e2e 用 leaderboard_score.csv + id/score），需要 track 区分处理逻辑。
+TRACK_BY_COMPETITION = {
+    "76ad3f56-ec2b-431a-890e-139a7f4bbcba": "factor",   # 赛道一 · AI 因子挖掘
+    "523f9302-5b4b-42bd-bce1-f232e7c74316": "e2e",       # 赛道二 · 端到端 AI 量化模型
+}
+
+
+def resolve_track(competition_id: str) -> str:
+    """把 competition_id 映射到赛道标识（"factor" / "e2e"），未注册的 ID 直接报错。"""
+    track = TRACK_BY_COMPETITION.get(competition_id)
+    if track is None:
+        raise ValueError(
+            f"未知的 competition_id: {competition_id}，请先在 TRACK_BY_COMPETITION 中注册赛道"
+        )
+    return track
+
 # 各用途子目录（脚本产出/读取的本地数据都在这里）
 PARTICIPANTS_DIR = DATA_ROOT / "participants"
 REWARD_COINS_DIR = DATA_ROOT / "reward_coins"

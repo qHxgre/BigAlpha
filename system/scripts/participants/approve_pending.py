@@ -32,7 +32,7 @@ COMPETITION_IDS = [
 ]
 TARGET_STATUS = "approved_join_space"      # 目标状态：通过并加入空间
 SOURCE_STATUSES = {"pending", "approved"}  # 要处理的源状态（不含 rejected）
-DRY_RUN = True                             # True 只预览；确认后改 False 真正写入
+DRY_RUN = False                            # True 只预览；确认后改 False 真正写入
 # ===========================================================================
 
 
@@ -44,16 +44,17 @@ def approve_competition(client: AlphathonClient, competition_id: str) -> None:
     print(f"\n=== 比赛 {competition_id}  待处理 {len(todo)} 人 ===")
     for u in todo:
         record_id = str(u.get("id"))
-        name = (u.get("data") or {}).get("name") or str(u.get("user_id"))
+        user_id = str(u.get("user_id"))
+        name = (u.get("data") or {}).get("name") or user_id
         cur = u.get("status")
         if DRY_RUN:
-            print(f"  [dry-run] {name}  ({record_id})  {cur} -> {TARGET_STATUS}")
+            print(f"  [dry-run] {name}  ({user_id})  {cur} -> {TARGET_STATUS}")
             continue
         try:
             client.update_user_status(record_id, TARGET_STATUS)
-            print(f"  [ok] {name}  ({record_id})  {cur} -> {TARGET_STATUS}")
+            print(f"  [ok] {name}  ({user_id})  {cur} -> {TARGET_STATUS}")
         except Exception as e:  # noqa: BLE001 — 单条失败不影响其他人
-            print(f"  [失败] {name}  ({record_id})  {cur}: {e}")
+            print(f"  [失败] {name}  ({user_id})  {cur}: {e}")
 
 
 if __name__ == "__main__":
