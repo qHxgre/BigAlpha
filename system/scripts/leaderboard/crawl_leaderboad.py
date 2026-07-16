@@ -5,7 +5,8 @@
 （common.paths.LEADERBOARD_CRAWL_DIR：system/files/scripts/leaderboard_crawl）：
 
     leaderboard_<competition_id>.json   完整原始条目（含团队成员明细）
-    leaderboard_<competition_id>.csv    扁平化后的榜单（每行一个团队/个人）
+    leaderboard_<competition_id>.csv    扁平化后的榜单（每行一个团队/个人，
+                                         个人条目的 team_name 列用参赛者姓名填充）
 
 默认行为（不带参数直接运行）：
     早上启动脚本后一直挂着，在每天 14:50–15:30 之间每隔 5 分钟爬取一次，
@@ -40,6 +41,7 @@ import pandas as pd
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common...` 可用
+from common.client import AlphathonClient
 from common.paths import LEADERBOARD_CRAWL_DIR
 
 DEFAULT_BASE_URL = "https://bigquant.com/bigapis/alphathon/v1"
@@ -53,7 +55,7 @@ DEFAULT_COMPETITION_IDS = [
 OUT_DIR = LEADERBOARD_CRAWL_DIR
 
 # 定时爬取窗口，可用环境变量覆盖
-CRAWL_START = os.getenv("ALPHATHON_CRAWL_START", "14:50")
+CRAWL_START = os.getenv("ALPHATHON_CRAWL_START", "10:00")
 CRAWL_END = os.getenv("ALPHATHON_CRAWL_END", "15:30")
 CRAWL_INTERVAL = int(os.getenv("ALPHATHON_CRAWL_INTERVAL", "300"))
 
@@ -88,18 +90,43 @@ def fetch_leaderboard(competition_id: str, page_size: int = 1000, max_pages: int
     return results
 
 
-def flatten_leaderboard(items: list[dict[str, Any]]) -> pd.DataFrame:
-    """把排行榜条目扁平化成一行一个团队/个人，团队成员数放到 member_count 列。"""
+def build_name_map(competition_id: str) -> dict[str, str]:
+    """拉某场比赛的参赛者名单，返回 {user_id: 姓名}，查不到姓名时不放进去。"""
+    name_map: dict[str, str] = {}
+    try:
+        client = AlphathonClient()
+        for u in client.list_users(competition_id):
+            user_id = str(u.get("user_id"))
+            name = (u.get("data") or {}).get("name")
+            if name:
+                name_map[user_id] = name
+    except Exception as exc:  # 名单查不到不应该影响排行榜落地
+        print(f"  警告：拉取参赛者名单失败（{competition_id}）：{exc}", file=sys.stderr)
+    return name_map
+
+
+def flatten_leaderboard(items: list[dict[str, Any]], name_map: dict[str, str] | None = None) -> pd.DataFrame:
+    """把排行榜条目扁平化成一行一个团队/个人，团队成员数放到 member_count 列。
+
+    个人条目（type == "individual"）本身没有 team_name，这里用参赛者姓名（name_map）填充，
+    查不到姓名时回退成 user_id。
+    """
+    name_map = name_map or {}
     rows: list[dict[str, Any]] = []
     for it in items:
         members = it.get("members") or []
+        is_individual = it.get("type") == "individual"
+        user_id = it.get("user_id")
+        team_name = it.get("team_name")
+        if is_individual:
+            team_name = name_map.get(str(user_id), str(user_id))
         rows.append(
             {
                 "rank":                 it.get("rank"),
                 "type":                 it.get("type"),
                 "team_id":              it.get("team_id"),
-                "team_name":            it.get("team_name"),
-                "user_id":              it.get("user_id"),
+                "team_name":            team_name,
+                "user_id":              user_id,
                 "public_score":         it.get("public_score"),
                 "private_score":        it.get("private_score"),
                 "submission_count":     it.get("submission_count"),
@@ -122,7 +149,8 @@ def crawl_one(competition_id: str, out_dir: Path, stamp: str) -> int:
         json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    df = flatten_leaderboard(items)
+    name_map = build_name_map(competition_id)
+    df = flatten_leaderboard(items, name_map)
     csv_path = out_dir / f"leaderboard_{competition_id}_{stamp}.csv"
     df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 

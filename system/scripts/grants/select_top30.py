@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common
 from common.paths import LEADERBOARD_CRAWL_DIR, REWARD_COINS_DIR
 
 # ===== 配置 =================================================================
-SNAPSHOT_DATE = "20260708"     # 快照日期目录
+SNAPSHOT_DATE = "20260715"     # 快照日期目录
 SNAPSHOT_TIME = "1500"         # 以接近 15:00 的快照为准
 TOP_RATIO = 0.30               # 取前 30%
 
@@ -72,14 +72,20 @@ def select_one(cid: str) -> tuple[list[str], dict]:
                 seen.add(u)
                 uids.append(u)
 
+    last = top[-1] if top else None
+    last_name = (last.get("team_name") if last and last.get("type") == "team"
+                 else last.get("user_id")) if last else None
+
     summary = {
         "snapshot": snap.name,
+        "total_entries": len(rows),
         "pool_size": len(pool),
         "top_n_entries": n_top,
         "team_entries": team_cnt,
         "individual_entries": ind_cnt,
         "unique_users": len(uids),
-        "cutoff_rank_score": top[-1].get("public_score") if top else None,
+        "cutoff_rank_score": last.get("public_score") if last else None,
+        "cutoff_entry_name": last_name,
     }
     return uids, summary
 
@@ -97,9 +103,11 @@ def main() -> None:
         )
         print(f"\n=== {name} (单价 {amt}) ===")
         print(f"  快照       : {s['snapshot']}")
+        print(f"  参赛总数   : {s['total_entries']} 条")
         print(f"  submission>0池: {s['pool_size']} 条")
         print(f"  前{int(TOP_RATIO*100)}% 取     : {s['top_n_entries']} 条"
               f"（team {s['team_entries']} / 个人 {s['individual_entries']}）")
+        print(f"  末位队伍/用户: {s['cutoff_entry_name']}")
         print(f"  末位分数   : {s['cutoff_rank_score']}")
         print(f"  展开去重   : {s['unique_users']} 人")
         print(f"  预计发币   : {s['unique_users'] * amt}")
