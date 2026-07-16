@@ -69,6 +69,7 @@ def resolve_leaderboard_files(competition_id: str) -> dict[str, str]:
 # 各用途子目录（脚本产出/读取的本地数据都在这里）
 PARTICIPANTS_DIR = DATA_ROOT / "participants"
 REWARD_COINS_DIR = DATA_ROOT / "reward_coins"
+NOTICE_DIR = DATA_ROOT / "notices"
 DAILY_REPORTS_DIR = DATA_ROOT / "daily_reports"
 LEADERBOARD_CRAWL_DIR = DATA_ROOT / "leaderboard_crawl"
 SQL_DIR = DATA_ROOT / "sql"
