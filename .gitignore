@@ -16,6 +16,7 @@ __pycache__/
 mineru/
 
 .claude/
+.vscode/
 
 # 忽略 ppt 目录
 ppt/
