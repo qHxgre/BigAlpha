@@ -7,14 +7,23 @@
 本类只在比赛目录内继承并重写 _run_code，不改动 alphathonapiserver 框架代码：
     1. 用 preexec_fn + RLIMIT_AS 给用户子进程设虚拟内存上限，超限时只有该子进程自身
        malloc 失败（抛 MemoryError 非 0 退出），不会波及 judge 主进程与其它评测；
+       同一 preexec_fn 里再加 RLIMIT_FSIZE，限制单个文件写出大小，作为磁盘写满的第一道闸；
     2. 子进程非 0 退出时，扫描其 stdout 日志尾部识别是否为内存溢出（MemoryError /
        Cannot allocate memory / std::bad_alloc / CUDA out of memory 等），是则以
        reason="oom" 抛出，并把日志尾部一并带出，供上层单独记状态与留存日志。
+    3. 起子进程前，把所有会写大文件的缓存/临时目录（HuggingFace / torch / pip / TMPDIR / $HOME）
+       强制重定向到本提交目录下（持久卷 BeeGFS），而非容器可写层（ephemeral）。端到端赛道跑的是
+       陌生用户提交，无法指望用户自己 export 这些变量，故由平台在起进程时注入 env 兜底。这样
+       ephemeral 占用能压回几百 MB，不再触发 K8s 的 ephemeral-storage 驱逐（把整个 pod 连同
+       judge 主进程一起打挂）；
+    4. 子进程结束后（无论成功/失败），清掉这些缓存/临时目录，只保留产物（parquet / stdout /
+       状态文件）。模型权重等缓存可重新下载，没必要长期占用持久卷（该卷已接近写满）。
 """
 from __future__ import annotations
 
 import os
 import resource
+import shutil
 import subprocess
 import threading
 import time
@@ -24,6 +33,15 @@ import structlog
 from judge.runner import LocalProcessUserRunner, UserCodeRunError
 
 logger = structlog.get_logger()
+
+# 起子进程前，重定向到本提交目录下的缓存/临时子目录名；跑完统一按这些名字清理。
+# 相对 runner_dir，故各提交天然隔离、互不干扰。
+SCRATCH_DIRNAMES = (".cache", "tmp")
+
+# 单个文件写出大小上限（RLIMIT_FSIZE，字节）。限的是「单文件」不是「总量」，
+# 目的是拦住失控写出的超大文件（如把整张表 dump 成一个几百 GB 的文件），
+# 而不误伤正常产物（模型权重分片、parquet 一般远小于此）。总量控制靠跑完清理。
+FSIZE_LIMIT = 200 * 1024**3  # 200 GiB / 单文件
 
 # 识别「内存溢出」的日志特征串（大小写不敏感匹配）。
 # 覆盖主机内存溢出（RLIMIT_AS 触发的 MemoryError / glibc 的 Cannot allocate memory /
@@ -65,10 +83,78 @@ class MemoryLimitedUserRunner(LocalProcessUserRunner):
         low = log_tail.lower()
         return any(marker in low for marker in OOM_MARKERS)
 
+    def _scratch_env(self) -> dict:
+        """构造注入给用户子进程的环境变量：把所有会写大文件的缓存/临时目录重定向到
+        本提交目录（持久卷）下，避免写满容器 ephemeral 层触发 pod 驱逐。
+
+        继承 judge 主进程的完整环境，只覆盖缓存/临时相关的键，并提前把目录建好
+        （HuggingFace/pip 等库遇到不存在的父目录时行为不一，先建好最稳妥）。
+        """
+        env = dict(os.environ)
+        cache_root = os.path.join(self.runner_dir, ".cache")
+        tmp_dir = os.path.join(self.runner_dir, "tmp")
+        hf_home = os.path.join(cache_root, "huggingface")
+        env.update({
+            # $HOME 兜底：很多库（含未显式支持 HF_HOME 的老版本）按 ~/.cache 落缓存。
+            "HOME": self.runner_dir,
+            "TMPDIR": tmp_dir,
+            # HuggingFace：新老版本认的 key 不同，一并设上覆盖全。
+            "HF_HOME": hf_home,
+            "HUGGINGFACE_HUB_CACHE": hf_home,
+            "HF_HUB_CACHE": hf_home,
+            "TRANSFORMERS_CACHE": hf_home,
+            # torch.hub / 预训练权重
+            "TORCH_HOME": os.path.join(cache_root, "torch"),
+            # XDG 规范缓存根（部分库按此落盘）
+            "XDG_CACHE_HOME": cache_root,
+            # pip 运行时缓存
+            "PIP_CACHE_DIR": os.path.join(cache_root, "pip"),
+        })
+        for path in (cache_root, tmp_dir, hf_home,
+                     os.path.join(cache_root, "torch"), os.path.join(cache_root, "pip")):
+            os.makedirs(path, exist_ok=True)
+        return env
+
+    def _cleanup_scratch(self) -> None:
+        """跑完清理本提交目录下的缓存/临时目录，只保留产物（parquet/stdout/状态文件）。
+
+        模型权重等缓存可重新下载，没必要长期占用持久卷（该卷已接近写满）。
+        清理失败只记日志、不影响主流程（产物已落盘，评分不受影响）。
+        """
+        for name in SCRATCH_DIRNAMES:
+            target = os.path.join(self.runner_dir, name)
+            if not os.path.isdir(target):
+                continue
+            try:
+                shutil.rmtree(target, ignore_errors=True)
+            except Exception as e:
+                logger.warning(
+                    "runner.cleanup_failed",
+                    submission_id=self.submission_id,
+                    path=target,
+                    error=str(e),
+                )
+
     def _run_code(self) -> int:
-        def _limit_memory() -> None:
+        """跑用户子进程，无论成功/超时/OOM/报错，结束后都清理缓存/临时目录。
+
+        清理放在 finally：_run_code_inner 在超时/非 0 退出时会抛 UserCodeRunError，
+        产物此时已落盘，缓存/临时目录不再需要，清掉以免长期占用持久卷。
+        """
+        try:
+            return self._run_code_inner()
+        finally:
+            self._cleanup_scratch()
+
+    def _run_code_inner(self) -> int:
+        def _limit_resources() -> None:
             # 在子进程 fork 之后、exec 之前执行，只作用于用户子进程自身。
             resource.setrlimit(resource.RLIMIT_AS, (self.MEM_LIMIT, self.MEM_LIMIT))
+            # 单文件写出上限：拦住失控的超大文件写出（磁盘写满的第一道闸）。
+            resource.setrlimit(resource.RLIMIT_FSIZE, (FSIZE_LIMIT, FSIZE_LIMIT))
+
+        # 缓存/临时目录重定向到持久卷（本提交目录下），不落容器 ephemeral 层。
+        env = self._scratch_env()
 
         # 用户任务的运行日志只落盘到 {runner_dir}/stdout，绝不写到终端。
         process = subprocess.Popen(
@@ -80,7 +166,8 @@ class MemoryLimitedUserRunner(LocalProcessUserRunner):
             encoding="utf-8",
             errors="replace",
             bufsize=1,
-            preexec_fn=_limit_memory,
+            preexec_fn=_limit_resources,
+            env=env,
         )
         timeout = 3 * 60 * 60
         start = time.time()
