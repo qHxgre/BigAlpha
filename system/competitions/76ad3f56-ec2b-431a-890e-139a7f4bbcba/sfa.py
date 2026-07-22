@@ -13,7 +13,8 @@ import os
 
 import pandas as pd
 
-from judge.judgebase import LocalProcessUserRunner, UserCodeRunError, log_context, log_timer
+from judge.judgebase import UserCodeRunError, log_context, log_timer
+from runner import ScratchRedirectRunner as LocalProcessUserRunner
 
 import scoring
 from constants import (
