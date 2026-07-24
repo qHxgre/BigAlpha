@@ -58,58 +58,58 @@ _COUNTS_FILE = str(_CAND_DIR / "submission_counts.json")
 TASKS: list[dict] = [
     # ↓ 周榜前30%：先跑 select_top30.py 生成 candidates_top30_<key>_<date>.json，
     #   每个赛道一个独立 task（单赛道 amounts + 对应 candidates_file）。需要时放开。↓
-    {
-        # 周榜前30%（20260708 快照）· 因子赛道。
-        # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
-        "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260722",
-        "task_key": "周榜前30%",
-        "amounts": {CID_FACTOR: 768},
-        "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260722.json"),
-    },
-    {
-        # 周榜前30%（20260708 快照）· 端到端赛道。金额较高，charge 前务必人工核对。
-        "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260722",
-        "task_key": "周榜前30%",
-        "amounts": {CID_E2E: 13920},
-        "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260722.json"),
-    },
+    # {
+    #     # 周榜前30%（20260708 快照）· 因子赛道。
+    #     # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260722",
+    #     "task_key": "周榜前30%",
+    #     "amounts": {CID_FACTOR: 768},
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260722.json"),
+    # },
+    # {
+    #     # 周榜前30%（20260708 快照）· 端到端赛道。金额较高，charge 前务必人工核对。
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260722",
+    #     "task_key": "周榜前30%",
+    #     "amounts": {CID_E2E: 13920},
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260722.json"),
+    # },
 
 
 
     # 每个里程碑合并成一个 task（多赛道 amounts）：同一 user 在多个赛道都达标时，
     # collect_targets 用 put() 取最大金额、只发一次；load_history 按这一个 label 剔重，
     # 保证每人每里程碑只发一次、不重复。
-    # {
-    #     "label": "BigAlpha2026首次提交宽币赠送",
-    #     "task_key": "首次提交",
-    #     "amounts": {CID_FACTOR: 288, CID_E2E: 5000, CID_OPEN: 288},
-    #     "counts_file": _COUNTS_FILE,
-    #     "threshold": 1,
-    # },
-    # {
-    #     "label": "BigAlpha2026累计第5次提交宽币赠送",
-    #     "task_key": "累计第5次提交",
-    #     "amounts": {CID_FACTOR: 480},
-    #     "counts_file": _COUNTS_FILE,
-    #     "threshold": 5,
-    # },
-    # {
-    #     "label": "BigAlpha2026累计第10次提交宽币赠送",
-    #     "task_key": "累计第10次提交",
-    #     "amounts": {CID_FACTOR: 480},
-    #     "counts_file": _COUNTS_FILE,
-    #     "threshold": 10,
-    # },
+    {
+        "label": "BigAlpha2026首次提交宽币赠送",
+        "task_key": "首次提交",
+        "amounts": {CID_FACTOR: 288, CID_E2E: 5000, CID_OPEN: 288},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 1,
+    },
+    {
+        "label": "BigAlpha2026累计第5次提交宽币赠送",
+        "task_key": "累计第5次提交",
+        "amounts": {CID_FACTOR: 480},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 5,
+    },
+    {
+        "label": "BigAlpha2026累计第10次提交宽币赠送",
+        "task_key": "累计第10次提交",
+        "amounts": {CID_FACTOR: 480},
+        "counts_file": _COUNTS_FILE,
+        "threshold": 10,
+    },
 
-    # {
-    #     "label": "BigAlpha2026报名宽币赠送",
-    #     "task_key": "初始礼包",
-    #     "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
-    # }
+    {
+        "label": "BigAlpha2026报名宽币赠送",
+        "task_key": "初始礼包",
+        "amounts": {CID_FACTOR: 5000, CID_E2E: 5000, CID_OPEN: 5000},
+    }
 ]
 # ===== 配置：改这里就行 =====================================================
 # 两步流程开关："generate"（生成待审核计划）或 "charge"（按审核后的计划发币）。
-STEP = "generate"
+STEP = "charge"
 
 # 主空间全零 UUID：发平台宽币用主空间；子空间发币换成对应 space_id。
 SPACE_ID = "00000000-0000-0000-0000-000000000000"

@@ -32,7 +32,7 @@ COMPETITION_IDS = [
 ]
 TARGET_STATUS = "approved_join_space"      # 目标状态：通过并加入空间
 SOURCE_STATUSES = {"pending", "approved"}  # 要处理的源状态（不含 rejected）
-DRY_RUN = True                             # True 只预览；确认后改 False 真正写入
+DRY_RUN = False                             # True 只预览；确认后改 False 真正写入
 # ===========================================================================
 
 
