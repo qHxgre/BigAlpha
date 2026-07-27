@@ -100,12 +100,19 @@ class MemoryLimitedUserRunner(LocalProcessUserRunner):
         （HuggingFace/pip 等库遇到不存在的父目录时行为不一，先建好最稳妥）。
         """
         env = dict(os.environ)
+        # 记住重定向前的原始 HOME：pip install --user 装的包落在「原始 HOME」/.local 下，
+        # 若不钉住 PYTHONUSERBASE，下面把 HOME 改成 runner_dir 后，Python 的 site 模块会
+        # 按新 HOME 去算 user site-packages 路径，导致已装的 --user 包在子进程里找不到
+        # （表现为 ModuleNotFoundError，但包其实一直都在原处，没装错）。
+        original_home = env.get("HOME") or os.path.expanduser("~")
         cache_root = os.path.join(self.runner_dir, ".cache")
         tmp_dir = os.path.join(self.runner_dir, "tmp")
         hf_home = os.path.join(cache_root, "huggingface")
         env.update({
             # $HOME 兜底：很多库（含未显式支持 HF_HOME 的老版本）按 ~/.cache 落缓存。
             "HOME": self.runner_dir,
+            # 让 --user 包的查找路径与上面的 HOME 重定向解耦，钉在原始 HOME 下。
+            "PYTHONUSERBASE": os.path.join(original_home, ".local"),
             "TMPDIR": tmp_dir,
             # HuggingFace：新老版本认的 key 不同，一并设上覆盖全。
             "HF_HOME": hf_home,
