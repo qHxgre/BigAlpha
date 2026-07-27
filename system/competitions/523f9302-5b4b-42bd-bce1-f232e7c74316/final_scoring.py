@@ -107,7 +107,9 @@ class ScoringMixin:
         scores = csv_to_map(read_csv(self.leaderboard_score_csv, logger=self.log), "id", "score")
 
         rows = []
-        for sid, submission, sub_dir in self._iter_submission_dirs():
+        # 汇总表覆盖全量提交，不受 SUBMISSION_IDS 调试子集影响，与 score_models /
+        # save_score_pool 口径一致，避免整表覆盖丢失其余提交的历史记录。
+        for sid, submission, sub_dir in self._iter_submission_dirs(all_submissions=True):
             row: dict = {
                 "submission_id": sid,
                 "user_id": submission.get("user_id"),
@@ -142,16 +144,8 @@ class ScoringMixin:
 
         df = pd.DataFrame(rows)
 
-        # 设了 SUBMISSION_IDS 只跑子集时，本轮 rows 只含该子集，若直接整表覆盖会抹掉
-        # 其他提交的历史行。此处做 upsert：读入旧表，剔除本轮涉及的 id，再拼回本轮结果，
-        # 保证该文件只新增或替换指定 submission 的记录，不删除其余提交的记录。
-        # 全量模式（SUBMISSION_IDS 为空）本轮即全体，旧表整体被替换，行为不变。
-        if self.SUBMISSION_IDS:
-            old_df = read_csv(self.submissions_summary_csv, logger=self.log)
-            if old_df is not None and "submission_id" in old_df.columns:
-                current_ids = set(df["submission_id"].astype(str))
-                kept = old_df[~old_df["submission_id"].astype(str).isin(current_ids)]
-                df = pd.concat([kept, df], ignore_index=True)
+        # rows 已经是全量提交（_iter_submission_dirs(all_submissions=True)），
+        # 不受 SUBMISSION_IDS 调试子集影响，故这里始终整表覆盖，无需额外 upsert。
 
         # 指标统一转数值，便于排序与后续分析
         for col in ["ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir", "score", "elapsed_ms"]:

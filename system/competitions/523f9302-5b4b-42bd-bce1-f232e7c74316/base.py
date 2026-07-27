@@ -52,9 +52,12 @@ class EndToEndJudgeBase(JudgeBase):
     DATE_END: str = ""
 
     # ---- 只跑部分提交（调试 / 复测用）------------------------------------
-    # SUBMISSION_IDS 非空时，整条流水线只处理这些 submission id：主循环只拉取它们来跑用户
-    # 代码，截面排名 / 打分 / 汇总也只遍历它们。留空（默认）则跑全量。子类（public/private）
-    # 临时复测某几个提交时填上即可，无需改其它逻辑：
+    # SUBMISSION_IDS 非空时，只影响「跑用户代码」这一步：主循环只拉取并重跑这些 submission
+    # id（is_done() 也会对它们强制重跑，忽略已有终态）。截面排名 / 分数池 / 汇总这几步始终
+    # 遍历全量提交（见 _iter_submission_dirs(all_submissions=True)），不受此配置影响，
+    # 保证复测个别提交时排名候选池、分数池、汇总表仍是全量口径，不会被收窄或整表覆盖丢失历史。
+    # 留空（默认）则跑用户代码这一步也是全量。子类（public/private）临时复测某几个提交时
+    # 填上即可，无需改其它逻辑：
     #     SUBMISSION_IDS = ["fe0722a2-887c-4dbe-bb9b-6634c0b392bb", ...]
     # MAX_PAGES 限制拉取页数，配合调试用；None 表示用 API 默认（全量翻页）。
     SUBMISSION_IDS: list[str] = []
@@ -133,29 +136,42 @@ class EndToEndJudgeBase(JudgeBase):
         )
 
     # ---- 只跑部分提交时统一收敛的拉取逻辑 --------------------------------
-    def query_constraints(self) -> dict:
-        """限定拉取提交的范围：在父类约束（private 默认只跑入围者）之上，叠加
-        SUBMISSION_IDS 子集过滤。两处拉取提交的入口（主循环与 _iter_submission_dirs）
-        都走这里，保证「只跑部分提交」在跑用户代码、排名、打分、汇总各环节口径一致。
+    def query_constraints(self, *, apply_submission_ids: bool = True) -> dict:
+        """限定拉取提交的范围：在父类约束（private 默认只跑入围者）之上，按需叠加
+        SUBMISSION_IDS 子集过滤。
+
+        apply_submission_ids=False 时跳过 SUBMISSION_IDS 过滤，只保留父类约束（如
+        private 的 selected_for_private）——用于截面排名 / 分数池 / 汇总这类只读全量
+        历史产物的环节，即便本轮只重跑了子集，这些环节仍要在全量提交上计算，避免把
+        排名候选池、分数池、汇总表都收窄成子集甚至覆盖丢失其余提交的历史记录。
+        跑用户代码的主循环则仍用默认的 apply_submission_ids=True，保证「只跑部分
+        提交」确实只重跑指定的这几个。
         """
         constraints = dict(super().query_constraints())
-        if self.SUBMISSION_IDS:
+        if apply_submission_ids and self.SUBMISSION_IDS:
             constraints["id__in"] = list(self.SUBMISSION_IDS)
         return constraints
 
-    def _query_submissions_kwargs(self) -> dict:
+    def _query_submissions_kwargs(self, *, apply_submission_ids: bool = True) -> dict:
         """统一组装 query_submissions 的关键字参数（约束 + 可选页数上限）。"""
         kwargs: dict = {
             "competition_id": self.competition_id,
-            "constraints": self.query_constraints(),
+            "constraints": self.query_constraints(apply_submission_ids=apply_submission_ids),
         }
         if self.MAX_PAGES is not None:
             kwargs["max_pages"] = self.MAX_PAGES
         return kwargs
 
     def query_submissions(self) -> list[dict]:
-        """按本比赛的约束（含 SUBMISSION_IDS 子集）拉取提交列表。"""
+        """按本比赛的约束（含 SUBMISSION_IDS 子集）拉取提交列表，供主循环派发用户代码用。"""
         return self.alphathon_api.query_submissions(**self._query_submissions_kwargs())
+
+    def query_all_submissions(self) -> list[dict]:
+        """拉取本比赛全量提交列表，忽略 SUBMISSION_IDS 过滤（其余约束如 private 的
+        selected_for_private 仍保留）。供截面排名 / 分数池 / 汇总环节使用，保证这些
+        环节始终在全量提交上计算，不受「只跑部分提交」调试开关影响。
+        """
+        return self.alphathon_api.query_submissions(**self._query_submissions_kwargs(apply_submission_ids=False))
 
     # ---- 共享小工具 -------------------------------------------------------
     def heartbeat_fields(self) -> dict:
@@ -188,14 +204,19 @@ class EndToEndJudgeBase(JudgeBase):
         """读取该提交的状态文件，不存在或读不出时返回 None。"""
         return read_json(self.score_status_path(submission), logger=self.log)
 
-    def _iter_submission_dirs(self):
+    def _iter_submission_dirs(self, *, all_submissions: bool = False):
         """遍历 submissions 目录，逐个 yield (sid, submission, sub_dir)。
 
-        只产出仍在本场比赛提交列表里的 sid，过滤掉目录残留的无效项；
-        score_models / summarize_submissions 共用此遍历逻辑。
-        设置 SUBMISSION_IDS 时只产出该子集，与主循环口径一致。
+        只产出仍在本场比赛提交列表里的 sid，过滤掉目录残留的无效项。
+
+        all_submissions=False（默认）：只产出 SUBMISSION_IDS 子集（未设置时即全量），
+        与主循环跑用户代码的口径一致，供需要「只处理指定子集」的场景使用。
+        all_submissions=True：忽略 SUBMISSION_IDS，遍历全量提交——截面排名
+        （score_models）/ 分数池（save_score_pool）/ 汇总（summarize_submissions）
+        都必须用这个口径，否则设了 SUBMISSION_IDS 复测时会把候选池收窄成子集，
+        排名结果失真，且整表覆盖会丢失其余提交的历史记录。
         """
-        submissions = self.query_submissions()
+        submissions = self.query_all_submissions() if all_submissions else self.query_submissions()
         sub_by_id = {str(s["id"]): s for s in submissions}
         if not os.path.isdir(self.submission_dir):
             return

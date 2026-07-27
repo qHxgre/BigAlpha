@@ -182,7 +182,9 @@ class ScoreMixin:
         最终分数由 score_final() 统一读取后回写，保持与因子挖掘赛道一致的分层结构。
         """
         rows = []
-        for sid, _submission, sub_dir in self._iter_submission_dirs():
+        # 截面排名的候选池必须是全量提交，不受 SUBMISSION_IDS 调试子集影响，否则设了
+        # SUBMISSION_IDS 复测时排名会收窄成子集内部互相比，结果失真。
+        for sid, _submission, sub_dir in self._iter_submission_dirs(all_submissions=True):
             analyze = read_json(os.path.join(sub_dir, self.score_analyze_file), logger=self.log)
             if analyze is None:
                 continue
@@ -221,7 +223,9 @@ class ScoreMixin:
         pool = None
         raw_pool = None  # 与 pool 入池集合一致，取每个提交的 raw_score（未处理）作存档
         count = 0
-        for sid, _submission, sub_dir in self._iter_submission_dirs():
+        # 分数池是全体已跑通提交的存档，同样不受 SUBMISSION_IDS 调试子集影响，
+        # 否则设了 SUBMISSION_IDS 复测时会把 parquet 整表覆盖成只含子集，丢失历史。
+        for sid, _submission, sub_dir in self._iter_submission_dirs(all_submissions=True):
             pf_path = os.path.join(sub_dir, self.process_score_file)
             if not os.path.exists(pf_path):
                 continue

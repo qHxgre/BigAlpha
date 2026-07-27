@@ -18,6 +18,11 @@
        judge 主进程一起打挂）；
     4. 子进程结束后（无论成功/失败），清掉这些缓存/临时目录，只保留产物（parquet / stdout /
        状态文件）。模型权重等缓存可重新下载，没必要长期占用持久卷（该卷已接近写满）。
+    5. 用户代码里调用平台数据接口（dai.query 等）时，还会在当前工作目录（即本提交目录）下
+       自行产出查询结果缓存（bigalpha_memmap_cache_ 前缀命名，如
+       bigalpha_memmap_cache_P4_raw_trunk_gated_relative_aux/），不在 .cache/tmp 下，
+       SCRATCH_DIRNAMES 扫不到。跑完清理时按这个前缀额外扫一遍删除；除此之外 runner_dir
+       根下的其它目录不动（不确定是否为可清理的中间产物，误删风险大于占用磁盘的成本）。
 """
 from __future__ import annotations
 
@@ -37,6 +42,10 @@ logger = structlog.get_logger()
 # 起子进程前，重定向到本提交目录下的缓存/临时子目录名；跑完统一按这些名字清理。
 # 相对 runner_dir，故各提交天然隔离、互不干扰。
 SCRATCH_DIRNAMES = (".cache", "tmp")
+
+# 用户代码调用平台数据接口（dai.query 等）时，在 runner_dir 根下自行产出的查询结果缓存目录
+# 前缀；目录名后半段是因子/脚本名，不固定，故用前缀匹配。跑完清理时按此前缀一并删除。
+DATA_CACHE_DIR_PREFIX = "bigalpha_memmap_cache"
 
 # 单个文件写出大小上限（RLIMIT_FSIZE，字节）。限的是「单文件」不是「总量」，
 # 目的是拦住失控写出的超大文件（如把整张表 dump 成一个几百 GB 的文件），
@@ -120,20 +129,45 @@ class MemoryLimitedUserRunner(LocalProcessUserRunner):
 
         模型权重等缓存可重新下载，没必要长期占用持久卷（该卷已接近写满）。
         清理失败只记日志、不影响主流程（产物已落盘，评分不受影响）。
+
+        除了固定名字的 SCRATCH_DIRNAMES，还按 DATA_CACHE_DIR_PREFIX 前缀扫一遍 runner_dir
+        根下的目录：这是用户代码调用平台数据接口时自行产出的查询结果缓存，名字后半段
+        （因子/脚本名）不固定，只有前缀固定，故用前缀匹配。除此之外根下的其它目录不动——
+        不确定是否为可清理的中间产物，宁可留着占空间，不误删。
         """
         for name in SCRATCH_DIRNAMES:
-            target = os.path.join(self.runner_dir, name)
-            if not os.path.isdir(target):
+            self._rmtree_logged(os.path.join(self.runner_dir, name))
+
+        try:
+            entries = os.listdir(self.runner_dir)
+        except Exception as e:
+            logger.warning(
+                "runner.cleanup_listdir_failed",
+                submission_id=self.submission_id,
+                path=self.runner_dir,
+                error=str(e),
+            )
+            return
+        for entry in entries:
+            if not entry.startswith(DATA_CACHE_DIR_PREFIX):
                 continue
-            try:
-                shutil.rmtree(target, ignore_errors=True)
-            except Exception as e:
-                logger.warning(
-                    "runner.cleanup_failed",
-                    submission_id=self.submission_id,
-                    path=target,
-                    error=str(e),
-                )
+            target = os.path.join(self.runner_dir, entry)
+            if os.path.isdir(target):
+                self._rmtree_logged(target)
+
+    def _rmtree_logged(self, target: str) -> None:
+        """删除一个目录，失败只记日志、不影响主流程；目录不存在则跳过。"""
+        if not os.path.isdir(target):
+            return
+        try:
+            shutil.rmtree(target, ignore_errors=True)
+        except Exception as e:
+            logger.warning(
+                "runner.cleanup_failed",
+                submission_id=self.submission_id,
+                path=target,
+                error=str(e),
+            )
 
     def _run_code(self) -> int:
         """跑用户子进程，无论成功/超时/OOM/报错，结束后都清理缓存/临时目录。
