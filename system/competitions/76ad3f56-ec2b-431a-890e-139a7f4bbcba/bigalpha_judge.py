@@ -47,6 +47,7 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
         """
         stats: dict = {}
         self._tick_seq += 1  # 本进程进入 on_tick 的次数，供心跳显示当前第几个 tick
+        self.log.info("tick.begin", tick=self._tick_seq, msg="on_tick 开始")
 
         # 第一步：单因子横向排名（A 项），刷新 leaderboard_sfa.csv
         self._stage = "sfa_rank"

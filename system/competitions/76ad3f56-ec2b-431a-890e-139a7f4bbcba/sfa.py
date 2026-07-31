@@ -139,6 +139,11 @@ class SFAMixin:
         sid = submission["id"]
         # 绑定一次 submission_id，作用域内所有 self.log 自动带上
         with log_context(submission_id=sid):
+            # REGRESSION_ONLY 开启时完全不跑用户代码，只靠 on_tick 用磁盘上已有的产物
+            # 刷新排名/因子池/回归/最终分/汇总，用于回归长期落后时快速追平。
+            if self.REGRESSION_ONLY:
+                return
+
             # 已经跑过的提交（产物已落盘）直接跳过，避免重启后重复执行用户代码。
             # 排名/回归/最终评分统一由 on_tick 刷新，跳过这里不影响榜单。
             if self.is_done(submission):

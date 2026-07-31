@@ -39,11 +39,13 @@ class Judge(BigAlphaJudge):
     }
 
     # 自适应评估间隔：Elastic Net 计算量随全局因子数增长，间隔按上一轮实测耗时自调。
-    #     t_next = max(k * t_last_run, t_min)，k = 1.5，t_min = 1 小时。
-    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。
+    #     t_next = clamp(k * t_last_run, t_min, t_max)，k = 1.5，t_min = 1 分钟，t_max = 2 小时。
+    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预；
+    # t_max 兜底，保证因子池再大，回归也至少每 2 小时跑一次。
     adaptive_interval = True
     tick_safety_factor = 1.5
     tick_min_interval = 60
+    tick_max_interval = 7200
 
     # 并行跑用户代码的线程数上限（同时评测的提交数）。默认继承基类的 5，这里按需覆盖。
     max_workers = 5
@@ -54,6 +56,11 @@ class Judge(BigAlphaJudge):
     #     "4ec02a39-de56-4aa7-8c19-b195f212b3cd",
     # ]
     # MAX_PAGES = 1
+
+    # 只跑因子池回归（调试 / 补跑用）：开启后不再执行任何用户代码，只用磁盘上已有产物
+    # 反复刷新「排名 -> 建池 -> 回归 -> 合成最终分 -> 汇总」，用于回归长期落后于单因子排名时
+    # 快速追平 leaderboard_final.csv。跑完记得关掉，否则新提交永远不会被评测。
+    REGRESSION_ONLY = False
 
 
 if __name__ == "__main__":

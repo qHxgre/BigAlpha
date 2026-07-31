@@ -84,8 +84,11 @@ class BigAlphaJudgeBase(JudgeBase):
     # ---- 自适应评估间隔 ---------------------------------------------------
     # 本比赛特有：on_tick 里的 Elastic Net 回归计算量随全局因子数增长，固定间隔会在因子池
     # 变大后频繁空转或排队堆积。开启 adaptive_interval 后，下一轮间隔按上一轮实际评估耗时自调：
-    #     t_next = max(k * t_last_run, t_min)，k = tick_safety_factor，t_min = tick_min_interval
-    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预。
+    #     t_next = min(max(k * t_last_run, t_min), t_max)，k = tick_safety_factor，
+    #     t_min = tick_min_interval，t_max = tick_max_interval
+    # 比赛初期因子少、间隔短；后期因子池扩大、间隔自动拉长，无需人工干预；
+    # t_max 兜底，防止因子池持续变大导致间隔无限拉长、回归迟迟不再跑（这是导致
+    # leaderboard_final.csv 长期不同步于 leaderboard_sfa.csv 的根因之一）。
     # 关闭时（默认）退化为父类的固定 tick_interval —— 私榜逐日增量构建用固定节奏即可。
     #
     # 实现上不改动父类主循环：父类每轮先调 on_tick() 再 sleep(self.tick_interval)。这里给
@@ -94,6 +97,14 @@ class BigAlphaJudgeBase(JudgeBase):
     adaptive_interval: bool = False
     tick_safety_factor: float = 1.5   # k：安全系数
     tick_min_interval: int = 3600     # t_min：最小间隔（秒），默认 1 小时
+    tick_max_interval: int = 7200     # t_max：最大间隔（秒），默认 2 小时，回归至少每 2 小时跑一次
+
+    # ---- 只跑因子池回归（调试 / 补跑用）------------------------------------
+    # 开启后主循环不再拉取/执行任何提交的用户代码（跳过 on_submission），只在每个 tick 里
+    # 用磁盘上已有的产物（factor_analyze.json / process_factor.parquet）跑「排名 -> 建池 ->
+    # 回归 -> 合成最终分 -> 汇总」这一串。适合回归长期没跟上、想尽快把 leaderboard_final.csv
+    # 追平 leaderboard_sfa.csv 时临时开启，跑完关掉即可恢复正常评测。
+    REGRESSION_ONLY: bool = False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -102,8 +113,8 @@ class BigAlphaJudgeBase(JudgeBase):
             self._wrap_on_tick_with_adaptive_interval()
 
     def next_tick_interval(self, last_run_seconds: float) -> int:
-        """据上一轮评估实测耗时按 t_next = max(k * t_last_run, t_min) 算下一轮 sleep 秒数。"""
-        return int(max(self.tick_safety_factor * last_run_seconds, self.tick_min_interval))
+        """据上一轮评估实测耗时按 t_next = clamp(k * t_last_run, t_min, t_max) 算下一轮 sleep 秒数。"""
+        return int(min(max(self.tick_safety_factor * last_run_seconds, self.tick_min_interval), self.tick_max_interval))
 
     def _wrap_on_tick_with_adaptive_interval(self) -> None:
         """把实例上的 on_tick 包成「计时 + 回写 tick_interval」版本。
