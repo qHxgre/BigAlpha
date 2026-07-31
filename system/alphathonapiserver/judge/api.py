@@ -47,6 +47,12 @@ class AlphathonAPI:
         items = (data or {}).get("data", {}).get("items", []) if isinstance(data, dict) else []
         return items[0] if items else None
 
+    # 默认排序：按提交时间升序，即「先提交的先跑」。
+    # 主循环按本列表顺序把提交派发进线程池（FIFO 消费），故这里的顺序直接决定评测先后。
+    # 附带 id 作为第二排序键：created_at 可能并列（同一秒多份提交），只按它排序时数据库
+    # 返回的页内顺序不稳定，翻页会出现重复行或漏行；加上唯一的 id 后排序全序确定，分页安全。
+    DEFAULT_SUBMISSION_ORDER_BY = ["created_at", "id"]
+
     def query_submissions(
         self,
         *,
@@ -54,17 +60,24 @@ class AlphathonAPI:
         constraints: Optional[Dict[str, Any]] = None,
         page_size: int = 5000,
         max_pages: int = 10000,
+        order_by: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
+        """拉取某场比赛的提交列表（自动翻页）。
+
+        order_by 缺省用 DEFAULT_SUBMISSION_ORDER_BY（created_at 升序，先提交的排前面）；
+        需要倒序时显式传 ["-created_at"]。字段名前缀 "-" 表示降序。
+        """
         results: List[Dict[str, Any]] = []
         page = 1
         constraints = constraints or {}
+        order_by = list(order_by) if order_by else list(self.DEFAULT_SUBMISSION_ORDER_BY)
 
         while page <= max_pages:
             params: Dict[str, Any] = {
                 "competition_id": str(competition_id),
                 "page": page,
                 "size": page_size,
-                "order_by": "-created_at",
+                "order_by": order_by,
                 "constraints": json.dumps(constraints),
             }
             data = self._request("GET", "/submissions", params=params).json()["data"]

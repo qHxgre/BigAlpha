@@ -393,7 +393,11 @@ class JudgeBase:
                 self._submission_ids = {str(s.get("id")) for s in submissions}
                 self._submission_total = len(self._submission_ids)
 
-                # 过滤掉本进程已派发过的，剩下的入队执行
+                # 过滤掉本进程已派发过的，剩下的按顺序入队执行。
+                # submissions 已按 created_at 升序返回（见 AlphathonAPI.DEFAULT_SUBMISSION_ORDER_BY），
+                # 列表推导保序、线程池 FIFO 消费，故整体是「先提交的先跑」。
+                # 注意这只保证入队那一刻的顺序：积压很长时，本轮之后新到的提交会排在已入队的
+                # 积压之后（dispatched 是内存集合，队列不会重排），符合先来先服务的语义。
                 pending = [s for s in submissions if s.get("id") not in dispatched]
                 for submission in pending:
                     sid = str(submission.get("id"))
