@@ -48,26 +48,37 @@ class ScoringMixin:
         os.makedirs(self.leaderboard_dir, exist_ok=True)
         final.to_csv(self.leaderboard_final_csv, index=False)
 
+        failed = 0
         for _, row in final.iterrows():
             score = row["score"]
-            # NaN != NaN：指标全空导致得分缺失时，统一记为 -2 失败
-            if score != score:
-                self.alphathon_api.update_submission_score(
-                    submission_id=row["id"],
-                    **{
-                        self.score_field: -2,
-                        self.score_data_field: {"err_msg": STATUS_ERR_MSG[STATUS_ENV_ERROR]},
-                    },
+            try:
+                # NaN != NaN：指标全空导致得分缺失时，统一记为 -2 失败
+                if score != score:
+                    self.alphathon_api.update_submission_score(
+                        submission_id=row["id"],
+                        **{
+                            self.score_field: -2,
+                            self.score_data_field: {"err_msg": STATUS_ERR_MSG[STATUS_ENV_ERROR]},
+                        },
+                    )
+                else:
+                    self.alphathon_api.update_submission_score(
+                        submission_id=row["id"],
+                        **{
+                            self.score_field: float(score),
+                            self.score_data_field: self._row_to_jsonable(row),
+                        },
+                    )
+            except Exception as e:
+                # 单条提交回写失败（如提交已被删除导致 404）不应阻断其余提交的回写；
+                # 之前这里没有单独捕获，一条失败就会中断循环，导致排在它之后的提交
+                # 本轮全部漏更新，分数停留在上一次的旧值（包括之前失败时写的 -2）。
+                failed += 1
+                self.log.error(
+                    "final.row_failed", submission_id=row["id"], error=str(e),
+                    msg="单条提交最终得分回写失败，跳过继续处理其余提交",
                 )
-            else:
-                self.alphathon_api.update_submission_score(
-                    submission_id=row["id"],
-                    **{
-                        self.score_field: float(score),
-                        self.score_data_field: self._row_to_jsonable(row),
-                    },
-                )
-        self.log.info("final.scored", count=len(final), msg="回写最终得分完成")
+        self.log.info("final.scored", count=len(final), failed=failed, msg="回写最终得分完成")
 
     @staticmethod
     def _row_to_jsonable(row: pd.Series) -> dict:
