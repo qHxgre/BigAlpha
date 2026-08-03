@@ -26,8 +26,8 @@ USER_INFO_CSV = LEADERBOARD_CRAWL_DIR / "user_info.csv"
 
 DEFAULT_TARGET = (
     LEADERBOARD_CRAWL_DIR
-    / "20260722"
-    / "leaderboard_76ad3f56-ec2b-431a-890e-139a7f4bbcba_20260722_1740.csv"
+    / "20260729"
+    / "leaderboard_523f9302-5b4b-42bd-bce1-f232e7c74316_20260729_1500.csv"
 )
 
 

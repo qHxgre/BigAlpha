@@ -23,8 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 使 `from common
 from common.paths import LEADERBOARD_CRAWL_DIR, REWARD_COINS_DIR
 
 # ===== 配置 =================================================================
-SNAPSHOT_DATE = "20260722"     # 快照日期目录
-SNAPSHOT_TIME = "1740"         # 以接近 15:00 的快照为准
+SNAPSHOT_DATE = "20260729"     # 快照日期目录
+SNAPSHOT_TIME = "1500"         # 以接近 15:00 的快照为准
 TOP_RATIO = 0.30               # 取前 30%
 
 # 参与本轮的赛道：cid -> (输出名 key, 该赛道单价, 中文名)

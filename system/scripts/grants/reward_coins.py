@@ -61,17 +61,17 @@ TASKS: list[dict] = [
     # {
     #     # 周榜前30%（20260708 快照）· 因子赛道。
     #     # 候选来自 select_top30.py：submission>0 池按 rank 取前30%，team 全体展开。
-    #     "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260722",
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-因子-20260729",
     #     "task_key": "周榜前30%",
     #     "amounts": {CID_FACTOR: 768},
-    #     "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260722.json"),
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_factor_20260729.json"),
     # },
     # {
     #     # 周榜前30%（20260708 快照）· 端到端赛道。金额较高，charge 前务必人工核对。
-    #     "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260722",
+    #     "label": "BigAlpha2026周榜前30%宽币赠送-端到端-20260729",
     #     "task_key": "周榜前30%",
     #     "amounts": {CID_E2E: 13920},
-    #     "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260722.json"),
+    #     "candidates_file": str(_CAND_DIR / "candidates_top30_e2e_20260729.json"),
     # },
 
 
