@@ -46,7 +46,20 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
         统一降为 debug 只进日志文件；本方法把各阶段关键数字收进 stats，最后汇总成一行
         INFO 输出到终端（见 _emit_tick_summary）。阶段失败仍按 error 单独打，便于定位。
         对账（reconcile_scores）纠正条数非零时单独打 warning，方便第一时间发现历史错误计分。
+
+        SUBMISSION_IDS 非空时（调试/复测某几个提交），整个 on_tick 直接跳过：只走
+        on_submission 重跑这几个提交的用户代码，不做排名/建池/回归/合成最终分/汇总，
+        避免这几步用「SUBMISSION_IDS 过滤后的小子集」刷新 leaderboard_sfa.csv /
+        leaderboard_final.csv / submissions_summary.csv 等全量榜单文件，污染正常评测产物。
         """
+        if self.SUBMISSION_IDS:
+            self.log.debug(
+                "tick.skip_debug_subset",
+                submission_ids=list(self.SUBMISSION_IDS),
+                msg="SUBMISSION_IDS 非空，跳过整个 on_tick（只重跑用户代码，不排名/回归/评分）",
+            )
+            return
+
         stats: dict = {}
         self._tick_seq += 1  # 本进程进入 on_tick 的次数，供心跳显示当前第几个 tick
         self.log.info("tick.begin", tick=self._tick_seq, msg="on_tick 开始")
