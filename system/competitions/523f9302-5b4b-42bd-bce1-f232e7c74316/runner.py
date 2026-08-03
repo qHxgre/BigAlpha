@@ -125,6 +125,14 @@ class MemoryLimitedUserRunner(LocalProcessUserRunner):
             "XDG_CACHE_HOME": cache_root,
             # pip 运行时缓存
             "PIP_CACHE_DIR": os.path.join(cache_root, "pip"),
+            # scipy/numpy 底层 OpenBLAS 默认按 CPU 核数（容器里探测到 64）开线程池，
+            # 而容器的 nproc/pids 配额远小于此，pthread_create 撞到配额会卡死在库初始化
+            # 阶段（实测表现为 OpenBLAS blas_thread_init pthread_create failed，进而被
+            # 外部超时机制打断成 KeyboardInterrupt）。限制到较小线程数即可规避。
+            "OPENBLAS_NUM_THREADS": "4",
+            "OMP_NUM_THREADS": "4",
+            "MKL_NUM_THREADS": "4",
+            "NUMEXPR_NUM_THREADS": "4",
         })
         for path in (cache_root, tmp_dir, hf_home,
                      os.path.join(cache_root, "torch"), os.path.join(cache_root, "pip")):
