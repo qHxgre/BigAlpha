@@ -275,6 +275,59 @@ class SFAMixin:
         self.log.info("lookahead.passed", cutoff=cutoff, msg="截断复算检测通过，无未来函数")
         return False
 
+    # ---- 对账：修复竟态错误计分 --------------------------------------------
+
+    def reconcile_scores(self) -> int:
+        """对账：纠正因未来函数检测竟态被错误计分的提交。
+
+        is_scoreable 网关堵住的是「以后」发生的竟态（未通过检测的产物不再被 score_sfa /
+        save_factor_pool 摸到），但堵不住「之前」已经踩过这个窗口、被某轮 tick 提前计过分
+        的提交：这类提交本地状态早已是终态失败（如 lookahead），产物也已被 check_lookahead
+        删除，此后再也不会被排名/建池流程碰到，错误分数不会自愈，需要主动对账纠正。
+
+        每轮扫一次：本地终态失败（非 success）但后端当前分数不是 -2，说明分数写错了，
+        重新回写 -2 + 对应提示语。返回本轮纠正条数（供 on_tick 汇总成一行日志）。
+        """
+        fixed = 0
+        for sid, submission, _sub_dir in self._iter_submission_dirs():
+            status = self.read_sfa_status(submission)
+            if status is None:
+                continue
+            st = status.get("status")
+            if st not in TERMINAL_STATUSES or st == STATUS_SUCCESS:
+                continue
+
+            current = submission.get(self.score_field)
+            try:
+                current = float(current) if current is not None else None
+            except (TypeError, ValueError):
+                current = None
+            if current == -2.0:
+                continue
+
+            self.log.warning(
+                "reconcile.fix",
+                submission_id=sid,
+                status=st,
+                current_score=current,
+                msg="检出错误计分，纠正为 -2",
+            )
+            try:
+                self.alphathon_api.update_submission_score(
+                    submission_id=sid,
+                    **{
+                        self.score_field: -2,
+                        self.score_data_field: {"err_msg": STATUS_ERR_MSG.get(st, STATUS_ERR_MSG[STATUS_ENV_ERROR])},
+                    },
+                )
+                fixed += 1
+            except Exception as e:
+                self.log.error("reconcile.fix_failed", submission_id=sid, error=str(e), msg="回写纠正分数失败")
+
+        if fixed:
+            self.log.warning("reconcile.done", fixed=fixed, msg="本轮对账纠正了错误计分的提交")
+        return fixed
+
     # ---- 单因子排名 (A) ---------------------------------------------------
 
     def score_sfa(self) -> int:
@@ -290,7 +343,11 @@ class SFAMixin:
         返回参与排名的因子数（供 on_tick 汇总成一行日志）；无数据时返回 0。
         """
         rows = []
-        for sid, _submission, sub_dir in self._iter_submission_dirs():
+        for sid, submission, sub_dir in self._iter_submission_dirs():
+            # 只看文件是否存在不够：单因子分析产物落盘与未来函数检测判定之间有时间窗口，
+            # 必须状态文件明确记为 success 才纳入排名，避免检测未完成的提交被提前计分。
+            if not self.is_scoreable(submission):
+                continue
             fa = read_json(os.path.join(sub_dir, self.factor_analyze_file), logger=self.log)
             if fa is None:
                 continue

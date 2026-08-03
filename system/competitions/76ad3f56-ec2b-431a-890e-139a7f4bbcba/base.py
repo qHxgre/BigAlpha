@@ -372,6 +372,24 @@ class BigAlphaJudgeBase(JudgeBase):
         """读取该提交的状态文件，不存在或读不出时返回 None。"""
         return read_json(self.sfa_status_path(submission), logger=self.log)
 
+    def is_scoreable(self, submission: dict) -> bool:
+        """该提交是否已通过全部校验、可参与截面排名 / 因子池 / 回归。
+
+        必须状态文件明确记为 success 才算数——不能只看 factor_analyze.json /
+        process_factor.parquet 是否存在：on_submission 里跑完单因子分析（子进程①落盘产物）
+        与未来函数切窗检测（子进程②判定，见 check_lookahead）之间有一段执行时间，如果这段
+        时间里 on_tick 恰好跑到，score_sfa / save_factor_pool 若只看文件是否存在就会把
+        「还没做完检测」的提交提前纳入计分；即便检测随后判定泄漏、回写 -2，只要该提交此前
+        已被某轮 tick 计过分、产物又已被 check_lookahead 删除，后续 tick 也不会再摸到它，
+        错误分数就会一直卡住（详见 lookahead 状态提交的现场排查）。
+        没有状态文件时视为早于状态文件机制上线的历史成功提交，兼容旧数据。
+        """
+        status = self.read_sfa_status(submission)
+        if status is not None:
+            return status.get("status") == STATUS_SUCCESS
+        legacy_fa = os.path.join(self.submission_path(submission), self.factor_analyze_file)
+        return os.path.exists(legacy_fa)
+
     def _iter_submission_dirs(self):
         """遍历 submissions 目录，逐个 yield (sid, submission, sub_dir)。
 

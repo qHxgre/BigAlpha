@@ -67,6 +67,10 @@ class RegressionMixin:
 
         records = []
         for sid, submission, sub_dir in self._iter_submission_dirs():
+            # 同 score_sfa：必须状态文件确认 success 才能入池，避免检测未完成的提交
+            # 抢在 check_lookahead 判定前被建池、参与回归。
+            if not self.is_scoreable(submission):
+                continue
             pf_path = os.path.join(sub_dir, self.process_factor_file)
             if not os.path.exists(pf_path):
                 continue

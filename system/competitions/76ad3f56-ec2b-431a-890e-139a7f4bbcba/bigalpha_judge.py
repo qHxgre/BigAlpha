@@ -26,6 +26,7 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
     # 主循环阶段标签：on_tick 各步骤前赋值，供心跳线程读出「此刻在跑单因子还是 on_tick 里
     # 的哪一步」。主线程写、心跳线程读，CPython 下字符串/整数赋值原子，读到旧值也无害。
     #   sfa       —— on_tick 已跑完，主循环在 sleep + 等线程池里的单因子分析任务
+    #   reconcile —— on_tick 正在对账纠正错误计分
     #   sfa_rank  —— on_tick 正在做单因子截面排名（A 项）
     #   pool      —— on_tick 正在构建因子池
     #   regression—— on_tick 正在跑因子池回归
@@ -44,10 +45,18 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
         各阶段明细（sfa.ranked / pool.saved / regression.done / final.scored / summary.saved）
         统一降为 debug 只进日志文件；本方法把各阶段关键数字收进 stats，最后汇总成一行
         INFO 输出到终端（见 _emit_tick_summary）。阶段失败仍按 error 单独打，便于定位。
+        对账（reconcile_scores）纠正条数非零时单独打 warning，方便第一时间发现历史错误计分。
         """
         stats: dict = {}
         self._tick_seq += 1  # 本进程进入 on_tick 的次数，供心跳显示当前第几个 tick
         self.log.info("tick.begin", tick=self._tick_seq, msg="on_tick 开始")
+
+        # 第零步：对账，纠正未来函数检测竟态导致的错误计分（历史遗留，见 reconcile_scores）。
+        self._stage = "reconcile"
+        try:
+            stats["fixed"] = self.reconcile_scores()
+        except Exception as e:
+            self.log.error("reconcile.failed", error=str(e), msg="对账失败")
 
         # 第一步：单因子横向排名（A 项），刷新 leaderboard_sfa.csv
         self._stage = "sfa_rank"
@@ -100,6 +109,8 @@ class BigAlphaJudge(SFAMixin, RegressionMixin, ScoringMixin, BigAlphaJudgeBase):
         """
         stats = getattr(self, "_tick_stats", {}) or {}
         parts = []
+        if stats.get("fixed"):
+            parts.append(f"fixed={stats['fixed']}")
         if stats.get("sfa") is not None:
             parts.append(f"sfa={stats['sfa']}")
         if stats.get("pool") is not None:
