@@ -92,29 +92,34 @@ class PrivateJudge(JudgeBase):
     DATE_END = ""
     RUNS_DIR = os.path.join(PRIVATE_FILES_DIR, "runs")
 
-    def __init__(self, input_dir: str) -> None:
+    def __init__(
+        self,
+        input_dir: str,
+        *,
+        batch_id: str,
+        resume: bool,
+        max_workers: int,
+    ) -> None:
         super().__init__()
         self.input_dir = os.path.abspath(input_dir)
         self.input_metadata_path = os.path.join(self.input_dir, "metadata.json")
         if not os.path.isfile(self.input_metadata_path):
             raise RuntimeError(f"private 输入包缺少 metadata.json: {self.input_dir}")
-        self.batch_id = os.getenv("PRIVATE_BATCH_ID") or time.strftime("%Y%m%d_%H%M%S")
+        self.batch_id = str(batch_id).strip()
+        if not self.batch_id:
+            raise RuntimeError("batch_id 不能为空")
         self.run_dir = os.path.join(self.RUNS_DIR, self.batch_id)
-        self.resume = os.getenv("PRIVATE_RESUME", "").strip().lower() in {
-            "1", "true", "yes", "on",
-        }
+        self.resume = bool(resume)
         try:
-            self.max_workers = int(
-                os.getenv("PRIVATE_MAX_WORKERS", str(self.max_workers))
-            )
-        except ValueError as exc:
-            raise RuntimeError("PRIVATE_MAX_WORKERS 必须是正整数") from exc
+            self.max_workers = int(max_workers)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("max_workers 必须是正整数") from exc
         if self.max_workers < 1:
-            raise RuntimeError("PRIVATE_MAX_WORKERS 必须是正整数")
+            raise RuntimeError("max_workers 必须是正整数")
         if os.path.exists(self.run_dir) and not self.resume:
             raise RuntimeError(
                 f"批次目录已存在，拒绝覆盖: {self.run_dir}。"
-                "如需断点续跑，请使用相同 PRIVATE_BATCH_ID 并设置 PRIVATE_RESUME=1"
+                "如需断点续跑，请在 private.py 中保持相同 BATCH_ID 并设置 RESUME = True"
             )
         if self.resume and not os.path.isdir(self.run_dir):
             raise RuntimeError(f"要续跑的批次目录不存在: {self.run_dir}")

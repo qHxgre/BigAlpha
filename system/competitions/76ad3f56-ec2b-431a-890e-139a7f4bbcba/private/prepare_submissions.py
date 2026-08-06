@@ -12,9 +12,8 @@ from collections import Counter, defaultdict
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-API_SERVER = os.getenv(
-    "ALPHATHON_API_SERVER_DIR",
-    os.path.abspath(os.path.join(HERE, "..", "..", "..", "alphathonapiserver")),
+API_SERVER = os.path.abspath(
+    os.path.join(HERE, "..", "..", "..", "alphathonapiserver")
 )
 if API_SERVER not in sys.path:
     sys.path.append(API_SERVER)

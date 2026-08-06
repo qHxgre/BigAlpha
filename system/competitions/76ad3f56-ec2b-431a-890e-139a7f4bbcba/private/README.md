@@ -46,23 +46,28 @@ private/prepared/
 python private.py --input /path/to/private/prepared
 ```
 
-也可以同时指定评测批次 ID：
+所有运行配置都在 `private.py` 顶部显式设置，不读取环境变量：
 
-```bash
-PRIVATE_BATCH_ID=final_private python private.py --input /path/to/private/prepared
+```python
+BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+RESUME = False
+MAX_WORKERS = 5
 ```
 
-默认最多并行评测 5 个 submission，也可以按机器资源调整：
+默认最多并行评测 5 个 submission。需要调整时，直接修改 `MAX_WORKERS`：
 
-```bash
-PRIVATE_BATCH_ID=final_private PRIVATE_MAX_WORKERS=3 python private.py
+```python
+MAX_WORKERS = 3
 ```
 
-如果运行中途被终止，使用原来的批次 ID 并开启续跑：
+如果运行中途被终止，将 `BATCH_ID` 改为原批次目录名，并开启续跑：
 
-```bash
-PRIVATE_BATCH_ID=final_private PRIVATE_RESUME=1 python private.py
+```python
+BATCH_ID = "20260806_172301"
+RESUME = True
 ```
+
+然后直接运行 `python private.py`。
 
 续跑会读取 `submissions/<submission_id>/result.json`：已有完整成功或失败结果的提交
 直接跳过，只执行尚未生成完整结果的提交。首次运行确定的 `DATE_END` 会从 manifest

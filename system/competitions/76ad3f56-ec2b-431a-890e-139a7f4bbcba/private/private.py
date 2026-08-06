@@ -18,6 +18,21 @@ for path in paths:
 from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 
 
+# ---------------------------------------------------------------------------
+# 私榜运行配置：所有运行参数都在本文件中显式设置，不读取环境变量。
+# ---------------------------------------------------------------------------
+
+# 新批次默认使用启动时间创建目录。需要断点续跑时，将这里改为原批次目录名，
+# 例如 "20260806_172301"，并把 RESUME 改为 True。
+BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# False：创建新批次；True：断点续跑 BATCH_ID 指定的已有批次。
+RESUME = False
+
+# 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
+MAX_WORKERS = 5
+
+
 class Judge(PrivateJudge):
     """私榜评测：读取已固化的提交，并生成待人工发布的评分批次。"""
 
@@ -28,7 +43,12 @@ class Judge(PrivateJudge):
     def __init__(self) -> None:
         # 每次启动时取当天作为评估结束日，避免模块长期驻留时日期过期。
         self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
-        super().__init__(input_dir=self.INPUT_DIR)
+        super().__init__(
+            input_dir=self.INPUT_DIR,
+            batch_id=BATCH_ID,
+            resume=RESUME,
+            max_workers=MAX_WORKERS,
+        )
 
     def run(self) -> None:
         self.run_once()
