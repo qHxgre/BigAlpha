@@ -15,14 +15,15 @@ for path in paths:
     if path not in sys.path:
         sys.path.append(path)
 
-from private_judge import PrivateJudge
+from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 
 
 class Judge(PrivateJudge):
     """私榜评测：读取已固化的提交，并生成待人工发布的评分批次。"""
 
-    # prepare_submissions.py 的默认输出目录。需要评测其他输入包时直接覆盖该属性。
-    INPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prepared")
+    # 与 prepare_submissions.py 的默认输出目录保持一致：
+    # system/files/<competition_id>/private/prepared。
+    INPUT_DIR = os.path.join(PRIVATE_FILES_DIR, "prepared")
 
     def __init__(self) -> None:
         # 每次启动时取当天作为评估结束日，避免模块长期驻留时日期过期。
