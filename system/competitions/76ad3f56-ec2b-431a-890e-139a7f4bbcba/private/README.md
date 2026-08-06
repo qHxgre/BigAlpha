@@ -3,8 +3,8 @@
 本目录是独立于 `public/` 的私榜评测实现，只复用
 `system/alphathonapiserver` 提供的通用评测框架。
 
-当前是最小版本：保留单次评估、A/B/最终分、产物落盘和人工发布；未来函数检测、
-样本外验证、并行执行与断点恢复暂不包含。
+当前是最小版本：保留单次评估、A/B/最终分、产物落盘、断点续跑和人工发布；
+未来函数检测、样本外验证与并行执行暂不包含。
 
 代码按职责拆分：`prepare_submissions.py` 固化私榜输入，`private.py` 是评测入口，
 `private_judge.py` 编排批次流程，
@@ -51,6 +51,16 @@ python private.py --input /path/to/private/prepared
 ```bash
 PRIVATE_BATCH_ID=final_private python private.py --input /path/to/private/prepared
 ```
+
+如果运行中途被终止，使用原来的批次 ID 并开启续跑：
+
+```bash
+PRIVATE_BATCH_ID=final_private PRIVATE_RESUME=1 python private.py
+```
+
+续跑会读取 `submissions/<submission_id>/result.json`：已有完整成功或失败结果的提交
+直接跳过，只执行尚未生成完整结果的提交。首次运行确定的 `DATE_END` 会从 manifest
+恢复，跨日续跑也不会改变评估口径。原始文件、stdout 和已有评测产物均不会删除。
 
 `private.py` 不再下载代码，也不再统计公榜信息；但每次启动评测时仍会通过 API 查询
 当前 `selected_for_private=True` 的 submission，并与 `metadata.json` 中的固化 ID 集合

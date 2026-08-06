@@ -98,8 +98,16 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"private 输入包缺少 metadata.json: {self.input_dir}")
         self.batch_id = os.getenv("PRIVATE_BATCH_ID") or time.strftime("%Y%m%d_%H%M%S")
         self.run_dir = os.path.join(self.RUNS_DIR, self.batch_id)
-        if os.path.exists(self.run_dir):
-            raise RuntimeError(f"批次目录已存在，拒绝覆盖: {self.run_dir}")
+        self.resume = os.getenv("PRIVATE_RESUME", "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }
+        if os.path.exists(self.run_dir) and not self.resume:
+            raise RuntimeError(
+                f"批次目录已存在，拒绝覆盖: {self.run_dir}。"
+                "如需断点续跑，请使用相同 PRIVATE_BATCH_ID 并设置 PRIVATE_RESUME=1"
+            )
+        if self.resume and not os.path.isdir(self.run_dir):
+            raise RuntimeError(f"要续跑的批次目录不存在: {self.run_dir}")
 
         self.submission_dir = os.path.join(self.run_dir, "submissions")
         self.artifact_dir = os.path.join(self.run_dir, "artifacts")
@@ -114,6 +122,13 @@ class PrivateJudge(JudgeBase):
 
         self.manifest_path = os.path.join(self.run_dir, "manifest.json")
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
+        if self.resume:
+            if not os.path.isfile(self.manifest_path):
+                raise RuntimeError(f"续跑批次缺少 manifest.json: {self.run_dir}")
+            with open(self.manifest_path, encoding="utf-8") as reader:
+                previous_manifest = json.load(reader)
+            # 同一批次必须沿用首次启动时确定的评估结束日，避免跨日续跑改变口径。
+            self.DATE_END = previous_manifest.get("date_end") or self.DATE_END
 
     def _prepare_submission(self, submission: dict, record: dict) -> tuple[str, str]:
         """把固化输入复制到运行目录；评测不再访问 submission API。"""
@@ -154,6 +169,23 @@ class PrivateJudge(JudgeBase):
         except Exception as exc:
             row.update(status="failed", error=str(exc))
         write_json(os.path.join(self.submission_path(submission), "result.json"), row)
+        return row
+
+    def _completed_result(self, submission: dict) -> dict | None:
+        """读取已完整落盘的单条结果；缺失或损坏时返回 None 并重新执行。"""
+        sid = str(submission["id"])
+        path = os.path.join(self.submission_path(submission), "result.json")
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, encoding="utf-8") as reader:
+                row = json.load(reader)
+        except (OSError, json.JSONDecodeError):
+            return None
+        if str(row.get("submission_id")) != sid:
+            return None
+        if row.get("status") not in {"success", "failed"}:
+            return None
         return row
 
     def _save_scores(self, rows: list[dict]) -> None:
@@ -239,25 +271,41 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每个用户最多选择两个 submission: {violations}")
 
         write_json(os.path.join(self.run_dir, "submissions.json"), submissions)
-        update_manifest(
-            self.manifest_path,
-            competition_id=self.competition_id,
-            mode=self.mode,
-            batch_id=self.batch_id,
-            status="preparing",
-            created_at=datetime.now().astimezone().isoformat(timespec="seconds"),
-            date_start=self.DATE_START,
-            date_end=self.DATE_END,
-            datasets=self.DATASETS,
-            submission_count=len(submissions),
-            input_dir=self.input_dir,
-            input_batch_id=metadata.get("batch_id"),
-            input_summary=metadata.get("summary"),
-            selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
-            selected_submission_ids=sorted(current_id_set),
-            execution_code_source="prepared/submissions/<submission_id> 中自动识别的原始代码文件",
-            published=False,
-        )
+        if self.resume:
+            with open(self.manifest_path, encoding="utf-8") as reader:
+                previous_manifest = json.load(reader)
+            if previous_manifest.get("competition_id") != self.competition_id:
+                raise RuntimeError("续跑批次的 competition_id 不匹配")
+            if previous_manifest.get("input_batch_id") != metadata.get("batch_id"):
+                raise RuntimeError("续跑批次使用的固化输入包已变化，拒绝混用")
+            if set(previous_manifest.get("selected_submission_ids") or []) != current_id_set:
+                raise RuntimeError("续跑批次的 submission 集合已变化，拒绝混用")
+            update_manifest(
+                self.manifest_path,
+                status="resuming",
+                resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+            )
+        else:
+            update_manifest(
+                self.manifest_path,
+                competition_id=self.competition_id,
+                mode=self.mode,
+                batch_id=self.batch_id,
+                status="preparing",
+                created_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                date_start=self.DATE_START,
+                date_end=self.DATE_END,
+                datasets=self.DATASETS,
+                submission_count=len(submissions),
+                input_dir=self.input_dir,
+                input_batch_id=metadata.get("batch_id"),
+                input_summary=metadata.get("summary"),
+                selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                selected_submission_ids=sorted(current_id_set),
+                execution_code_source="prepared/submissions/<submission_id> 中自动识别的原始代码文件",
+                published=False,
+            )
         try:
             records_by_id = {str(record["submission_id"]): record for record in records}
             update_manifest(
@@ -265,12 +313,23 @@ class PrivateJudge(JudgeBase):
                 status="running",
                 prepared_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
-            rows = [
-                self._run_submission(
-                    submission, records_by_id[str(submission["id"])]
+            rows = []
+            for submission in submissions:
+                completed = self._completed_result(submission) if self.resume else None
+                if completed is not None:
+                    self.log.info(
+                        "submission.resume_skip",
+                        submission_id=str(submission["id"]),
+                        status=completed["status"],
+                        msg="已有完整结果，断点续跑时跳过",
+                    )
+                    rows.append(completed)
+                    continue
+                rows.append(
+                    self._run_submission(
+                        submission, records_by_id[str(submission["id"])]
+                    )
                 )
-                for submission in submissions
-            ]
             self._save_scores(rows)
             update_manifest(
                 self.manifest_path,
