@@ -29,6 +29,11 @@ BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 # False：创建新批次；True：断点续跑 BATCH_ID 指定的已有批次。
 RESUME = False
 
+# 仅在 RESUME = True 时生效。填入需要在原批次中强制重跑的 submission id；
+# 程序会先删除这些提交的旧运行目录，再从 prepared 输入包重新复制并评测。
+# 留空表示普通断点续跑，已有完整 result.json 的提交会跳过。
+RERUN_SUBMISSION_IDS: list[str] = []
+
 # 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
 MAX_WORKERS = 5
 
@@ -47,6 +52,7 @@ class Judge(PrivateJudge):
             input_dir=self.INPUT_DIR,
             batch_id=BATCH_ID,
             resume=RESUME,
+            rerun_submission_ids=RERUN_SUBMISSION_IDS,
             max_workers=MAX_WORKERS,
         )
 

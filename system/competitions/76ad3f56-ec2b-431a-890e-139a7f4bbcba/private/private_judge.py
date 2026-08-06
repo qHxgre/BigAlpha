@@ -98,6 +98,7 @@ class PrivateJudge(JudgeBase):
         *,
         batch_id: str,
         resume: bool,
+        rerun_submission_ids: list[str] | None,
         max_workers: int,
     ) -> None:
         super().__init__()
@@ -110,6 +111,14 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError("batch_id 不能为空")
         self.run_dir = os.path.join(self.RUNS_DIR, self.batch_id)
         self.resume = bool(resume)
+        rerun_ids = [str(sid).strip() for sid in (rerun_submission_ids or [])]
+        if any(not sid for sid in rerun_ids):
+            raise RuntimeError("rerun_submission_ids 不能包含空 ID")
+        if len(rerun_ids) != len(set(rerun_ids)):
+            raise RuntimeError("rerun_submission_ids 包含重复 ID")
+        self.rerun_submission_ids = set(rerun_ids)
+        if self.rerun_submission_ids and not self.resume:
+            raise RuntimeError("RERUN_SUBMISSION_IDS 非空时必须设置 RESUME = True")
         try:
             self.max_workers = int(max_workers)
         except (TypeError, ValueError) as exc:
@@ -142,8 +151,28 @@ class PrivateJudge(JudgeBase):
                 raise RuntimeError(f"续跑批次缺少 manifest.json: {self.run_dir}")
             with open(self.manifest_path, encoding="utf-8") as reader:
                 previous_manifest = json.load(reader)
+            if previous_manifest.get("published"):
+                raise RuntimeError("已发布批次不允许续跑或重跑，请创建新批次")
             # 同一批次必须沿用首次启动时确定的评估结束日，避免跨日续跑改变口径。
             self.DATE_END = previous_manifest.get("date_end") or self.DATE_END
+
+    def _reset_submission(self, submission: dict) -> None:
+        """删除指定 submission 的旧运行产物，使本次续跑必定重新执行。"""
+        sid = str(submission["id"])
+        path = os.path.abspath(self.submission_path(submission))
+        submission_root = os.path.abspath(self.submission_dir)
+        if os.path.commonpath([path, submission_root]) != submission_root or path == submission_root:
+            raise RuntimeError(f"submission {sid} 的运行目录越界: {path}")
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif os.path.exists(path):
+            os.remove(path)
+        self.log.info(
+            "submission.rerun_reset",
+            submission_id=sid,
+            path=path,
+            msg="已清理旧产物，将强制重跑 submission",
+        )
 
     def _prepare_submission(self, submission: dict, record: dict) -> tuple[str, str]:
         """把固化输入复制到运行目录；评测不再访问 submission API。"""
@@ -340,6 +369,12 @@ class PrivateJudge(JudgeBase):
         submissions = [dict(record["submission"]) for record in records]
         if not submissions:
             raise RuntimeError("没有 selected_for_private=True 的 submission")
+        unknown_rerun_ids = sorted(self.rerun_submission_ids - prepared_id_set)
+        if unknown_rerun_ids:
+            raise RuntimeError(
+                "RERUN_SUBMISSION_IDS 包含不在本批次中的 submission: "
+                f"{unknown_rerun_ids}"
+            )
 
         by_user: dict[str, list[str]] = {}
         for submission in submissions:
@@ -362,6 +397,7 @@ class PrivateJudge(JudgeBase):
                 self.manifest_path,
                 status="resuming",
                 resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                rerun_submission_ids=sorted(self.rerun_submission_ids),
                 selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
         else:
@@ -401,6 +437,7 @@ class PrivateJudge(JudgeBase):
                 running=0,
                 remaining=len(submissions),
                 resume=self.resume,
+                rerun_submission_ids=sorted(self.rerun_submission_ids),
                 max_workers=self.max_workers,
                 msg="私榜批次开始",
             )
@@ -410,6 +447,8 @@ class PrivateJudge(JudgeBase):
             pending: list[tuple[int, dict]] = []
             for position, submission in enumerate(submissions, 1):
                 sid = str(submission["id"])
+                if sid in self.rerun_submission_ids:
+                    self._reset_submission(submission)
                 completed = self._completed_result(submission) if self.resume else None
                 if completed is not None:
                     progress["completed"] += 1

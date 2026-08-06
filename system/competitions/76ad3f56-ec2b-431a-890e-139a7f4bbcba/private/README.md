@@ -51,6 +51,7 @@ python private.py --input /path/to/private/prepared
 ```python
 BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 RESUME = False
+RERUN_SUBMISSION_IDS = []
 MAX_WORKERS = 5
 ```
 
@@ -72,6 +73,23 @@ RESUME = True
 续跑会读取 `submissions/<submission_id>/result.json`：已有完整成功或失败结果的提交
 直接跳过，只执行尚未生成完整结果的提交。首次运行确定的 `DATE_END` 会从 manifest
 恢复，跨日续跑也不会改变评估口径。原始文件、stdout 和已有评测产物均不会删除。
+
+如果要在原批次中只强制重跑几个 submission，保持原 `BATCH_ID`、开启续跑并填写 ID：
+
+```python
+BATCH_ID = "20260806_172301"
+RESUME = True
+RERUN_SUBMISSION_IDS = [
+    "submission-id-1",
+    "submission-id-2",
+]
+```
+
+程序会校验这些 ID 必须属于原批次，然后删除对应的
+`submissions/<submission_id>/` 旧运行目录，从固化输入包重新复制源文件并评测。
+其他已有完整 `result.json` 的 submission 会继续跳过。评分榜、汇总文件和
+`pending_publish.jsonl` 会用全批次的最新结果重新生成。已发布批次不允许原地重跑，
+应创建新批次。
 
 `private.py` 不再下载代码，也不再统计公榜信息；但每次启动评测时仍会通过 API 查询
 当前 `selected_for_private=True` 的 submission，并与 `metadata.json` 中的固化 ID 集合
