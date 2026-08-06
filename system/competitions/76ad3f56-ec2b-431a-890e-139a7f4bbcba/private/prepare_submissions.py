@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import shutil
@@ -139,10 +140,7 @@ def _download_submission(api: AlphathonAPI, submission: dict, destination: str) 
 
     notebook_path, notebook = notebooks[0]
     notebook_name = os.path.basename(notebook_path)
-    for item in downloaded:
-        if item["name"] == notebook_name:
-            item["notebook"] = True
-            break
+    notebook_file = next(item for item in downloaded if item["name"] == notebook_name)
     code_cells = []
     for cell in notebook.get("cells", []):
         if isinstance(cell, dict) and cell.get("cell_type") == "code":
@@ -151,21 +149,35 @@ def _download_submission(api: AlphathonAPI, submission: dict, destination: str) 
     code_path = os.path.join(destination, "submission_code.py")
     with open(code_path, "w", encoding="utf-8") as writer:
         writer.write("\n\n".join(code_cells))
-    downloaded.append({"file_id": None, "name": "submission_code.py", "generated": True})
+    os.remove(notebook_path)
+    downloaded.remove(notebook_file)
+    downloaded.append(
+        {
+            "file_id": None,
+            "name": "submission_code.py",
+            "generated": True,
+            "source_file_id": notebook_file["file_id"],
+            "source_name": notebook_file["name"],
+        }
+    )
     return downloaded
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-root", default=DEFAULT_OUTPUT_ROOT, help="输入包父目录")
-    parser.add_argument("--batch-id", default=time.strftime("%Y%m%d_%H%M%S"))
+    parser.add_argument("--output-root", default=DEFAULT_OUTPUT_ROOT, help="固定输入包目录")
+    parser.add_argument(
+        "--batch-id",
+        default=time.strftime("%Y%m%d_%H%M%S"),
+        help="仅写入 metadata，不再用于创建分批目录",
+    )
     args = parser.parse_args()
 
-    output_dir = os.path.abspath(os.path.join(args.output_root, args.batch_id))
-    if os.path.exists(output_dir):
-        print(f"目标目录已存在，拒绝覆盖: {output_dir}", file=sys.stderr)
-        return 1
-    os.makedirs(os.path.join(output_dir, "submissions"))
+    output_dir = os.path.abspath(args.output_root)
+    os.makedirs(output_dir, exist_ok=True)
+    work_dir = os.path.join(output_dir, f".preparing-{os.getpid()}-{time.time_ns()}")
+    os.makedirs(os.path.join(work_dir, "submissions"))
+    atexit.register(shutil.rmtree, work_dir, ignore_errors=True)
 
     api = AlphathonAPI()
     competition = api.get_competition_by_id(COMPETITION_ID) or {}
@@ -206,7 +218,7 @@ def main() -> int:
         sid = str(submission["id"])
         uid = str(submission.get("user_id"))
         tid = team_by_user.get(uid)
-        destination = os.path.join(output_dir, "submissions", sid)
+        destination = os.path.join(work_dir, "submissions", sid)
         try:
             files = _download_submission(api, submission, destination)
         except Exception as exc:
@@ -248,6 +260,7 @@ def main() -> int:
                 "errors": preparation_errors,
             },
         )
+        shutil.rmtree(work_dir, ignore_errors=True)
         print(
             f"准备失败: {len(preparation_errors)}/{len(selected)} 个 submission；"
             f"详情: {error_path}",
@@ -297,7 +310,18 @@ def main() -> int:
         "participants": participant_records,
         "submissions": submission_records,
     }
-    write_json(os.path.join(output_dir, "metadata.json"), jsonable(metadata))
+    staged_metadata = os.path.join(work_dir, "metadata.json")
+    write_json(staged_metadata, jsonable(metadata))
+
+    submissions_dir = os.path.join(output_dir, "submissions")
+    if os.path.exists(submissions_dir):
+        shutil.rmtree(submissions_dir)
+    os.replace(os.path.join(work_dir, "submissions"), submissions_dir)
+    os.replace(staged_metadata, os.path.join(output_dir, "metadata.json"))
+    shutil.rmtree(work_dir, ignore_errors=True)
+    error_path = os.path.join(output_dir, "preparation_errors.json")
+    if os.path.exists(error_path):
+        os.remove(error_path)
     print(f"private submissions: {len(selected)}")
     print(f"participants: {len(participant_records)}")
     print(f"prepared input: {output_dir}")
