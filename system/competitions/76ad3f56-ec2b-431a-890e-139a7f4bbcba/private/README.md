@@ -4,7 +4,7 @@
 `system/alphathonapiserver` 提供的通用评测框架。
 
 当前是最小版本：保留单次评估、A/B/最终分、产物落盘、断点续跑和人工发布；
-未来函数检测、样本外验证与并行执行暂不包含。
+未来函数检测与样本外验证暂不包含。
 
 代码按职责拆分：`prepare_submissions.py` 固化私榜输入，`private.py` 是评测入口，
 `private_judge.py` 编排批次流程，
@@ -50,6 +50,12 @@ python private.py --input /path/to/private/prepared
 
 ```bash
 PRIVATE_BATCH_ID=final_private python private.py --input /path/to/private/prepared
+```
+
+默认最多并行评测 5 个 submission，也可以按机器资源调整：
+
+```bash
+PRIVATE_BATCH_ID=final_private PRIVATE_MAX_WORKERS=3 python private.py
 ```
 
 如果运行中途被终止，使用原来的批次 ID 并开启续跑：

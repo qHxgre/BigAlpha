@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import pandas as pd
@@ -80,7 +82,7 @@ def _load_submission_code(source_dir: str, record: dict, sid: str) -> tuple[str,
 class PrivateJudge(JudgeBase):
     competition_id = COMPETITION_ID
     mode = "private"
-    max_workers = 1
+    max_workers = 5
 
     DATASETS = {
         "bar1m": "bigalpha_2026_stock_bar1m_private",
@@ -101,6 +103,14 @@ class PrivateJudge(JudgeBase):
         self.resume = os.getenv("PRIVATE_RESUME", "").strip().lower() in {
             "1", "true", "yes", "on",
         }
+        try:
+            self.max_workers = int(
+                os.getenv("PRIVATE_MAX_WORKERS", str(self.max_workers))
+            )
+        except ValueError as exc:
+            raise RuntimeError("PRIVATE_MAX_WORKERS 必须是正整数") from exc
+        if self.max_workers < 1:
+            raise RuntimeError("PRIVATE_MAX_WORKERS 必须是正整数")
         if os.path.exists(self.run_dir) and not self.resume:
             raise RuntimeError(
                 f"批次目录已存在，拒绝覆盖: {self.run_dir}。"
@@ -144,9 +154,34 @@ class PrivateJudge(JudgeBase):
         code = self.preprocess_user_code(submission, code)
         return code, code_file
 
-    def _run_submission(self, submission: dict, record: dict) -> dict:
+    def _run_submission(
+        self,
+        submission: dict,
+        record: dict,
+        *,
+        position: int,
+        total: int,
+        progress: dict[str, int],
+        progress_lock: threading.Lock,
+    ) -> dict:
         sid = str(submission["id"])
         row = {"submission_id": sid, "user_id": submission.get("user_id")}
+        started_at = datetime.now().astimezone()
+        started = time.monotonic()
+        with progress_lock:
+            progress["running"] += 1
+            started_progress = dict(progress)
+        self.log.info(
+            "submission.start",
+            submission_id=sid,
+            position=position,
+            total=total,
+            completed=started_progress["completed"],
+            running=started_progress["running"],
+            remaining=total - started_progress["completed"] - started_progress["running"],
+            started_at=started_at.isoformat(timespec="seconds"),
+            msg="开始评测 submission",
+        )
         # 单条提交无论在哪个准备步骤失败，都要有独立结果目录和 result.json，
         # 不能因写失败结果时目录不存在而反过来中断整个批次。
         os.makedirs(self.submission_path(submission), exist_ok=True)
@@ -168,7 +203,45 @@ class PrivateJudge(JudgeBase):
             row["status"] = "success"
         except Exception as exc:
             row.update(status="failed", error=str(exc))
+            error_type = type(exc).__name__
+        elapsed_seconds = round(time.monotonic() - started, 3)
+        row["elapsed_seconds"] = elapsed_seconds
+        row["started_at"] = started_at.isoformat(timespec="seconds")
+        row["finished_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        # 将包含耗时和时间戳的最终结果落盘。
         write_json(os.path.join(self.submission_path(submission), "result.json"), row)
+        with progress_lock:
+            progress["running"] -= 1
+            progress["completed"] += 1
+            finished_progress = dict(progress)
+        remaining = total - finished_progress["completed"] - finished_progress["running"]
+        if row["status"] == "failed":
+            self.log.warning(
+                "submission.failed",
+                submission_id=sid,
+                position=position,
+                total=total,
+                completed=finished_progress["completed"],
+                running=finished_progress["running"],
+                remaining=remaining,
+                elapsed_seconds=elapsed_seconds,
+                error_type=error_type,
+                error=row["error"],
+                msg="submission 评测失败，继续处理后续提交",
+            )
+        self.log.info(
+            "submission.finish",
+            submission_id=sid,
+            status=row["status"],
+            position=position,
+            total=total,
+            completed=finished_progress["completed"],
+            running=finished_progress["running"],
+            remaining=remaining,
+            elapsed_seconds=elapsed_seconds,
+            finished_at=row["finished_at"],
+            msg="submission 评测结束",
+        )
         return row
 
     def _completed_result(self, submission: dict) -> dict | None:
@@ -304,37 +377,108 @@ class PrivateJudge(JudgeBase):
                 selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 selected_submission_ids=sorted(current_id_set),
                 execution_code_source="prepared/submissions/<submission_id> 中自动识别的原始代码文件",
+                max_workers=self.max_workers,
                 published=False,
             )
         try:
             records_by_id = {str(record["submission_id"]): record for record in records}
+            batch_started = time.monotonic()
             update_manifest(
                 self.manifest_path,
                 status="running",
                 prepared_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
-            rows = []
-            for submission in submissions:
+            self.log.info(
+                "private_batch.start",
+                batch_id=self.batch_id,
+                total=len(submissions),
+                completed=0,
+                running=0,
+                remaining=len(submissions),
+                resume=self.resume,
+                max_workers=self.max_workers,
+                msg="私榜批次开始",
+            )
+            progress = {"completed": 0, "running": 0}
+            progress_lock = threading.Lock()
+            rows_by_id: dict[str, dict] = {}
+            pending: list[tuple[int, dict]] = []
+            for position, submission in enumerate(submissions, 1):
+                sid = str(submission["id"])
                 completed = self._completed_result(submission) if self.resume else None
                 if completed is not None:
+                    progress["completed"] += 1
                     self.log.info(
                         "submission.resume_skip",
-                        submission_id=str(submission["id"]),
+                        submission_id=sid,
                         status=completed["status"],
+                        position=position,
+                        total=len(submissions),
+                        completed=progress["completed"],
+                        running=0,
+                        remaining=len(submissions) - progress["completed"],
                         msg="已有完整结果，断点续跑时跳过",
                     )
-                    rows.append(completed)
+                    rows_by_id[sid] = completed
                     continue
-                rows.append(
-                    self._run_submission(
-                        submission, records_by_id[str(submission["id"])]
-                    )
+                pending.append((position, submission))
+
+            worker_count = min(self.max_workers, len(pending))
+            if pending:
+                self.log.info(
+                    "private_batch.dispatch",
+                    batch_id=self.batch_id,
+                    pending=len(pending),
+                    max_workers=worker_count,
+                    completed=progress["completed"],
+                    running=0,
+                    remaining=len(pending),
+                    msg="开始并行调度待评测 submission",
                 )
+                with ThreadPoolExecutor(
+                    max_workers=worker_count,
+                    thread_name_prefix="private-judge",
+                ) as executor:
+                    futures = {
+                        executor.submit(
+                            self._run_submission,
+                            submission,
+                            records_by_id[str(submission["id"])],
+                            position=position,
+                            total=len(submissions),
+                            progress=progress,
+                            progress_lock=progress_lock,
+                        ): str(submission["id"])
+                        for position, submission in pending
+                    }
+                    for future in as_completed(futures):
+                        sid = futures[future]
+                        rows_by_id[sid] = future.result()
+
+            # 恢复 metadata 中的稳定顺序，避免并发完成先后影响汇总文件行序。
+            rows = [
+                rows_by_id[str(submission["id"])]
+                for submission in submissions
+            ]
             self._save_scores(rows)
+            batch_elapsed_seconds = round(time.monotonic() - batch_started, 3)
             update_manifest(
                 self.manifest_path,
                 status="review_pending",
                 completed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                elapsed_seconds=batch_elapsed_seconds,
+            )
+            self.log.info(
+                "private_batch.finish",
+                batch_id=self.batch_id,
+                total=len(submissions),
+                completed=len(submissions),
+                running=0,
+                remaining=0,
+                elapsed_seconds=batch_elapsed_seconds,
+                success=sum(row.get("status") == "success" for row in rows),
+                failed=sum(row.get("status") != "success" for row in rows),
+                msg="私榜批次完成，等待人工审查发布",
             )
         except Exception as exc:
             update_manifest(self.manifest_path, status="failed", error=str(exc))
