@@ -23,6 +23,48 @@ COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 PRIVATE_FILES_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private")
 
 
+def _notebook_code(path: str) -> str:
+    with open(path, encoding="utf-8") as reader:
+        notebook = json.load(reader)
+    code_cells = []
+    for cell in notebook.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = cell.get("source", [])
+        if isinstance(source, list):
+            code_cells.append("".join(source))
+        elif isinstance(source, str):
+            code_cells.append(source)
+    return "\n\n".join(code_cells)
+
+
+def _load_submission_code(source_dir: str, record: dict, sid: str) -> tuple[str, str]:
+    submission_files = ((record.get("submission") or {}).get("data") or {}).get("files") or {}
+    notebooks = [
+        (str(file_id), file_info)
+        for file_id, file_info in submission_files.items()
+        if (file_info or {}).get("name", "").endswith(".ipynb")
+    ]
+    if len(notebooks) != 1:
+        raise RuntimeError(
+            f"submission {sid} 包含 {len(notebooks)} 个 notebook，要求恰好 1 个"
+        )
+
+    file_id, file_info = notebooks[0]
+    saved_by_id = {
+        str(item.get("file_id")): item.get("name")
+        for item in record.get("files") or []
+        if item.get("file_id") is not None
+    }
+    saved_name = saved_by_id.get(file_id)
+    if not saved_name:
+        raise RuntimeError(f"submission {sid} 的 notebook {file_id} 未保存到输入包")
+    path = os.path.join(source_dir, saved_name)
+    if not os.path.isfile(path):
+        raise RuntimeError(f"submission {sid} 缺少 notebook 文件: {path}")
+    return _notebook_code(path), (file_info or {}).get("name") or saved_name
+
+
 class PrivateJudge(JudgeBase):
     competition_id = COMPETITION_ID
     mode = "private"
@@ -61,27 +103,24 @@ class PrivateJudge(JudgeBase):
         self.manifest_path = os.path.join(self.run_dir, "manifest.json")
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
 
-    def _prepare_submission(self, submission: dict, record: dict) -> str:
+    def _prepare_submission(self, submission: dict, record: dict) -> tuple[str, str]:
         """把固化输入复制到运行目录；评测不再访问 submission API。"""
         sid = str(submission["id"])
         source_dir = os.path.join(self.input_dir, record["relative_path"])
         runner_dir = self.submission_path(submission)
         if not os.path.isdir(source_dir):
             raise RuntimeError(f"submission {sid} 的固化目录不存在: {source_dir}")
+        code, code_file = _load_submission_code(source_dir, record, sid)
+        code = self.preprocess_user_code(submission, code)
         shutil.copytree(source_dir, runner_dir, dirs_exist_ok=True)
-        code_path = os.path.join(source_dir, "submission_code.py")
-        if not os.path.isfile(code_path):
-            raise RuntimeError(f"submission {sid} 缺少固化代码: {code_path}")
-        return code_path
+        return code, code_file
 
     def _run_submission(self, submission: dict) -> dict:
         sid = str(submission["id"])
         row = {"submission_id": sid, "user_id": submission.get("user_id")}
         try:
-            code_path = submission.pop("_prepared_code_path")
-            with open(code_path, encoding="utf-8") as reader:
-                code = reader.read()
-            row["code_path"] = code_path
+            code = submission.pop("_prepared_code")
+            row["code_file"] = submission.pop("_prepared_code_file")
             runner = LocalProcessUserRunner(
                 submission_id=sid,
                 files={
@@ -200,15 +239,17 @@ class PrivateJudge(JudgeBase):
             input_summary=metadata.get("summary"),
             selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             selected_submission_ids=sorted(current_id_set),
-            execution_code_source=os.path.join(self.input_dir, "submissions/<submission_id>/submission_code.py"),
+            execution_code_source="prepared/submissions/<submission_id> 中自动识别的原始代码文件",
             published=False,
         )
         try:
             records_by_id = {str(record["submission_id"]): record for record in records}
             for submission in submissions:
-                submission["_prepared_code_path"] = self._prepare_submission(
+                code, code_file = self._prepare_submission(
                     submission, records_by_id[str(submission["id"])]
                 )
+                submission["_prepared_code"] = code
+                submission["_prepared_code_file"] = code_file
             update_manifest(
                 self.manifest_path,
                 status="running",

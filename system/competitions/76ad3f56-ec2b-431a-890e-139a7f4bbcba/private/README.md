@@ -25,21 +25,14 @@ private/prepared/
 ├── metadata.json
 └── submissions/
     └── <submission_id>/
-        ├── <非 notebook 附件>
-        └── submission_code.py
+        └── <API 返回的全部原始文件>
 ```
 
 `metadata.json` 包含团队、团队成员姓名、学校、公榜分数、重新按纯公榜分数计算的
 公榜排名、每队私榜 submission 数，以及全部入围 submission 的原始 API 快照和落盘路径。
-没有团队的个人参赛者也会单独记录。原始 notebook 仅在准备过程中用于提取代码，
-生成 `submission_code.py` 后立即删除，避免同一份 submission 代码重复占用磁盘；
-非 notebook 附件仍会保留，`.parquet` 文件不会转移。
-
-脚本会按文件内容识别 notebook，不依赖上传文件名必须以 `.ipynb` 结尾。如果某个
-入围提交没有且仅有一个有效 notebook，脚本会继续检查其余提交，最后退出并在批次
-目录写入 `preparation_errors.json`。该报告包含失败 submission ID、用户 ID、API
-文件清单和原始提交快照；存在失败时不会生成可供 `private.py` 使用的
-新 `metadata.json`，上一份成功准备的输入仍会保留，应先修正入围提交后重新准备。
+没有团队的个人参赛者也会单独记录。脚本不判断文件类型或内容，通过 submission API
+返回的文件清单逐个原样下载，包括无扩展名文件、notebook、Python 文件和 parquet。
+只有 API 下载本身失败时才会记录到 `preparation_errors.json`。
 
 输出目录固定为 `private/prepared/`，每次成功运行会替换其中唯一的 `submissions/`
 目录和 `metadata.json`，不会再按时间创建多份 submission 目录。`--batch-id` 仅作为
@@ -63,7 +56,12 @@ PRIVATE_BATCH_ID=final_private python private.py --input /path/to/private/prepar
 当前 `selected_for_private=True` 的 submission，并与 `metadata.json` 中的固化 ID 集合
 做严格比对。数量和 ID 必须完全一致才会继续评测；如果参赛者在准备后重新选择，程序
 会列出线上新增及已取消选择的 submission，抛错并要求重新运行
-`prepare_submissions.py`。验证通过后，实际代码只从对应的 `submission_code.py` 读取。
+`prepare_submissions.py`。
+
+评测阶段按公榜相同规则从 submission 元数据中查找文件名以 `.ipynb` 结尾的文件，
+要求恰好一个，再从固化输入目录读取该 notebook、拼接其中的代码单元并注入 runner。
+其他原始文件只作为运行附件保留；私榜不会重新通过 API 下载文件，也不依赖预先生成的
+`submission_code.py`。
 
 程序会在
 `/home/aiuser/work/workspace/BigAlpha/system/files/76ad3f56-ec2b-431a-890e-139a7f4bbcba/private/runs/<batch_id>/`

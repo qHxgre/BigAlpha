@@ -76,20 +76,6 @@ def _submission_files(submission: dict) -> dict:
     return files
 
 
-def _load_notebook(path: str) -> dict | None:
-    """按内容识别 notebook，避免只依赖不可靠的文件名后缀。"""
-    try:
-        with open(path, encoding="utf-8-sig") as reader:
-            value = json.load(reader)
-    except (UnicodeDecodeError, json.JSONDecodeError, OSError):
-        return None
-    if not isinstance(value, dict) or not isinstance(value.get("cells"), list):
-        return None
-    if "nbformat" not in value:
-        return None
-    return value
-
-
 def _safe_file_name(file_id: str, file_info: dict | None, used: set[str]) -> str:
     info = file_info if isinstance(file_info, dict) else {}
     raw_name = info.get("name") or str(file_id)
@@ -105,10 +91,10 @@ def _safe_file_name(file_id: str, file_info: dict | None, used: set[str]) -> str
 
 
 def _download_submission(api: AlphathonAPI, submission: dict, destination: str) -> list[dict]:
+    """通过 API 原样下载提交中的全部文件，不判断文件类型或内容。"""
     sid = str(submission["id"])
     os.makedirs(destination)
     downloaded = []
-    notebooks: list[tuple[str, dict]] = []
     files = _submission_files(submission)
     used_names: set[str] = set()
     for file_id, file_info in files.items():
@@ -117,49 +103,9 @@ def _download_submission(api: AlphathonAPI, submission: dict, destination: str) 
                 f"文件 {file_id} 的元数据类型错误: {type(file_info).__name__}"
             )
         name = _safe_file_name(str(file_id), file_info, used_names)
-        if os.path.splitext(name)[1].lower() == ".parquet":
-            continue
         path = os.path.join(destination, name)
         api.get_submission_file(sid, str(file_id), file_info, save_to=path)
         downloaded.append({"file_id": str(file_id), "name": name})
-        notebook = _load_notebook(path)
-        if notebook is not None:
-            notebooks.append((path, notebook))
-    if len(notebooks) != 1:
-        file_summary = [
-            {
-                "file_id": str(file_id),
-                "name": file_info.get("name") if isinstance(file_info, dict) else None,
-            }
-            for file_id, file_info in files.items()
-        ]
-        raise RuntimeError(
-            f"submission {sid} 包含 {len(notebooks)} 个有效 notebook，要求恰好 1 个；"
-            f"API 文件清单={json.dumps(file_summary, ensure_ascii=False)}"
-        )
-
-    notebook_path, notebook = notebooks[0]
-    notebook_name = os.path.basename(notebook_path)
-    notebook_file = next(item for item in downloaded if item["name"] == notebook_name)
-    code_cells = []
-    for cell in notebook.get("cells", []):
-        if isinstance(cell, dict) and cell.get("cell_type") == "code":
-            source = cell.get("source", [])
-            code_cells.append("".join(source) if isinstance(source, list) else str(source))
-    code_path = os.path.join(destination, "submission_code.py")
-    with open(code_path, "w", encoding="utf-8") as writer:
-        writer.write("\n\n".join(code_cells))
-    os.remove(notebook_path)
-    downloaded.remove(notebook_file)
-    downloaded.append(
-        {
-            "file_id": None,
-            "name": "submission_code.py",
-            "generated": True,
-            "source_file_id": notebook_file["file_id"],
-            "source_name": notebook_file["name"],
-        }
-    )
     return downloaded
 
 
@@ -240,7 +186,6 @@ def main() -> int:
             "public_score": submission.get("public_score"),
             "created_at": submission.get("created_at"),
             "relative_path": f"submissions/{sid}",
-            "code_file": f"submissions/{sid}/submission_code.py",
             "files": files,
             "submission": submission,
         }
