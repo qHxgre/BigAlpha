@@ -39,7 +39,19 @@ def _notebook_code(path: str) -> str:
 
 
 def _load_submission_code(source_dir: str, record: dict, sid: str) -> tuple[str, str]:
-    submission_files = ((record.get("submission") or {}).get("data") or {}).get("files") or {}
+    submission = record.get("submission") or {}
+    submission_data = submission.get("data") or {}
+    # API 的 submission 列表在不同版本中可能把 files 放在 data 内或顶层。
+    # prepare_submissions.py 下载时已经兼容了两种结构，这里必须使用相同规则，
+    # 否则顶层 files 的提交会在文件已经固化后仍被误判为 0 个 notebook。
+    submission_files = submission_data.get("files")
+    if submission_files is None:
+        submission_files = submission.get("files")
+    if not isinstance(submission_files, dict):
+        raise RuntimeError(
+            f"submission {sid} 的 files 字段类型错误: "
+            f"{type(submission_files).__name__}"
+        )
     notebooks = [
         (str(file_id), file_info)
         for file_id, file_info in submission_files.items()
