@@ -33,6 +33,12 @@ private/prepared/final_20260806/
 公榜排名、每队私榜 submission 数，以及全部入围 submission 的原始 API 快照和落盘路径。
 没有团队的个人参赛者也会单独记录。`.parquet` 文件不会转移。
 
+脚本会按文件内容识别 notebook，不依赖上传文件名必须以 `.ipynb` 结尾。如果某个
+入围提交没有且仅有一个有效 notebook，脚本会继续检查其余提交，最后退出并在批次
+目录写入 `preparation_errors.json`。该报告包含失败 submission ID、用户 ID、API
+文件清单和原始提交快照；存在失败时不会生成可供 `private.py` 使用的
+`metadata.json`，应先修正入围提交后用新的 batch ID 重新准备。
+
 ## 运行评估
 
 评测必须显式指定上一步生成的输入包：
