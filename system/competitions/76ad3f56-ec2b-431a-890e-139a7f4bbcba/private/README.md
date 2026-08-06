@@ -8,7 +8,8 @@
 
 代码按职责拆分：`private.py` 是兼容入口，`private_judge.py` 编排批次流程，
 `templates.py` 生成隔离 runner，`scoring.py` 负责纯评分计算，`regression.py`
-负责因子池回归，`fileio.py` 管理批次文件，`trading_day.py` 查询评估结束日。
+负责因子池回归，`fileio.py` 管理批次文件。评估结束日由入口在运行时通过
+`datetime.now()` 取当前日期。
 
 ## 运行评估
 

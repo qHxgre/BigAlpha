@@ -1,8 +1,9 @@
-"""私榜评测入口：解析评估结束日并执行一次完整批次。"""
+"""私榜评测入口：使用当前日期作为评估结束日并执行一次完整批次。"""
 from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 API_SERVER = os.getenv(
@@ -14,7 +15,6 @@ for path in (API_SERVER, HERE):
         sys.path.append(path)
 
 from private_judge import PrivateJudge
-from trading_day import resolve_latest_trading_day
 
 
 # 保留原来的类名，避免外部脚本通过 ``from private import Judge`` 使用时失效。
@@ -22,5 +22,5 @@ Judge = PrivateJudge
 
 
 if __name__ == "__main__":
-    Judge.DATE_END = resolve_latest_trading_day(Judge.DATASETS["bar1m"])
+    Judge.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
     Judge().run_once()
