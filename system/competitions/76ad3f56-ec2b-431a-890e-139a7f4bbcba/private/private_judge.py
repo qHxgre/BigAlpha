@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
 from datetime import datetime
 
@@ -34,22 +35,23 @@ class PrivateJudge(JudgeBase):
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = ""
     RUNS_DIR = os.path.join(PRIVATE_FILES_DIR, "runs")
-    SELECTED_SUBMISSIONS_DIR = os.path.join(PRIVATE_FILES_DIR, "selected_submissions")
 
-    def __init__(self) -> None:
+    def __init__(self, input_dir: str) -> None:
         super().__init__()
+        self.input_dir = os.path.abspath(input_dir)
+        self.input_metadata_path = os.path.join(self.input_dir, "metadata.json")
+        if not os.path.isfile(self.input_metadata_path):
+            raise RuntimeError(f"private 输入包缺少 metadata.json: {self.input_dir}")
         self.batch_id = os.getenv("PRIVATE_BATCH_ID") or time.strftime("%Y%m%d_%H%M%S")
         self.run_dir = os.path.join(self.RUNS_DIR, self.batch_id)
         if os.path.exists(self.run_dir):
             raise RuntimeError(f"批次目录已存在，拒绝覆盖: {self.run_dir}")
 
         self.submission_dir = os.path.join(self.run_dir, "submissions")
-        self.selected_submission_dir = self.SELECTED_SUBMISSIONS_DIR
         self.artifact_dir = os.path.join(self.run_dir, "artifacts")
         self.log_dir = os.path.join(self.run_dir, "logs")
         for path in (
             self.submission_dir,
-            self.selected_submission_dir,
             self.artifact_dir,
             self.log_dir,
         ):
@@ -59,40 +61,27 @@ class PrivateJudge(JudgeBase):
         self.manifest_path = os.path.join(self.run_dir, "manifest.json")
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
 
-    def _save_selected_submission_files(self, submission: dict) -> None:
-        """单独归档入围提交的原始文件，不混入任何评测运行产物。"""
+    def _prepare_submission(self, submission: dict, record: dict) -> str:
+        """把固化输入复制到运行目录；评测不再访问 submission API。"""
         sid = str(submission["id"])
-        destination = os.path.join(self.selected_submission_dir, sid)
-        os.makedirs(destination, exist_ok=True)
-
-        files = (submission.get("data") or {}).get("files") or {}
-        for file_id, file_info in files.items():
-            file_name = (file_info or {}).get("name") or str(file_id)
-            # 与 collect_best_submissions.py 保持一致：大体积数据文件不归档。
-            if os.path.splitext(file_name)[1].lower() == ".parquet":
-                continue
-            # API 中的文件名来自用户输入，只取 basename，避免写出归档目录。
-            file_name = os.path.basename(file_name)
-            save_to = os.path.join(destination, file_name)
-            if os.path.isfile(save_to):
-                continue
-            self.alphathon_api.get_submission_file(
-                sid,
-                str(file_id),
-                file_info,
-                save_to=save_to,
-            )
+        source_dir = os.path.join(self.input_dir, record["relative_path"])
+        runner_dir = self.submission_path(submission)
+        if not os.path.isdir(source_dir):
+            raise RuntimeError(f"submission {sid} 的固化目录不存在: {source_dir}")
+        shutil.copytree(source_dir, runner_dir, dirs_exist_ok=True)
+        code_path = os.path.join(source_dir, "submission_code.py")
+        if not os.path.isfile(code_path):
+            raise RuntimeError(f"submission {sid} 缺少固化代码: {code_path}")
+        return code_path
 
     def _run_submission(self, submission: dict) -> dict:
         sid = str(submission["id"])
         row = {"submission_id": sid, "user_id": submission.get("user_id")}
         try:
-            self.save_submission_files(submission)
-            code = self.alphathon_api.get_file_content_of_submission(
-                submission, ipynb_to_py=True, to_str=True
-            )
-            if isinstance(code, bytes):
-                code = code.decode("utf-8")
+            code_path = submission.pop("_prepared_code_path")
+            with open(code_path, encoding="utf-8") as reader:
+                code = reader.read()
+            row["code_path"] = code_path
             runner = LocalProcessUserRunner(
                 submission_id=sid,
                 files={
@@ -155,10 +144,35 @@ class PrivateJudge(JudgeBase):
         write_pending_publish(self.pending_path, pending)
 
     def run_once(self) -> None:
-        submissions = self.alphathon_api.query_submissions(
+        with open(self.input_metadata_path, encoding="utf-8") as reader:
+            metadata = json.load(reader)
+        if metadata.get("competition_id") != self.competition_id:
+            raise RuntimeError("private 输入包的 competition_id 不匹配")
+        records = metadata.get("submissions") or []
+        prepared_ids = [str(record["submission_id"]) for record in records]
+        if len(prepared_ids) != len(set(prepared_ids)):
+            raise RuntimeError("private 输入包包含重复的 submission_id")
+
+        current_selected = self.alphathon_api.query_submissions(
             competition_id=self.competition_id,
             constraints={"selected_for_private": True},
         )
+        current_ids = [str(submission["id"]) for submission in current_selected]
+        prepared_id_set = set(prepared_ids)
+        current_id_set = set(current_ids)
+        if len(current_ids) != len(current_id_set):
+            raise RuntimeError("API 返回了重复的 selected_for_private submission_id")
+        if prepared_id_set != current_id_set:
+            newly_selected = sorted(current_id_set - prepared_id_set)
+            no_longer_selected = sorted(prepared_id_set - current_id_set)
+            raise RuntimeError(
+                "线上 private submission 与固化输入包不一致，拒绝评测: "
+                f"线上新增={newly_selected}, 已取消选择={no_longer_selected}, "
+                f"线上数量={len(current_ids)}, 输入包数量={len(prepared_ids)}。"
+                "请重新运行 prepare_submissions.py。"
+            )
+
+        submissions = [dict(record["submission"]) for record in records]
         if not submissions:
             raise RuntimeError("没有 selected_for_private=True 的 submission")
 
@@ -170,23 +184,36 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每个用户最多选择两个 submission: {violations}")
 
         write_json(os.path.join(self.run_dir, "submissions.json"), submissions)
-        for submission in submissions:
-            self._save_selected_submission_files(submission)
         update_manifest(
             self.manifest_path,
             competition_id=self.competition_id,
             mode=self.mode,
             batch_id=self.batch_id,
-            status="running",
+            status="preparing",
             created_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             date_start=self.DATE_START,
             date_end=self.DATE_END,
             datasets=self.DATASETS,
             submission_count=len(submissions),
-            selected_submissions_dir=self.selected_submission_dir,
+            input_dir=self.input_dir,
+            input_batch_id=metadata.get("batch_id"),
+            input_summary=metadata.get("summary"),
+            selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+            selected_submission_ids=sorted(current_id_set),
+            execution_code_source=os.path.join(self.input_dir, "submissions/<submission_id>/submission_code.py"),
             published=False,
         )
         try:
+            records_by_id = {str(record["submission_id"]): record for record in records}
+            for submission in submissions:
+                submission["_prepared_code_path"] = self._prepare_submission(
+                    submission, records_by_id[str(submission["id"])]
+                )
+            update_manifest(
+                self.manifest_path,
+                status="running",
+                prepared_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+            )
             rows = [self._run_submission(submission) for submission in submissions]
             self._save_scores(rows)
             update_manifest(

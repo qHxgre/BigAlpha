@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+import argparse
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,5 +23,8 @@ Judge = PrivateJudge
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="评估已经由 prepare_submissions.py 固化的私榜提交")
+    parser.add_argument("--input", required=True, help="prepared/<batch_id> 输入包目录")
+    args = parser.parse_args()
     Judge.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
-    Judge().run_once()
+    Judge(input_dir=args.input).run_once()
