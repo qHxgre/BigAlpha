@@ -122,17 +122,21 @@ class PrivateJudge(JudgeBase):
         runner_dir = self.submission_path(submission)
         if not os.path.isdir(source_dir):
             raise RuntimeError(f"submission {sid} 的固化目录不存在: {source_dir}")
+        # 与公榜先 save_submission_files 再执行代码一致：即使 notebook 不合规，
+        # 也保留该 submission 的原始文件，方便审查失败原因。
+        shutil.copytree(source_dir, runner_dir, dirs_exist_ok=True)
         code, code_file = _load_submission_code(source_dir, record, sid)
         code = self.preprocess_user_code(submission, code)
-        shutil.copytree(source_dir, runner_dir, dirs_exist_ok=True)
         return code, code_file
 
-    def _run_submission(self, submission: dict) -> dict:
+    def _run_submission(self, submission: dict, record: dict) -> dict:
         sid = str(submission["id"])
         row = {"submission_id": sid, "user_id": submission.get("user_id")}
+        # 单条提交无论在哪个准备步骤失败，都要有独立结果目录和 result.json，
+        # 不能因写失败结果时目录不存在而反过来中断整个批次。
+        os.makedirs(self.submission_path(submission), exist_ok=True)
         try:
-            code = submission.pop("_prepared_code")
-            row["code_file"] = submission.pop("_prepared_code_file")
+            code, row["code_file"] = self._prepare_submission(submission, record)
             runner = LocalProcessUserRunner(
                 submission_id=sid,
                 files={
@@ -256,18 +260,17 @@ class PrivateJudge(JudgeBase):
         )
         try:
             records_by_id = {str(record["submission_id"]): record for record in records}
-            for submission in submissions:
-                code, code_file = self._prepare_submission(
-                    submission, records_by_id[str(submission["id"])]
-                )
-                submission["_prepared_code"] = code
-                submission["_prepared_code_file"] = code_file
             update_manifest(
                 self.manifest_path,
                 status="running",
                 prepared_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
-            rows = [self._run_submission(submission) for submission in submissions]
+            rows = [
+                self._run_submission(
+                    submission, records_by_id[str(submission["id"])]
+                )
+                for submission in submissions
+            ]
             self._save_scores(rows)
             update_manifest(
                 self.manifest_path,
