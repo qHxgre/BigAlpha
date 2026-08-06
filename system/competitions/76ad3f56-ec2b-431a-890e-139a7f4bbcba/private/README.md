@@ -22,7 +22,9 @@ python private.py
 PRIVATE_BATCH_ID=final_20260806 python private.py
 ```
 
-程序会在 `runs/<batch_id>/` 下保存：
+程序会在
+`/home/aiuser/work/workspace/BigAlpha/system/files/76ad3f56-ec2b-431a-890e-139a7f4bbcba/private/runs/<batch_id>/`
+下保存批次产物：
 
 - `manifest.json`：批次状态、数据区间、数据表和提交数量；
 - `submissions.json`：本次入围提交快照；
@@ -30,6 +32,15 @@ PRIVATE_BATCH_ID=final_20260806 python private.py
 - `artifacts/`：单因子、回归、最终榜单和汇总文件；
 - `pending_publish.jsonl`：待人工确认的后台分数更新；
 - `logs/judge_private.log`：本批次评测日志。
+
+入围提交的原始上传文件单独保存在同一 `private` 根目录下：
+
+```text
+private/selected_submissions/<submission_id>/
+```
+
+该目录跳过 `.parquet`，不包含 runner、日志、结果 JSON、缓存等评测中间产物；
+文件已存在时不会重复下载，因此不同批次可以共享同一份原始提交归档。
 
 评估过程不会更新后台 submission 分数。批次成功结束后，`manifest.json` 状态为
 `review_pending`。

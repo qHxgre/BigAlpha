@@ -9,6 +9,7 @@ from datetime import datetime
 import pandas as pd
 
 from judge.judgebase import JudgeBase, LocalProcessUserRunner, setup_judge_logging
+from judge.paths import FILE_DIR
 
 from fileio import jsonable, update_manifest, write_json, write_pending_publish
 from regression import run_regression
@@ -17,10 +18,12 @@ from templates import build_sfa_runner
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+PRIVATE_FILES_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private")
 
 
 class PrivateJudge(JudgeBase):
-    competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+    competition_id = COMPETITION_ID
     mode = "private"
     max_workers = 1
 
@@ -30,7 +33,8 @@ class PrivateJudge(JudgeBase):
     }
     DATE_START = "2025-01-01 00:00:00"
     DATE_END = ""
-    RUNS_DIR = os.path.join(HERE, "runs")
+    RUNS_DIR = os.path.join(PRIVATE_FILES_DIR, "runs")
+    SELECTED_SUBMISSIONS_DIR = os.path.join(PRIVATE_FILES_DIR, "selected_submissions")
 
     def __init__(self) -> None:
         super().__init__()
@@ -40,14 +44,44 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"批次目录已存在，拒绝覆盖: {self.run_dir}")
 
         self.submission_dir = os.path.join(self.run_dir, "submissions")
+        self.selected_submission_dir = self.SELECTED_SUBMISSIONS_DIR
         self.artifact_dir = os.path.join(self.run_dir, "artifacts")
         self.log_dir = os.path.join(self.run_dir, "logs")
-        for path in (self.submission_dir, self.artifact_dir, self.log_dir):
+        for path in (
+            self.submission_dir,
+            self.selected_submission_dir,
+            self.artifact_dir,
+            self.log_dir,
+        ):
             os.makedirs(path, exist_ok=True)
         setup_judge_logging(os.path.join(self.log_dir, "judge_private.log"))
 
         self.manifest_path = os.path.join(self.run_dir, "manifest.json")
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
+
+    def _save_selected_submission_files(self, submission: dict) -> None:
+        """单独归档入围提交的原始文件，不混入任何评测运行产物。"""
+        sid = str(submission["id"])
+        destination = os.path.join(self.selected_submission_dir, sid)
+        os.makedirs(destination, exist_ok=True)
+
+        files = (submission.get("data") or {}).get("files") or {}
+        for file_id, file_info in files.items():
+            file_name = (file_info or {}).get("name") or str(file_id)
+            # 与 collect_best_submissions.py 保持一致：大体积数据文件不归档。
+            if os.path.splitext(file_name)[1].lower() == ".parquet":
+                continue
+            # API 中的文件名来自用户输入，只取 basename，避免写出归档目录。
+            file_name = os.path.basename(file_name)
+            save_to = os.path.join(destination, file_name)
+            if os.path.isfile(save_to):
+                continue
+            self.alphathon_api.get_submission_file(
+                sid,
+                str(file_id),
+                file_info,
+                save_to=save_to,
+            )
 
     def _run_submission(self, submission: dict) -> dict:
         sid = str(submission["id"])
@@ -136,6 +170,8 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每个用户最多选择两个 submission: {violations}")
 
         write_json(os.path.join(self.run_dir, "submissions.json"), submissions)
+        for submission in submissions:
+            self._save_selected_submission_files(submission)
         update_manifest(
             self.manifest_path,
             competition_id=self.competition_id,
@@ -147,6 +183,7 @@ class PrivateJudge(JudgeBase):
             date_end=self.DATE_END,
             datasets=self.DATASETS,
             submission_count=len(submissions),
+            selected_submissions_dir=self.selected_submission_dir,
             published=False,
         )
         try:
