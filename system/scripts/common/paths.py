@@ -118,3 +118,8 @@ def resolve_daily_reports_dir(competition_id: str) -> Path:
 def resolve_submissions_dir(competition_id: str) -> Path:
     """评测系统产出的提交目录：system/files/{competition_id}/submissions。"""
     return FILES_ROOT / competition_id / "submissions"
+
+
+def resolve_downloads_dir(competition_id: str) -> Path:
+    """本地整理出的下载目录：system/files/{competition_id}/downloads（与 submissions 平级）。"""
+    return FILES_ROOT / competition_id / "downloads"
