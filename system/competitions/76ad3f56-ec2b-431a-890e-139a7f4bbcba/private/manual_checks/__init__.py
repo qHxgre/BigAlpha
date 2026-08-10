@@ -16,11 +16,18 @@ from .regression import (
 )
 from .visualization import plot_regression_overview, rerun_regression_explanation
 
+
+def generate_markdown_report(*args, **kwargs):
+    """延迟导入报告模块，兼容 Notebook 导入和 ``python -m`` 执行。"""
+    from .report import generate_markdown_report as generate
+
+    return generate(*args, **kwargs)
+
 __all__ = [
     "CheckPaths", "check_score_consistency", "analyze_rank_conflicts",
     "analyze_ab_weight_sensitivity", "analyze_a_metric_sensitivity",
     "check_regression_integrity", "analyze_regression_stability",
     "analyze_factor_similarity", "analyze_failed_submissions",
     "analyze_b_score_robustness", "plot_regression_overview",
-    "rerun_regression_explanation",
+    "rerun_regression_explanation", "generate_markdown_report",
 ]

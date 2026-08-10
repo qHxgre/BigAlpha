@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -59,8 +62,15 @@ def plot_regression_overview(paths: CheckPaths, *, top_n: int = 30) -> pd.DataFr
     return result
 
 
-def rerun_regression_explanation(paths: CheckPaths, *, top_n: int = 20) -> dict[str, pd.DataFrame]:
-    """复跑正式滚动回归并绘制解释图；需要 BigQuant 评测环境。"""
+def rerun_regression_explanation(
+    paths: CheckPaths,
+    *,
+    top_n: int = 20,
+    output_dir: str | Path | None = None,
+    tolerance: float = 1e-8,
+    plot: bool = True,
+) -> dict[str, pd.DataFrame]:
+    """复跑正式滚动回归；可导出结果包供本地报告读取。"""
     if paths.bigalpha_eval_src is None:
         raise ValueError("CheckPaths.bigalpha_eval_src 未配置")
     add_to_sys_path(paths.bigalpha_eval_src)
@@ -72,12 +82,56 @@ def rerun_regression_explanation(paths: CheckPaths, *, top_n: int = 20) -> dict[
     rerun = analyzer.score(pool, plot=False)
     scores, weights = rerun.per_factor_scores.copy(), rerun.weights_history.copy()
     official = read_regression(paths)
-    check = official.merge(scores, on="factor", suffixes=("_official", "_rerun"), validate="one_to_one")
-    for metric in ("model_score", "abs_weight_mean", "abs_weight_std", "selection_rate"):
+    metrics = ("model_score", "abs_weight_mean", "abs_weight_std", "selection_rate")
+    check = official.merge(
+        scores,
+        on="factor",
+        how="outer",
+        suffixes=("_official", "_rerun"),
+        validate="one_to_one",
+        indicator=True,
+    )
+    for metric in metrics:
         check[f"{metric}_delta"] = (check[f"{metric}_official"] - check[f"{metric}_rerun"]).abs()
     delta_columns = [column for column in check if column.endswith("_delta")]
-    print(f"解释性复跑与正式回归最大字段差异: {check[delta_columns].max().max():.3e}；滚动窗口: {len(weights)}")
-    analyzer.plot()
+    check["rerun_mismatch"] = check["_merge"].ne("both") | check[delta_columns].gt(tolerance).any(axis=1)
+    max_delta = check[delta_columns].max().max()
+    mismatch_count = int(check["rerun_mismatch"].sum())
+    print(
+        f"解释性复跑与正式回归最大字段差异: {max_delta:.3e}；"
+        f"差异因子: {mismatch_count}；滚动窗口: {len(weights)}"
+    )
+    if plot:
+        analyzer.plot()
+
+    if output_dir is not None:
+        export_dir = Path(output_dir).expanduser().resolve()
+        export_dir.mkdir(parents=True, exist_ok=True)
+        check.to_csv(export_dir / "regression_rerun_comparison.csv", index=False, encoding="utf-8-sig")
+        scores.to_csv(export_dir / "regression_rerun_scores.csv", index=False, encoding="utf-8-sig")
+        weights.to_parquet(export_dir / "regression_rerun_weights_history.parquet", index=False)
+        summary = {
+            "status": "PASS" if mismatch_count == 0 else "BLOCK",
+            "tolerance": tolerance,
+            "official_factor_count": int(len(official)),
+            "rerun_factor_count": int(len(scores)),
+            "comparison_factor_count": int(len(check)),
+            "mismatch_count": mismatch_count,
+            "rolling_window_count": int(len(weights)),
+            "max_delta": None if pd.isna(max_delta) else float(max_delta),
+            "max_delta_by_metric": {
+                metric: (
+                    None
+                    if pd.isna(check[f"{metric}_delta"].max())
+                    else float(check[f"{metric}_delta"].max())
+                )
+                for metric in metrics
+            },
+        }
+        (export_dir / "regression_rerun_summary.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"回归复跑结果包已导出：{export_dir}")
     # 库内置图保留正式解释口径；返回底层数据，便于 notebook 继续自定义绘图。
     result = {"score_check": check, "scores": scores, "weights_history": weights}
     show(scores.head(top_n), weights.head())
