@@ -32,7 +32,7 @@ class Judge(PrivateJudge):
         "bar15m": "bigalpha_2026_stock_bar15m_private",
         "bar30m": "bigalpha_2026_stock_bar30m_private",
     }
-    DATE_START = "2025-12-01 00:00:00"
+    DATE_START = "2025-01-01 00:00:00"
 
     def __init__(self) -> None:
         self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")

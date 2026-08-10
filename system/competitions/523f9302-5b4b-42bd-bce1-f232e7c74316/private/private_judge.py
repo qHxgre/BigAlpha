@@ -58,6 +58,7 @@ class PrivateJudge(JudgeBase):
     DATE_START = ""
     DATE_END = ""
     RUNS_DIR = os.path.join(PRIVATE_FILES_DIR, "runs")
+    HEARTBEAT_INTERVAL_SECONDS = 60
 
     def __init__(self, input_dir: str, *, batch_id: str, resume: bool,
                  rerun_submission_ids: list[str], max_workers: int) -> None:
@@ -138,7 +139,32 @@ class PrivateJudge(JudgeBase):
         with lock:
             progress["running"] -= 1
             progress["completed"] += 1
+            progress[row["status"]] += 1
         return row
+
+    def _heartbeat(self, total: int, progress: dict, lock: threading.Lock,
+                   stop: threading.Event, started: float) -> None:
+        """定时输出批次进度；Event.wait 让退出时无需等待完整间隔。"""
+        sequence = 0
+        while not stop.wait(self.HEARTBEAT_INTERVAL_SECONDS):
+            with lock:
+                snapshot = dict(progress)
+            sequence += 1
+            remaining = total - snapshot["completed"]
+            self.log.info(
+                "private_batch.heartbeat",
+                seq=sequence,
+                batch_id=self.batch_id,
+                total=total,
+                completed=snapshot["completed"],
+                success=snapshot["success"],
+                failed=snapshot["failed"],
+                running=snapshot["running"],
+                queued=max(0, remaining - snapshot["running"]),
+                remaining=remaining,
+                elapsed_seconds=round(time.monotonic() - started, 1),
+                msg="私榜批次仍在运行",
+            )
 
     def _save_score_pool(self, rows: list[dict]) -> None:
         process_frames, raw_frames = [], []
@@ -227,13 +253,31 @@ class PrivateJudge(JudgeBase):
                     rows[sid] = done
                 else:
                     pending.append(submission)
-            progress = {"running": 0, "completed": len(rows)}
+            progress = {
+                "running": 0,
+                "completed": len(rows),
+                "success": sum(row.get("status") == "success" for row in rows.values()),
+                "failed": sum(row.get("status") == "failed" for row in rows.values()),
+            }
             lock = threading.Lock()
             if pending:
-                with ThreadPoolExecutor(max_workers=min(self.max_workers, len(pending))) as pool:
-                    futures = {pool.submit(self._run_one, s, record_map[str(s["id"])], progress, lock): str(s["id"]) for s in pending}
-                    for future in as_completed(futures):
-                        rows[futures[future]] = future.result()
+                heartbeat_stop = threading.Event()
+                heartbeat_started = time.monotonic()
+                heartbeat_thread = threading.Thread(
+                    target=self._heartbeat,
+                    args=(len(submissions), progress, lock, heartbeat_stop, heartbeat_started),
+                    name="private-judge-heartbeat",
+                    daemon=True,
+                )
+                heartbeat_thread.start()
+                try:
+                    with ThreadPoolExecutor(max_workers=min(self.max_workers, len(pending))) as pool:
+                        futures = {pool.submit(self._run_one, s, record_map[str(s["id"])], progress, lock): str(s["id"]) for s in pending}
+                        for future in as_completed(futures):
+                            rows[futures[future]] = future.result()
+                finally:
+                    heartbeat_stop.set()
+                    heartbeat_thread.join()
             ordered = [rows[str(s["id"])] for s in submissions]
             self._save_scores(ordered)
             update_manifest(self.manifest_path, status="review_pending",
