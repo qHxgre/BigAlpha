@@ -118,6 +118,17 @@ RERUN_SUBMISSION_IDS = [
 
 ## 审查与发布
 
+`manual_check.py` 按 `# %%` 分成多个自包含的 Notebook chunk。复制需要的 chunk 到
+Notebook，修改其中的 `RUN_DIR` 后直接运行查看输出：
+
+```bash
+# 在编辑器中打开 manual_check.py，复制某个 # %% 代码块
+```
+
+检查包括评分复算一致性、A/B 权重敏感性、移除单项指标后的排名稳定性、指标相关性、
+相邻名次分差，以及处理后因子的两两相关性。每个 chunk 只通过 `display()` 和
+`print()` 展示结果，不生成文件，也不会修改榜单或 `pending_publish.jsonl`。
+
 先预览：
 
 ```bash
