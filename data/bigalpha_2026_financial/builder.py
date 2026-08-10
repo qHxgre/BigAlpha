@@ -7,7 +7,7 @@ from bigalpha_2026_financial.schema import BigAlpha2026FinancialSchema
 
 
 class Bigalpha2026FinancialBuilder(BaseBuilder):
-    datasource_id = "bigalpha_2026_financial"
+    datasource_id = "bigalpha_2026_financial_private"
     unique_together = ["date", "instrument", "report_date", "shift", "category"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
