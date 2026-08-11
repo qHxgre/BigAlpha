@@ -17,7 +17,6 @@ from .config import PATHS, CheckPaths
 
 KEY_COLUMNS = ("date", "instrument")
 RAW_FACTOR_FILENAME = "raw_factor.parquet"
-RAW_FACTOR_POOL_FILENAME = "factor_pool_raw.parquet"
 
 
 def build_raw_factor_pool(
@@ -41,7 +40,7 @@ def build_raw_factor_pool(
     target = (
         Path(output_path).expanduser().resolve()
         if output_path is not None
-        else paths.artifacts_dir / RAW_FACTOR_POOL_FILENAME
+        else paths.factor_pool_raw_path
     )
 
     if not processed_pool_path.exists():

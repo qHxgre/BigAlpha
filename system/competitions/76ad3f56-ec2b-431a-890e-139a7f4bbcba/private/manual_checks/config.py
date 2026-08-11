@@ -57,6 +57,7 @@ EXPOSURE_COLUMNS = (*STYLE_COLUMNS, *INDUSTRY_COLUMNS)
 
 # 产物文件名
 FACTOR_POOL_FILENAME = "factor_pool.parquet"
+FACTOR_POOL_RAW_FILENAME = "factor_pool_raw.parquet"
 SUMMARY_FILENAME = "submissions_summary.csv"
 FINAL_FILENAME = "leaderboard_final.csv"
 REGRESSION_FILENAME = "leaderboard_reg.csv"
@@ -101,6 +102,11 @@ class CheckPaths:
     @property
     def factor_pool_path(self) -> Path:
         return self.artifacts_dir / FACTOR_POOL_FILENAME
+
+    @property
+    def factor_pool_raw_path(self) -> Path:
+        """由各 submission 的 raw_factor.parquet 合并得到的原始因子池。"""
+        return self.artifacts_dir / FACTOR_POOL_RAW_FILENAME
 
     @property
     def summary_path(self) -> Path:

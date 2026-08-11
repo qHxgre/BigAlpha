@@ -147,7 +147,7 @@ def analyze_style_exposure(
     output_dir: str | Path | None = None,
     plot: bool = False,
 ) -> StyleExposureCheckResult:
-    """检查因子池的风格暴露残留。
+    """检查原始因子池的 BARRA 风格暴露。
 
     检查逻辑与正式预处理一致：将缺失暴露填为 0，并按交易日以十个 BARRA
     风格因子和行业哑变量做截面回归。结果同时给出原因子与各风格因子的
@@ -183,8 +183,8 @@ def analyze_style_exposure(
     if sample_interval < 1:
         raise ValueError(f"sample_interval 必须大于等于 1，实际为 {sample_interval}")
     stage_started_at = perf_counter()
-    print(f"[风格暴露] 1/5 读取因子池: {paths.factor_pool_path}", flush=True)
-    pool = pd.read_parquet(paths.factor_pool_path)
+    print(f"[风格暴露] 1/5 读取原始因子池: {paths.factor_pool_raw_path}", flush=True)
+    pool = pd.read_parquet(paths.factor_pool_raw_path)
     required = {"date", "instrument"}
     missing = required.difference(pool.columns)
     if missing:
