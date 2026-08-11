@@ -47,7 +47,8 @@ class Judge(PrivateJudge):
 
     def __init__(self) -> None:
         # 每次启动时取当天作为评估结束日，避免模块长期驻留时日期过期。
-        self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
+        # self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
+        self.DATE_END = "2026-08-10 23:59:59"
         super().__init__(
             input_dir=self.INPUT_DIR,
             batch_id=BATCH_ID,
