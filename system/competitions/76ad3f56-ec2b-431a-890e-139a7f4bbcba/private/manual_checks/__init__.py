@@ -2,7 +2,6 @@
 
 from .config import CheckPaths
 from .factors import analyze_factor_similarity
-from .failures import analyze_failed_submissions
 from .ranking import (
     analyze_a_metric_sensitivity,
     analyze_ab_weight_sensitivity,
@@ -27,7 +26,7 @@ __all__ = [
     "CheckPaths", "check_score_consistency", "analyze_rank_conflicts",
     "analyze_ab_weight_sensitivity", "analyze_a_metric_sensitivity",
     "check_regression_integrity", "analyze_regression_stability",
-    "analyze_factor_similarity", "analyze_failed_submissions",
+    "analyze_factor_similarity",
     "analyze_b_score_robustness", "plot_regression_overview",
     "rerun_regression_explanation", "generate_markdown_report",
 ]

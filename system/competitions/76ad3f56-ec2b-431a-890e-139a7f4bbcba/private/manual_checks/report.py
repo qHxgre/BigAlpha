@@ -12,7 +12,6 @@ import pandas as pd
 from .common import read_final, read_regression, read_summary
 from .config import CheckPaths
 from .factors import analyze_factor_similarity
-from .failures import analyze_failed_submissions
 from .ranking import (
     analyze_a_metric_sensitivity,
     analyze_ab_weight_sensitivity,
@@ -58,7 +57,6 @@ def _require_inputs(paths: CheckPaths) -> None:
         paths.final_path,
         paths.regression_path,
         paths.factor_pool_path,
-        paths.metadata_path,
     ]
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
@@ -97,8 +95,6 @@ def generate_markdown_report(
         max_samples=max_similarity_samples,
         display=False,
     )
-    failures = analyze_failed_submissions(paths, display=False)
-
     rerun_dir = (
         Path(regression_rerun_dir).expanduser().resolve()
         if regression_rerun_dir is not None
@@ -114,7 +110,6 @@ def generate_markdown_report(
             rerun_comparison = pd.read_csv(rerun_comparison_path, encoding="utf-8-sig")
 
     success_count = int(summary["status"].eq("success").sum())
-    failed_count = len(summary) - success_count
     set_problems = regression_integrity["set_problems"]
     field_problems = regression_integrity["field_problems"]
     high_similarity = similarity.loc[similarity["high_similarity"]].copy()
@@ -122,16 +117,9 @@ def generate_markdown_report(
     rerun_blocking = int(rerun_summary is not None and rerun_summary.get("status") == "BLOCK")
     rerun_missing = int(rerun_summary is None)
     blocking_count = len(score_problems) + len(set_problems) + len(field_problems) + rerun_blocking
-    review_count = failed_count + len(high_similarity) + len(suspicious) + rerun_missing
+    review_count = len(high_similarity) + len(suspicious) + rerun_missing
     status = "BLOCK" if blocking_count else ("REVIEW" if review_count else "PASS")
 
-    failure_counts = (
-        summary.loc[summary["status"].ne("success"), "error"]
-        .fillna("未记录错误")
-        .value_counts()
-        .rename_axis("error")
-        .reset_index(name="count")
-    )
     top_final = final.loc[final["final_score"].ge(0)].head(top_n).copy()
     top_final.insert(0, "rank", range(1, len(top_final) + 1))
     sensitive_ab = ab_sensitivity[["best_rank", "worst_rank", "rank_span"]].head(top_n)
@@ -159,7 +147,6 @@ def generate_markdown_report(
         f"| Run ID | `{run_id}` |",
         f"| 总提交数 | {len(summary)} |",
         f"| 成功提交数 | {success_count} |",
-        f"| 失败提交数 | {failed_count} |",
         f"| 成功率 | {success_count / len(summary):.2%} |",
         f"| 回归因子数 | {len(regression)} |",
         f"| 成绩复算异常 | {len(score_problems)} |",
@@ -169,7 +156,7 @@ def generate_markdown_report(
         f"| 稳定性可疑因子 | {len(suspicious)} |",
         f"| 回归复跑检查 | {rerun_summary.get('status') if rerun_summary else 'NOT_PROVIDED'} |",
         "",
-        "状态规则：成绩、集合或字段异常时为 `BLOCK`；不存在阻断项但有失败提交、高相似因子或稳定性可疑因子时为 `REVIEW`；否则为 `PASS`。",
+        "状态规则：成绩、集合或字段异常时为 `BLOCK`；不存在阻断项但有高相似因子或稳定性可疑因子时为 `REVIEW`；否则为 `PASS`。",
         "",
         "## 2. 成绩复算",
         "",
@@ -274,28 +261,7 @@ def generate_markdown_report(
         "",
         _table(similarity_top),
         "",
-        "## 9. 失败提交",
-        "",
-        f"失败提交 **{failed_count}** 个，涉及 **{len(failures['by_contact'])}** 个参赛方。",
-        "",
-        "### 错误类型",
-        "",
-        _table(failure_counts),
-        "",
-        "### 参赛方联系清单",
-        "",
-        _table(failures["by_contact"], limit=top_n),
-        "",
-        "### 失败提交明细",
-        "",
-        _table(
-            failures["by_submission"][
-                ["submission_id", "code_file", "status", "error", "participant_name", "contact_names", "stdout_path"]
-            ],
-            limit=top_n,
-        ),
-        "",
-        "## 10. 自动建议",
+        "## 9. 自动建议",
         "",
     ])
 
@@ -306,8 +272,6 @@ def generate_markdown_report(
         recommendations.append("从云端下载回归复跑结果包后重新生成报告；当前回归可复现性尚未验证。")
     elif rerun_summary.get("status") == "BLOCK":
         recommendations.append("云端回归复跑与正式结果不一致，应检查环境、数据版本和回归确定性。")
-    if failed_count:
-        recommendations.append(f"对 {failed_count} 个失败提交完成根因分类，并排除平台或资源侧批量异常。")
     if len(high_similarity):
         recommendations.append(f"对 {len(high_similarity)} 组高相似因子执行全量相关、参赛方关系和代码人工核验。")
     if int(ab_sensitivity["rank_span"].ge(20).sum()):
@@ -319,7 +283,7 @@ def generate_markdown_report(
     lines.extend(f"{index}. {item}" for index, item in enumerate(recommendations, start=1))
     lines.extend([
         "",
-        "## 11. 输入路径",
+        "## 10. 输入路径",
         "",
         f"- 运行目录：`{paths.run_dir}`",
         f"- 预处理目录：`{paths.prepared_dir}`",
