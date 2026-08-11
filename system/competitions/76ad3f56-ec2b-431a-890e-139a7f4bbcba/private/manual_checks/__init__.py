@@ -13,7 +13,13 @@ from .regression import (
     analyze_regression_stability,
     check_regression_integrity,
 )
-from .style_exposure import StyleExposureCheckResult, analyze_style_exposure
+from .style_exposure import (
+    StyleExposureCheckResult,
+    analyze_style_exposure,
+    load_style_exposure_results,
+    plot_style_exposure_results,
+    save_style_exposure_results,
+)
 from .visualization import plot_regression_overview, rerun_regression_explanation
 
 
@@ -30,6 +36,7 @@ __all__ = [
     "check_regression_integrity", "analyze_regression_stability",
     "analyze_factor_similarity",
     "analyze_style_exposure", "StyleExposureCheckResult",
+    "load_style_exposure_results", "plot_style_exposure_results", "save_style_exposure_results",
     "analyze_b_score_robustness", "plot_regression_overview",
     "rerun_regression_explanation", "generate_markdown_report",
 ]

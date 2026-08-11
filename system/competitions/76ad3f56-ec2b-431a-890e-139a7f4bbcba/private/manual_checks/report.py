@@ -16,6 +16,9 @@ from .config import (
     PATHS,
     RERUN_COMPARISON_FILENAME,
     RERUN_SUMMARY_FILENAME,
+    STYLE_EXPOSURE_FIGURE_FILENAME,
+    STYLE_EXPOSURE_METADATA_FILENAME,
+    STYLE_EXPOSURE_SUMMARY_FILENAME,
     CheckPaths,
 )
 from .factors import analyze_factor_similarity
@@ -78,6 +81,7 @@ def generate_markdown_report(
     max_similarity_samples: int = CONFIG.max_similarity_samples,
     top_n: int = CONFIG.report_top_n,
     regression_rerun_dir: str | Path | None = None,
+    style_exposure_dir: str | Path | None = None,
 ) -> Path:
     """运行全部非绘图检查，将结果写入 Markdown，并返回报告路径。"""
     _require_inputs(paths)
@@ -116,6 +120,25 @@ def generate_markdown_report(
         if rerun_comparison_path.is_file():
             rerun_comparison = pd.read_csv(rerun_comparison_path, encoding="utf-8-sig")
 
+    style_dir = (
+        Path(style_exposure_dir).expanduser().resolve()
+        if style_exposure_dir is not None
+        else paths.style_exposure_dir
+    )
+    style_summary_path = style_dir / STYLE_EXPOSURE_SUMMARY_FILENAME
+    style_metadata_path = style_dir / STYLE_EXPOSURE_METADATA_FILENAME
+    style_figure_path = style_dir / STYLE_EXPOSURE_FIGURE_FILENAME
+    style_summary = pd.DataFrame()
+    style_metadata = None
+    if style_summary_path.is_file():
+        style_summary = pd.read_csv(style_summary_path, dtype={"submission_id": str})
+        if "style_exposure_warning" in style_summary:
+            style_summary["style_exposure_warning"] = (
+                style_summary["style_exposure_warning"].astype(str).str.lower().eq("true")
+            )
+    if style_metadata_path.is_file():
+        style_metadata = json.loads(style_metadata_path.read_text(encoding="utf-8"))
+
     success_count = int(summary["status"].eq("success").sum())
     set_problems = regression_integrity["set_problems"]
     field_problems = regression_integrity["field_problems"]
@@ -123,8 +146,13 @@ def generate_markdown_report(
     suspicious = regression_stability.loc[regression_stability["suspicious"]].copy()
     rerun_blocking = int(rerun_summary is not None and rerun_summary.get("status") == "BLOCK")
     rerun_missing = int(rerun_summary is None)
+    style_missing = int(style_summary.empty)
+    style_warnings = (
+        int(style_summary["style_exposure_warning"].sum())
+        if "style_exposure_warning" in style_summary else 0
+    )
     blocking_count = len(score_problems) + len(set_problems) + len(field_problems) + rerun_blocking
-    review_count = len(high_similarity) + len(suspicious) + rerun_missing
+    review_count = len(high_similarity) + len(suspicious) + rerun_missing + style_missing + style_warnings
     status = "BLOCK" if blocking_count else ("REVIEW" if review_count else "PASS")
 
     top_final = final.loc[final["final_score"].ge(0)].head(top_n).copy()
@@ -162,8 +190,9 @@ def generate_markdown_report(
         f"| 高相似因子对（≥ {high_correlation:.2f}） | {len(high_similarity)} |",
         f"| 稳定性可疑因子 | {len(suspicious)} |",
         f"| 回归复跑检查 | {rerun_summary.get('status') if rerun_summary else 'NOT_PROVIDED'} |",
+        f"| BARRA 风格暴露告警 | {style_warnings if not style_summary.empty else 'NOT_PROVIDED'} |",
         "",
-        "状态规则：成绩、集合或字段异常时为 `BLOCK`；不存在阻断项但有高相似因子或稳定性可疑因子时为 `REVIEW`；否则为 `PASS`。",
+        "状态规则：成绩、集合、字段或云端复跑异常时为 `BLOCK`；不存在阻断项但有高相似、稳定性、风格暴露告警或云端结果缺失时为 `REVIEW`；否则为 `PASS`。",
         "",
         "## 2. 成绩复算",
         "",
@@ -265,13 +294,55 @@ def generate_markdown_report(
         "",
         _table(robust_b),
         "",
-        "## 8. 因子相似度",
+        "## 8. BARRA 风格暴露",
+        "",
+    ])
+
+    if style_summary.empty:
+        lines.extend([
+            "**NOT_PROVIDED**：本地未找到云端风格暴露结果包，本项尚未验证。",
+            "",
+            f"预期目录：`{style_dir}`",
+            "",
+        ])
+    else:
+        style_top = style_summary[
+            [
+                "submission_id", "trading_days", "valid_days", "median_sample_count",
+                "p95_regression_r2", "p95_max_abs_style_corr",
+                "max_abs_residual_corr", "style_exposure_warning",
+            ]
+        ].head(top_n)
+        lines.extend([
+            f"- 检查因子数：{len(style_summary)}。",
+            f"- 风格暴露告警因子数：{style_warnings}。",
+            f"- 检查周期：{style_metadata.get('start_date')} 至 {style_metadata.get('end_date')}。"
+            if style_metadata else "- 检查周期：元数据未提供。",
+            f"- 抽样交易日：{style_metadata.get('sampled_trading_days')} / {style_metadata.get('total_trading_days')}。"
+            if style_metadata else "- 抽样交易日：元数据未提供。",
+            "",
+            _table(style_top),
+            "",
+        ])
+        if style_figure_path.is_file():
+            figure_reference = Path(
+                Path(style_figure_path).relative_to(output.parent)
+                if style_figure_path.is_relative_to(output.parent)
+                else style_figure_path
+            ).as_posix()
+            lines.extend([
+                f"![BARRA 风格暴露概览]({figure_reference})",
+                "",
+            ])
+
+    lines.extend([
+        "## 9. 因子相似度",
         "",
         f"从最多 {max_similarity_samples:,} 个样本计算两两 Pearson 相关。高相似阈值为 `{high_correlation:.2f}`，命中 **{len(high_similarity)}** 对。",
         "",
         _table(similarity_top),
         "",
-        "## 9. 自动建议",
+        "## 10. 自动建议",
         "",
     ])
 
@@ -284,6 +355,10 @@ def generate_markdown_report(
         recommendations.append("云端回归复跑与正式结果不一致，应检查环境、数据版本和回归确定性。")
     if len(high_similarity):
         recommendations.append(f"对 {len(high_similarity)} 组高相似因子执行全量相关、参赛方关系和代码人工核验。")
+    if style_summary.empty:
+        recommendations.append("从云端下载风格暴露结果包后重新生成报告；当前 BARRA 中性化效果尚未验证。")
+    elif style_warnings:
+        recommendations.append(f"复核 {style_warnings} 个风格暴露告警因子的中性化过程和样本覆盖。")
     if int(ab_sensitivity["rank_span"].ge(MAX_AB_RANK_GAP).sum()):
         recommendations.append("确认 A/B 权重已经在赛事规则中固定，并专项查看获奖线附近的局部权重敏感性。")
     if int(b_robustness["max_final_rank_change"].ge(MAX_FINAL_RANK_CHANGE).sum()):
@@ -293,7 +368,7 @@ def generate_markdown_report(
     lines.extend(f"{index}. {item}" for index, item in enumerate(recommendations, start=1))
     lines.extend([
         "",
-        "## 10. 输入路径",
+        "## 11. 输入路径",
         "",
         f"- 运行目录：`{paths.run_dir}`",
         f"- 预处理目录：`{paths.prepared_dir}`",

@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
 
 import numpy as np
 import pandas as pd
 
 from .common import show
-from .config import CONFIG, EXPOSURE_COLUMNS, PATHS, STYLE_COLUMNS, CheckPaths
+from .config import (
+    CONFIG,
+    EXPOSURE_COLUMNS,
+    PATHS,
+    STYLE_COLUMNS,
+    STYLE_EXPOSURE_DAILY_FILENAME,
+    STYLE_EXPOSURE_DETAIL_FILENAME,
+    STYLE_EXPOSURE_FIGURE_FILENAME,
+    STYLE_EXPOSURE_METADATA_FILENAME,
+    STYLE_EXPOSURE_SUMMARY_FILENAME,
+    CheckPaths,
+)
 from .exposure import (
     calculate_residual,
     max_finite,
@@ -27,6 +40,100 @@ class StyleExposureCheckResult:
     daily: pd.DataFrame
 
 
+def save_style_exposure_results(
+    result: StyleExposureCheckResult,
+    output_dir: str | Path,
+    *,
+    metadata: dict[str, object] | None = None,
+    plot: bool = False,
+) -> Path:
+    """持久化风格暴露结果包，并可生成适合 Markdown 引用的静态图。"""
+    export_dir = Path(output_dir).expanduser().resolve()
+    export_dir.mkdir(parents=True, exist_ok=True)
+    result.summary.to_csv(
+        export_dir / STYLE_EXPOSURE_SUMMARY_FILENAME, index=False, encoding="utf-8-sig"
+    )
+    result.exposure_summary.to_csv(
+        export_dir / STYLE_EXPOSURE_DETAIL_FILENAME, index=False, encoding="utf-8-sig"
+    )
+    result.daily.to_parquet(export_dir / STYLE_EXPOSURE_DAILY_FILENAME, index=False)
+    payload = metadata or {}
+    (export_dir / STYLE_EXPOSURE_METADATA_FILENAME).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    if plot:
+        plot_style_exposure_results(result, export_dir / STYLE_EXPOSURE_FIGURE_FILENAME)
+    print(f"风格暴露结果包已导出：{export_dir}")
+    return export_dir
+
+
+def load_style_exposure_results(output_dir: str | Path) -> StyleExposureCheckResult:
+    """读取从云端下载的风格暴露结果包。"""
+    source_dir = Path(output_dir).expanduser().resolve()
+    summary = pd.read_csv(source_dir / STYLE_EXPOSURE_SUMMARY_FILENAME, dtype={"submission_id": str})
+    detail = pd.read_csv(source_dir / STYLE_EXPOSURE_DETAIL_FILENAME, dtype={"submission_id": str})
+    daily = pd.read_parquet(source_dir / STYLE_EXPOSURE_DAILY_FILENAME)
+    daily["date"] = pd.to_datetime(daily["date"])
+    return StyleExposureCheckResult(summary, detail, daily)
+
+
+def plot_style_exposure_results(
+    result: StyleExposureCheckResult,
+    output_path: str | Path | None = None,
+    *,
+    top_n: int = 20,
+):
+    """用持久化结果绘制告警概览、风格热力图和逐日趋势。"""
+    import matplotlib.pyplot as plt
+
+    summary = result.summary.head(top_n).copy()
+    factor_order = summary["submission_id"].astype(str).tolist()
+    detail = result.exposure_summary.loc[
+        result.exposure_summary["submission_id"].astype(str).isin(factor_order)
+    ].copy()
+    daily = result.daily.loc[result.daily["submission_id"].astype(str).isin(factor_order)].copy()
+
+    fig, axes = plt.subplots(2, 2, figsize=(18, 13))
+    bars = summary.sort_values("p95_max_abs_style_corr")
+    axes[0, 0].barh(bars["submission_id"].astype(str).str[:12], bars["p95_max_abs_style_corr"])
+    axes[0, 0].axvline(CONFIG.max_abs_style_correlation, color="red", linestyle="--")
+    axes[0, 0].set_title("P95 Maximum Absolute Style Correlation")
+    axes[0, 0].grid(alpha=0.25, axis="x")
+
+    axes[0, 1].scatter(
+        summary["p95_max_abs_style_corr"], summary["p95_regression_r2"],
+        c=summary["style_exposure_warning"].astype(int), cmap="coolwarm", alpha=0.8,
+    )
+    axes[0, 1].axvline(CONFIG.max_abs_style_correlation, color="grey", linestyle="--")
+    axes[0, 1].axhline(CONFIG.max_style_regression_r2, color="grey", linestyle="--")
+    axes[0, 1].set_xlabel("P95 max abs style correlation")
+    axes[0, 1].set_ylabel("P95 exposure regression R²")
+    axes[0, 1].set_title("Exposure Warning Map")
+
+    heatmap = detail.pivot(index="submission_id", columns="style", values="p95_abs_correlation")
+    heatmap = heatmap.reindex(factor_order).dropna(how="all")
+    image = axes[1, 0].imshow(heatmap, aspect="auto", cmap="YlOrRd", vmin=0)
+    axes[1, 0].set_xticks(range(len(heatmap.columns)), heatmap.columns, rotation=45, ha="right")
+    axes[1, 0].set_yticks(range(len(heatmap.index)), heatmap.index.astype(str).str[:12], fontsize=8)
+    axes[1, 0].set_title("P95 Absolute Correlation by Style")
+    fig.colorbar(image, ax=axes[1, 0])
+
+    trend = daily.groupby("date", as_index=False)[["max_abs_style_corr", "regression_r2"]].quantile(0.95)
+    axes[1, 1].plot(trend["date"], trend["max_abs_style_corr"], label="P95 max abs corr")
+    axes[1, 1].plot(trend["date"], trend["regression_r2"], label="P95 regression R²")
+    axes[1, 1].set_title("Cross-factor P95 by Sampled Date")
+    axes[1, 1].legend()
+    axes[1, 1].grid(alpha=0.25)
+    fig.suptitle("BARRA Style Exposure Check", fontsize=17)
+    fig.tight_layout()
+    if output_path is not None:
+        target = Path(output_path).expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(target, dpi=160, bbox_inches="tight")
+        print(f"风格暴露图已生成：{target}")
+    return fig
+
+
 def analyze_style_exposure(
     paths: CheckPaths = PATHS,
     start_date: str = CONFIG.start_date,
@@ -37,6 +144,8 @@ def analyze_style_exposure(
     sample_interval: int = 5,
     progress_every: int = 10,
     display: bool = True,
+    output_dir: str | Path | None = None,
+    plot: bool = False,
 ) -> StyleExposureCheckResult:
     """检查因子池的风格暴露残留。
 
@@ -61,6 +170,12 @@ def analyze_style_exposure(
         每处理多少个抽样交易日输出一次进度；设为 0 时不输出逐日进度。
     display:
         是否在 Notebook 中展示汇总结果。
+    output_dir:
+        结果包输出目录。云端运行时建议传入 ``paths.style_exposure_dir``，然后将
+        整个目录下载到本地相同位置。
+    plot:
+        写出结果包时是否同时生成 PNG 概览图，默认关闭；建议下载结果包后
+        在本地调用 ``plot_style_exposure_results`` 绘图。
     """
     started_at = perf_counter()
     start = pd.Timestamp(start_date).normalize()
@@ -264,6 +379,24 @@ def analyze_style_exposure(
         f"总耗时 {perf_counter() - started_at:.1f}s",
         flush=True,
     )
+    result = StyleExposureCheckResult(summary, exposure_summary, daily)
+    if output_dir is not None:
+        save_style_exposure_results(
+            result,
+            output_dir,
+            metadata={
+                "start_date": start_date,
+                "end_date": end_date,
+                "sample_interval": sample_interval,
+                "sampled_trading_days": len(sampled_dates),
+                "total_trading_days": len(all_dates),
+                "factor_count": len(factor_columns),
+                "warning_count": int(summary["style_exposure_warning"].sum()),
+                "max_abs_style_correlation": max_abs_style_corr,
+                "max_style_regression_r2": max_regression_r2,
+            },
+            plot=plot,
+        )
     if display:
         show(summary, exposure_summary)
-    return StyleExposureCheckResult(summary, exposure_summary, daily)
+    return result

@@ -67,6 +67,12 @@ RERUN_SUMMARY_FILENAME = "regression_rerun_summary.json"
 RERUN_COMPARISON_FILENAME = "regression_rerun_comparison.csv"
 RERUN_SCORES_FILENAME = "regression_rerun_scores.csv"
 RERUN_WEIGHTS_FILENAME = "regression_rerun_weights_history.parquet"
+STYLE_EXPOSURE_DIRNAME = "style_exposure"
+STYLE_EXPOSURE_SUMMARY_FILENAME = "style_exposure_summary.csv"
+STYLE_EXPOSURE_DETAIL_FILENAME = "style_exposure_by_style.csv"
+STYLE_EXPOSURE_DAILY_FILENAME = "style_exposure_daily.parquet"
+STYLE_EXPOSURE_METADATA_FILENAME = "style_exposure_metadata.json"
+STYLE_EXPOSURE_FIGURE_FILENAME = "style_exposure_overview.png"
 
 
 def _resolved(path: str | Path) -> Path:
@@ -119,6 +125,10 @@ class CheckPaths:
     @property
     def regression_rerun_dir(self) -> Path:
         return self.artifacts_dir / REGRESSION_RERUN_DIRNAME
+
+    @property
+    def style_exposure_dir(self) -> Path:
+        return self.artifacts_dir / STYLE_EXPOSURE_DIRNAME
 
 
 @dataclass(frozen=True)
