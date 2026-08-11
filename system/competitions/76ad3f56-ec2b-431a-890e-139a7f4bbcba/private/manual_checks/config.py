@@ -35,6 +35,16 @@ MAX_FINAL_RANK_CHANGE = 10
 MAX_ABS_STYLE_CORRELATION = 0.10
 MAX_STYLE_REGRESSION_R2 = 0.10
 STYLE_QUANTILE = 0.95
+INCREMENTAL_TRAIN_WINDOW = 60
+INCREMENTAL_TEST_WINDOW = 20
+INCREMENTAL_STEP = 20
+INCREMENTAL_ALPHA = 1e-3
+INCREMENTAL_L1_RATIO = 0.5
+SIMILARITY_CLUSTER_THRESHOLD = 0.80
+SIMILARITY_HIGH_THRESHOLD = 0.90
+SIMILARITY_NEAR_DUPLICATE_THRESHOLD = 0.95
+SIMILARITY_TOP_PEERS = 3
+MIN_WEIGHT_FOR_SIGN = 1e-4
 
 # 数据字段
 METRICS = ("ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir")
@@ -74,6 +84,15 @@ STYLE_EXPOSURE_DETAIL_FILENAME = "style_exposure_by_style.csv"
 STYLE_EXPOSURE_DAILY_FILENAME = "style_exposure_daily.parquet"
 STYLE_EXPOSURE_METADATA_FILENAME = "style_exposure_metadata.json"
 STYLE_EXPOSURE_FIGURE_FILENAME = "style_exposure_overview.png"
+INCREMENTAL_DIRNAME = "incremental_analysis"
+INCREMENTAL_BY_WINDOW_FILENAME = "incremental_by_window.parquet"
+INCREMENTAL_SUMMARY_FILENAME = "incremental_summary.csv"
+GROUP_INCREMENTAL_BY_WINDOW_FILENAME = "group_incremental_by_window.parquet"
+GROUP_INCREMENTAL_SUMMARY_FILENAME = "group_incremental_summary.csv"
+FACTOR_SIMILARITY_DAILY_FILENAME = "factor_similarity_daily.parquet"
+FACTOR_SIMILARITY_SUMMARY_FILENAME = "factor_similarity_summary.csv"
+FACTOR_CLUSTERS_FILENAME = "factor_clusters.csv"
+INCREMENTAL_METADATA_FILENAME = "analysis_metadata.json"
 
 
 def _resolved(path: str | Path) -> Path:
@@ -136,6 +155,10 @@ class CheckPaths:
     def style_exposure_dir(self) -> Path:
         return self.artifacts_dir / STYLE_EXPOSURE_DIRNAME
 
+    @property
+    def incremental_dir(self) -> Path:
+        return self.artifacts_dir / INCREMENTAL_DIRNAME
+
 
 @dataclass(frozen=True)
 class ManualCheckConfig:
@@ -153,6 +176,16 @@ class ManualCheckConfig:
     max_abs_style_correlation: float = MAX_ABS_STYLE_CORRELATION
     max_style_regression_r2: float = MAX_STYLE_REGRESSION_R2
     style_quantile: float = STYLE_QUANTILE
+    incremental_train_window: int = INCREMENTAL_TRAIN_WINDOW
+    incremental_test_window: int = INCREMENTAL_TEST_WINDOW
+    incremental_step: int = INCREMENTAL_STEP
+    incremental_alpha: float = INCREMENTAL_ALPHA
+    incremental_l1_ratio: float = INCREMENTAL_L1_RATIO
+    similarity_cluster_threshold: float = SIMILARITY_CLUSTER_THRESHOLD
+    similarity_high_threshold: float = SIMILARITY_HIGH_THRESHOLD
+    similarity_near_duplicate_threshold: float = SIMILARITY_NEAR_DUPLICATE_THRESHOLD
+    similarity_top_peers: int = SIMILARITY_TOP_PEERS
+    min_weight_for_sign: float = MIN_WEIGHT_FOR_SIGN
 
     def activate(self) -> None:
         """注册项目源码目录，确保 Notebook 和脚本使用相同导入环境。"""

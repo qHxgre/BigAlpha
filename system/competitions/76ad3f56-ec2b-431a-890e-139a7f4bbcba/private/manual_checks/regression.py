@@ -1,4 +1,4 @@
-"""回归产物完整性、稳定性和替代口径检查。"""
+"""联合回归中的因子解释性分析及辅助校验。"""
 
 from __future__ import annotations
 
@@ -79,6 +79,75 @@ def analyze_regression_stability(
     print(f"回归因子: {len(result)}，建议优先复核: {int(result['suspicious'].sum())}")
     if display:
         show(result.style.background_gradient(subset=["model_stability_rank_gap"], cmap="YlOrRd"))
+    return result
+
+
+def analyze_regression_explainability(
+    paths: CheckPaths = PATHS, *, display: bool = True
+) -> pd.DataFrame:
+    """解释各因子在联合回归中的相对重要性、持续性和权重方向。
+
+    正式回归汇总只保存绝对权重统计；若存在回归复跑产生的逐期权重历史，则
+    进一步补充平均有符号权重、正负权重占比和方向一致性。返回结果按最终榜
+    排名排列，便于重点解释头部因子。
+    """
+    final, regression = read_final(paths), read_regression(paths)
+    result = final.loc[final["final_score"].ge(0)].merge(
+        regression, left_on="submission_id", right_on="factor", how="left", validate="one_to_one"
+    )
+    result = result.sort_values("final_score", ascending=False).reset_index(drop=True)
+    result["final_rank"] = np.arange(1, len(result) + 1)
+    result["model_rank"] = result["model_score"].rank(ascending=False, method="min")
+    result["weight_rank"] = result["abs_weight_mean"].rank(ascending=False, method="min")
+    result["weight_cv"] = result["abs_weight_std"].div(
+        result["abs_weight_mean"].replace(0, np.nan)
+    )
+    result["importance_share"] = result["model_score"].clip(lower=0).div(
+        result["model_score"].clip(lower=0).sum()
+    )
+    result["cumulative_importance"] = result.sort_values("model_score", ascending=False)[
+        "importance_share"
+    ].cumsum().reindex(result.index)
+
+    weights_path = paths.regression_rerun_dir / "regression_rerun_weights_history.parquet"
+    if weights_path.is_file():
+        weights = pd.read_parquet(weights_path)
+        factor_columns = [column for column in weights.columns if column != "window_end"]
+        signed = weights[factor_columns].apply(pd.to_numeric, errors="coerce")
+        selected = signed.ne(0) & signed.notna()
+        selected_count = selected.sum().replace(0, np.nan)
+        direction = pd.DataFrame({
+            "factor": factor_columns,
+            "signed_weight_mean": signed.mean().values,
+            "positive_weight_rate": signed.gt(0).sum().div(selected_count).values,
+            "negative_weight_rate": signed.lt(0).sum().div(selected_count).values,
+            "latest_weight": signed.iloc[-1].values,
+        })
+        direction["direction_consistency"] = direction[
+            ["positive_weight_rate", "negative_weight_rate"]
+        ].max(axis=1)
+        direction["dominant_direction"] = np.select(
+            [
+                direction["positive_weight_rate"].gt(direction["negative_weight_rate"]),
+                direction["negative_weight_rate"].gt(direction["positive_weight_rate"]),
+            ],
+            ["正向", "负向"],
+            default="混合",
+        )
+        result = result.merge(direction, on="factor", how="left", validate="one_to_one")
+
+    columns = [
+        "final_rank", "submission_id", "a_score", "b_score", "final_score",
+        "model_rank", "model_score", "importance_share", "abs_weight_mean",
+        "abs_weight_std", "weight_cv", "selection_rate", "weight_rank",
+    ]
+    columns.extend(column for column in (
+        "signed_weight_mean", "latest_weight", "positive_weight_rate",
+        "negative_weight_rate", "direction_consistency", "dominant_direction",
+    ) if column in result)
+    result = result[columns]
+    if display:
+        show(result)
     return result
 
 

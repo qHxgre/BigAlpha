@@ -1,7 +1,8 @@
 """私榜人工复核工具，面向 Notebook 的统一导入入口。"""
 
 from .config import CONFIG, PATHS, ManualCheckConfig, CheckPaths
-from .factors import analyze_factor_similarity
+from .factors import analyze_cross_sectional_similarity, analyze_factor_similarity
+from .incremental import analyze_incremental_contribution
 from .ranking import (
     analyze_a_metric_sensitivity,
     analyze_ab_weight_sensitivity,
@@ -10,6 +11,7 @@ from .ranking import (
 )
 from .regression import (
     analyze_b_score_robustness,
+    analyze_regression_explainability,
     analyze_regression_stability,
     check_regression_integrity,
 )
@@ -34,7 +36,9 @@ __all__ = [
     "check_score_consistency", "analyze_rank_conflicts",
     "analyze_ab_weight_sensitivity", "analyze_a_metric_sensitivity",
     "check_regression_integrity", "analyze_regression_stability",
+    "analyze_regression_explainability",
     "analyze_factor_similarity",
+    "analyze_cross_sectional_similarity", "analyze_incremental_contribution",
     "analyze_style_exposure", "StyleExposureCheckResult",
     "load_style_exposure_results", "plot_style_exposure_results", "save_style_exposure_results",
     "analyze_b_score_robustness", "plot_regression_overview",

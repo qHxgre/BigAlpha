@@ -13,15 +13,22 @@ import pandas as pd
 from .common import read_final, read_summary
 from .config import (
     CONFIG,
+    FACTOR_CLUSTERS_FILENAME,
+    FACTOR_SIMILARITY_SUMMARY_FILENAME,
+    GROUP_INCREMENTAL_SUMMARY_FILENAME,
+    INCREMENTAL_BY_WINDOW_FILENAME,
+    INCREMENTAL_SUMMARY_FILENAME,
     MAX_AB_RANK_GAP,
     PATHS,
     STYLE_EXPOSURE_FIGURE_FILENAME,
     STYLE_EXPOSURE_DETAIL_FILENAME,
     STYLE_EXPOSURE_METADATA_FILENAME,
     STYLE_EXPOSURE_SUMMARY_FILENAME,
+    RERUN_WEIGHTS_FILENAME,
     CheckPaths,
 )
 from .factors import analyze_factor_similarity
+from .regression import analyze_regression_explainability
 from .ranking import (
     analyze_a_metric_sensitivity,
     analyze_ab_weight_sensitivity,
@@ -143,6 +150,7 @@ def _participant_lookup(paths: CheckPaths) -> pd.DataFrame:
 
 def _generate_report_figures(
     *,
+    paths: CheckPaths,
     output: Path,
     summary: pd.DataFrame,
     final: pd.DataFrame,
@@ -153,6 +161,11 @@ def _generate_report_figures(
     style_summary: pd.DataFrame,
     style_detail: pd.DataFrame,
     similarity: pd.DataFrame,
+    regression_explanation: pd.DataFrame,
+    incremental_summary: pd.DataFrame,
+    incremental_by_window: pd.DataFrame,
+    factor_clusters: pd.DataFrame,
+    group_incremental_summary: pd.DataFrame,
     high_correlation: float,
     top_ids: list[str],
     rank_map: dict[str, int],
@@ -255,6 +268,244 @@ def _generate_report_figures(
     ax.legend(ncol=3, loc="lower right")
     save("03_top_ranking_comparison", fig)
 
+    # 联合回归解释：头部因子的相对重要性、持续入选情况和逐期权重方向。
+    regression_top = regression_explanation.loc[
+        regression_explanation["submission_id"].isin(top_ids)
+    ].sort_values("final_rank")
+    fig, axes = plt.subplots(2, 2, figsize=(17, 12))
+    labels = [f"#{int(rank)} {sid[:8]}" for rank, sid in zip(
+        regression_top["final_rank"], regression_top["submission_id"]
+    )]
+    y = np.arange(len(regression_top))
+    bars = axes[0, 0].barh(
+        y, regression_top["model_score"],
+        color=plt.cm.Blues(0.25 + 0.75 * regression_top["selection_rate"].clip(0, 1)),
+    )
+    axes[0, 0].set_yticks(y, labels)
+    axes[0, 0].invert_yaxis()
+    axes[0, 0].set(
+        title="Top finalists: joint-model importance",
+        xlabel="model score (color intensity = selection rate)",
+        ylabel="final rank / submission",
+    )
+    for bar, rate in zip(bars, regression_top["selection_rate"]):
+        axes[0, 0].text(
+            bar.get_width(), bar.get_y() + bar.get_height() / 2,
+            f"  {rate:.0%}", va="center", fontsize=8,
+        )
+
+    axes[0, 1].scatter(
+        regression_explanation["final_rank"], regression_explanation["model_rank"],
+        color="#B8B8B8", alpha=.55, label="all factors",
+    )
+    axes[0, 1].scatter(
+        regression_top["final_rank"], regression_top["model_rank"],
+        s=70, color="#E45756", label="top finalists", zorder=3,
+    )
+    limit = max(len(regression_explanation), 1)
+    axes[0, 1].plot([1, limit], [1, limit], "--", color="grey", linewidth=1)
+    axes[0, 1].invert_xaxis()
+    axes[0, 1].invert_yaxis()
+    axes[0, 1].set(
+        title="Official final rank vs. regression importance rank",
+        xlabel="final rank (better to the right)",
+        ylabel="model-score rank (better at the top)",
+    )
+    axes[0, 1].legend()
+
+    weights_path = paths.regression_rerun_dir / RERUN_WEIGHTS_FILENAME
+    if weights_path.is_file():
+        weights = pd.read_parquet(weights_path)
+        available = [sid for sid in regression_top["submission_id"] if sid in weights]
+        heatmap = weights.set_index("window_end")[available].T
+        max_abs_weight = np.nanmax(np.abs(heatmap.values))
+        max_abs_weight = max_abs_weight if np.isfinite(max_abs_weight) and max_abs_weight > 0 else 1.0
+        image = axes[1, 0].imshow(
+            heatmap, aspect="auto", cmap="RdBu_r",
+            vmin=-max_abs_weight, vmax=max_abs_weight,
+        )
+        axes[1, 0].set_yticks(
+            np.arange(len(available)),
+            [f"#{rank_map.get(sid, '-')} {sid[:8]}" for sid in available],
+        )
+        tick_positions = np.linspace(0, max(len(heatmap.columns) - 1, 0), min(6, len(heatmap.columns))).astype(int)
+        dates = pd.to_datetime(heatmap.columns)
+        axes[1, 0].set_xticks(tick_positions, [dates[i].strftime("%Y-%m") for i in tick_positions])
+        axes[1, 0].set(title="Rolling regression weights of top finalists", xlabel="window end")
+        fig.colorbar(image, ax=axes[1, 0], label="signed coefficient")
+    else:
+        axes[1, 0].text(.5, .5, "NOT PROVIDED\nNo rolling weight history", ha="center", va="center")
+        axes[1, 0].set(xticks=[], yticks=[])
+
+    axes[1, 1].errorbar(
+        regression_top["abs_weight_mean"], y,
+        xerr=regression_top["abs_weight_std"], fmt="o", color="#4C78A8",
+        ecolor="#A0A0A0", capsize=3,
+    )
+    axes[1, 1].set_yticks(y, labels)
+    axes[1, 1].invert_yaxis()
+    axes[1, 1].set(
+        title="Typical coefficient magnitude and variation",
+        xlabel="mean absolute weight ± one standard deviation",
+        ylabel="final rank / submission",
+    )
+    save("04_regression_explainability", fig)
+
+    # 头部因子逐截面权重趋势：每 5 个排名一组，避免全因子折线相互遮挡。
+    if weights_path.is_file():
+        weights = pd.read_parquet(weights_path)
+        weights["window_end"] = pd.to_datetime(weights["window_end"])
+        factor_columns = [column for column in weights.columns if column != "window_end"]
+        ranked_top_ids = [submission_id for submission_id in top_ids if submission_id in factor_columns][:20]
+        group_colors = ["#B2182B", "#EF8A62", "#FDDDBC", "#67A9CF", "#2166AC"]
+        fig, axes = plt.subplots(2, 2, figsize=(17, 11), sharex=True)
+        axes = axes.ravel()
+        for group_index, ax in enumerate(axes):
+            start = group_index * 5
+            group_ids = ranked_top_ids[start:start + 5]
+            for offset, factor in enumerate(group_ids):
+                color = group_colors[offset]
+                final_rank = rank_map.get(factor, start + offset + 1)
+                ax.plot(
+                    weights["window_end"], weights[factor],
+                    color=color, linewidth=2.2, marker="o", markersize=3.5,
+                    label=f"#{final_rank} {factor[:8]}",
+                )
+            ax.axhline(0, color="#777777", linewidth=.8, linestyle="--")
+            ax.set(
+                title=f"Final ranks {start + 1}–{start + len(group_ids)}",
+                xlabel="regression window end",
+                ylabel="signed coefficient",
+            )
+            ax.legend(fontsize=8, loc="best")
+            ax.tick_params(axis="x", rotation=25)
+        fig.suptitle("Rolling regression weights of top 20 finalists", fontsize=17)
+        save("04b_top20_weight_trends", fig)
+    else:
+        fig, ax = plt.subplots(figsize=(14, 5))
+        ax.text(
+            .5, .5, "NOT PROVIDED\nNo rolling weight history",
+            ha="center", va="center", fontsize=15,
+        )
+        ax.set(xticks=[], yticks=[], title="Rolling regression weights of top 20 finalists")
+        save("04b_top20_weight_trends", fig)
+
+    # 样本外增量贡献与信息独特性。
+    fig, axes = plt.subplots(2, 2, figsize=(17, 12))
+    if not incremental_summary.empty and not factor_clusters.empty:
+        contribution = incremental_summary.merge(
+            factor_clusters, on="submission_id", how="left", validate="one_to_one"
+        ).merge(
+            regression_explanation[["submission_id", "final_rank", "abs_weight_mean"]],
+            on="submission_id", how="left", validate="one_to_one",
+        )
+        is_top = contribution["submission_id"].isin(top_ids)
+        sizes = 30 + 900 * contribution["abs_weight_mean"].div(
+            contribution["abs_weight_mean"].max()
+        ).fillna(0)
+        axes[0, 0].scatter(
+            contribution.loc[~is_top, "uniqueness"],
+            contribution.loc[~is_top, "mean_delta_ic"],
+            s=sizes.loc[~is_top], color="#B8B8B8", alpha=.55, label="all other factors",
+        )
+        top_scatter = axes[0, 0].scatter(
+            contribution.loc[is_top, "uniqueness"],
+            contribution.loc[is_top, "mean_delta_ic"],
+            s=sizes.loc[is_top], c=contribution.loc[is_top, "final_rank"],
+            cmap="RdYlBu", alpha=.9, edgecolor="black", linewidth=.4, label="top finalists",
+        )
+        axes[0, 0].axhline(0, color="grey", linestyle="--", linewidth=.8)
+        axes[0, 0].axvline(contribution["uniqueness"].median(), color="grey", linestyle="--", linewidth=.8)
+        axes[0, 0].set(
+            title="Out-of-sample incremental value vs. uniqueness",
+            xlabel="uniqueness (1 - mean top-peer similarity)",
+            ylabel="mean delta IC when factor is removed",
+        )
+        axes[0, 0].legend()
+        fig.colorbar(top_scatter, ax=axes[0, 0], label="official final rank")
+
+        top_contribution = contribution.loc[is_top].sort_values("final_rank")
+        labels = [f"#{int(rank)} {sid[:8]}" for rank, sid in zip(
+            top_contribution["final_rank"], top_contribution["submission_id"]
+        )]
+        y = np.arange(len(top_contribution))
+        axes[0, 1].errorbar(
+            top_contribution["mean_delta_ic"], y,
+            xerr=top_contribution["std_delta_ic"], fmt="o", capsize=3,
+            color="#4C78A8", ecolor="#A0A0A0",
+        )
+        axes[0, 1].axvline(0, color="grey", linestyle="--", linewidth=.8)
+        axes[0, 1].set_yticks(y, labels)
+        axes[0, 1].invert_yaxis()
+        axes[0, 1].set(
+            title="Top finalists: incremental IC and window variation",
+            xlabel="mean delta IC ± one standard deviation", ylabel="final rank / submission",
+        )
+
+        group_lookup = group_incremental_summary.set_index("cluster_id")["mean_delta_ic"] \
+            if not group_incremental_summary.empty else pd.Series(dtype=float)
+        top_contribution["group_delta_ic"] = top_contribution["cluster_id"].map(group_lookup)
+        axes[1, 0].scatter(
+            top_contribution["mean_delta_ic"], top_contribution["group_delta_ic"],
+            c=top_contribution["cluster_size"], cmap="viridis", s=75, alpha=.85,
+        )
+        axes[1, 0].axvline(0, color="grey", linestyle="--", linewidth=.8)
+        axes[1, 0].axhline(0, color="grey", linestyle="--", linewidth=.8)
+        axes[1, 0].set(
+            title="Individual removal vs. similarity-group removal",
+            xlabel="individual mean delta IC", ylabel="group mean delta IC",
+        )
+        for row in top_contribution.itertuples(index=False):
+            axes[1, 0].annotate(
+                f"#{int(row.final_rank)}", (row.mean_delta_ic, row.group_delta_ic),
+                xytext=(3, 3), textcoords="offset points", fontsize=8,
+            )
+
+        axes[1, 1].scatter(
+            contribution["max_peer_similarity"], contribution["positive_delta_rate"],
+            c=contribution["mean_delta_ic"], cmap="RdBu_r", s=sizes, alpha=.7,
+        )
+        axes[1, 1].set(
+            title="Similarity and persistence of incremental contribution",
+            xlabel="maximum peer similarity", ylabel="positive delta-IC window rate",
+        )
+    else:
+        for ax in axes.ravel():
+            ax.text(.5, .5, "NOT PROVIDED\nRun incremental contribution analysis", ha="center", va="center")
+            ax.set(xticks=[], yticks=[])
+    save("05_incremental_contribution", fig)
+
+    # 前20名逐窗口增量 IC，每5个最终排名一组。
+    fig, axes = plt.subplots(2, 2, figsize=(17, 11), sharex=True)
+    axes = axes.ravel()
+    if not incremental_by_window.empty:
+        group_colors = ["#B2182B", "#EF8A62", "#FDDDBC", "#67A9CF", "#2166AC"]
+        for group_index, ax in enumerate(axes):
+            start = group_index * 5
+            group_ids = top_ids[start:start + 5]
+            for offset, factor in enumerate(group_ids):
+                values = incremental_by_window.loc[
+                    incremental_by_window["item_id"].astype(str).eq(factor)
+                ].sort_values("test_end")
+                ax.plot(
+                    pd.to_datetime(values["test_end"]), values["delta_ic"],
+                    color=group_colors[offset], linewidth=2, marker="o", markersize=3.5,
+                    label=f"#{rank_map.get(factor, start + offset + 1)} {factor[:8]}",
+                )
+            ax.axhline(0, color="#777777", linewidth=.8, linestyle="--")
+            ax.set(
+                title=f"Final ranks {start + 1}–{start + len(group_ids)}",
+                xlabel="out-of-sample window end", ylabel="delta IC",
+            )
+            ax.legend(fontsize=8, loc="best")
+            ax.tick_params(axis="x", rotation=25)
+    else:
+        for ax in axes:
+            ax.text(.5, .5, "NOT PROVIDED", ha="center", va="center")
+            ax.set(xticks=[], yticks=[])
+    fig.suptitle("Rolling out-of-sample incremental IC of top 20 finalists", fontsize=17)
+    save("05b_top20_incremental_trends", fig)
+
     def plot_style_group(group_summary: pd.DataFrame, title_prefix: str, figure_name: str) -> None:
         """按相同口径绘制主风格数量与平均暴露强度。"""
         fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
@@ -350,11 +601,45 @@ def generate_markdown_report(
     rank_conflicts = analyze_rank_conflicts(paths, display=False)
     ab_sensitivity = analyze_ab_weight_sensitivity(paths, display=False)
     a_metric_sensitivity = analyze_a_metric_sensitivity(paths, display=False)
-    similarity = analyze_factor_similarity(
-        paths,
-        high_correlation=high_correlation,
-        max_samples=max_similarity_samples,
-        display=False,
+    cross_similarity_path = paths.incremental_dir / FACTOR_SIMILARITY_SUMMARY_FILENAME
+    using_cross_similarity = cross_similarity_path.is_file()
+    if using_cross_similarity:
+        similarity = pd.read_csv(
+            cross_similarity_path,
+            dtype={"submission_id_1": str, "submission_id_2": str},
+        ).rename(columns={
+            "mean_correlation": "pearson",
+            "mean_abs_correlation": "abs_correlation",
+            "mean_overlap": "overlap",
+        })
+        similarity["high_similarity"] = similarity["abs_correlation"].ge(high_correlation)
+    else:
+        similarity = analyze_factor_similarity(
+            paths,
+            high_correlation=high_correlation,
+            max_samples=max_similarity_samples,
+            display=False,
+        )
+    regression_explanation = analyze_regression_explainability(paths, display=False)
+    incremental_summary_path = paths.incremental_dir / INCREMENTAL_SUMMARY_FILENAME
+    incremental_by_window_path = paths.incremental_dir / INCREMENTAL_BY_WINDOW_FILENAME
+    factor_clusters_path = paths.incremental_dir / FACTOR_CLUSTERS_FILENAME
+    group_incremental_summary_path = paths.incremental_dir / GROUP_INCREMENTAL_SUMMARY_FILENAME
+    incremental_summary = (
+        pd.read_csv(incremental_summary_path, dtype={"submission_id": str})
+        if incremental_summary_path.is_file() else pd.DataFrame()
+    )
+    incremental_by_window = (
+        pd.read_parquet(incremental_by_window_path)
+        if incremental_by_window_path.is_file() else pd.DataFrame()
+    )
+    factor_clusters = (
+        pd.read_csv(factor_clusters_path, dtype={"submission_id": str})
+        if factor_clusters_path.is_file() else pd.DataFrame()
+    )
+    group_incremental_summary = (
+        pd.read_csv(group_incremental_summary_path)
+        if group_incremental_summary_path.is_file() else pd.DataFrame()
     )
     style_dir = (
         Path(style_exposure_dir).expanduser().resolve()
@@ -399,10 +684,15 @@ def generate_markdown_report(
     rank_map = dict(zip(ranked_final["submission_id"].astype(str), ranked_final["rank"]))
 
     figures = _generate_report_figures(
-        output=output, summary=summary, final=final, score_problems=score_problems,
+        paths=paths, output=output, summary=summary, final=final, score_problems=score_problems,
         rank_conflicts=rank_conflicts, ab_sensitivity=ab_sensitivity,
         a_metric_sensitivity=a_metric_sensitivity,
         style_summary=style_summary, style_detail=style_detail,
+        regression_explanation=regression_explanation,
+        incremental_summary=incremental_summary,
+        incremental_by_window=incremental_by_window,
+        factor_clusters=factor_clusters,
+        group_incremental_summary=group_incremental_summary,
         similarity=similarity, high_correlation=high_correlation,
         top_ids=top_ids, rank_map=rank_map,
     )
@@ -486,6 +776,82 @@ def generate_markdown_report(
          "abs_correlation", "high_similarity"]
     ].head(top_n)
 
+    regression_top = regression_explanation.loc[
+        regression_explanation["submission_id"].isin(top_ids)
+    ].sort_values("final_rank").merge(participants, on="submission_id", how="left")
+    regression_top["participant"] = regression_top["participant"].fillna("（未匹配）")
+    regression_diagnostic = pd.DataFrame({
+        "最终排名": regression_top["final_rank"].astype(int),
+        "队伍/个人": regression_top["participant"],
+        "submission": regression_top["submission_id"].str[:8],
+        "回归重要性排名": regression_top["model_rank"].astype("Int64"),
+        "模型得分": regression_top["model_score"],
+        "重要性占比": regression_top["importance_share"],
+        "入选率": regression_top["selection_rate"],
+        "平均绝对权重": regression_top["abs_weight_mean"],
+        "权重波动": regression_top["abs_weight_std"],
+    })
+    if "dominant_direction" in regression_top:
+        regression_diagnostic["主要方向"] = regression_top["dominant_direction"]
+        regression_diagnostic["方向一致率"] = regression_top["direction_consistency"]
+    strongest_regression = regression_top.loc[regression_top["model_score"].idxmax()]
+    most_persistent = regression_top.loc[regression_top["selection_rate"].idxmax()]
+    top_importance_share = regression_top["importance_share"].sum()
+
+    incremental_available = not incremental_summary.empty and not factor_clusters.empty
+    incremental_diagnostic = pd.DataFrame()
+    incremental_observations: list[str] = []
+    if incremental_available:
+        incremental_top = (
+            incremental_summary.merge(
+                factor_clusters, on="submission_id", how="left", validate="one_to_one"
+            )
+            .loc[lambda frame: frame["submission_id"].isin(top_ids)]
+            .merge(
+                ranked_final[["rank", "submission_id"]], on="submission_id", how="left"
+            )
+            .merge(participants, on="submission_id", how="left")
+        )
+        if not group_incremental_summary.empty:
+            group_values = group_incremental_summary[["cluster_id", "mean_delta_ic"]].rename(
+                columns={"mean_delta_ic": "group_mean_delta_ic"}
+            )
+            incremental_top = incremental_top.merge(group_values, on="cluster_id", how="left")
+        else:
+            incremental_top["group_mean_delta_ic"] = np.nan
+        incremental_top["category"] = np.select(
+            [
+                incremental_top["mean_delta_ic"].gt(0)
+                & incremental_top["uniqueness"].ge(incremental_top["uniqueness"].median()),
+                incremental_top["mean_delta_ic"].gt(0),
+                incremental_top["uniqueness"].ge(incremental_top["uniqueness"].median()),
+            ],
+            ["独特且有增量", "有增量但可替代", "独特但增量有限"],
+            default="相似且增量有限",
+        )
+        incremental_top = incremental_top.sort_values("rank")
+        incremental_diagnostic = pd.DataFrame({
+            "最终排名": incremental_top["rank"].astype(int),
+            "队伍/个人": incremental_top["participant"].fillna("（未匹配）"),
+            "submission": incremental_top["submission_id"].str[:8],
+            "平均增量IC": incremental_top["mean_delta_ic"],
+            "正贡献窗口占比": incremental_top["positive_delta_rate"],
+            "增量IC波动": incremental_top["std_delta_ic"],
+            "独特性": incremental_top["uniqueness"],
+            "最大同类相似度": incremental_top["max_peer_similarity"],
+            "相似组": incremental_top["cluster_id"],
+            "组规模": incremental_top["cluster_size"],
+            "整组增量IC": incremental_top["group_mean_delta_ic"],
+            "特征分类": incremental_top["category"],
+        })
+        best_incremental = incremental_top.loc[incremental_top["mean_delta_ic"].idxmax()]
+        most_unique = incremental_top.loc[incremental_top["uniqueness"].idxmax()]
+        incremental_observations = [
+            f"- 前 {len(incremental_top)} 名中，平均样本外增量 IC 为正的有 **{int(incremental_top['mean_delta_ic'].gt(0).sum())}** 个。",
+            f"- 头部中增量贡献最高的是最终第 **{int(best_incremental['rank'])}** 名，平均 ΔIC 为 **{best_incremental['mean_delta_ic']:.6f}**，正贡献窗口占比为 **{best_incremental['positive_delta_rate']:.2%}**。",
+            f"- 头部中信息独特性最高的是最终第 **{int(most_unique['rank'])}** 名，独特性为 **{most_unique['uniqueness']:.4f}**，最相似同类相关为 **{most_unique['max_peer_similarity']:.4f}**。",
+        ]
+
     generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
     run_id = paths.run_dir.name
     lines = [
@@ -507,7 +873,7 @@ def generate_markdown_report(
         f"| 高相似因子对（≥ {high_correlation:.2f}） | {len(high_similarity)} |",
         f"| BARRA 风格暴露告警 | {style_warnings if not style_summary.empty else 'NOT_PROVIDED'} |",
         "",
-        "状态规则：成绩复算异常时为 `BLOCK`；不存在阻断项但有高相似、风格暴露告警或风格结果缺失时为 `REVIEW`；否则为 `PASS`。回归相关分析暂不纳入本报告。",
+        "状态规则：成绩复算异常时为 `BLOCK`；不存在阻断项但有高相似、风格暴露告警或风格结果缺失时为 `REVIEW`；否则为 `PASS`。联合回归章节用于解释因子贡献，不作为问题判定项。",
         "",
         "### 怎么分析",
         "",
@@ -545,7 +911,53 @@ def generate_markdown_report(
         "",
         "字段说明：`submission` 展示完整 ID 的前 8 位；`B-A` 为正表示 B 分更高，为负表示 A 分更高；`A/B名次` 依次为 A 排名和 B 排名；`最近相邻分差` 取与前后名次分差中的较小值；`敏感性` 综合 A/B 权重扫描和 A 指标留一法标记为高、中、低。",
         "",
-        "## 4. BARRA 风格暴露",
+        "## 4. 联合回归中的因子解释性",
+        "",
+        "### 怎么分析",
+        "",
+        f"本节聚焦最终榜前 {len(top_final)} 名，解释每个因子进入全因子联合 ElasticNet 后的模型内重要性和权重稳定性。`模型得分`表示平均绝对权重相对其波动的大小；`入选率`表示滚动窗口中非零系数出现的比例；`平均绝对权重`表示典型影响强度；逐期有符号权重展示影响方向是否持续一致。严格的独立增量信息由下一节的样本外删除实验判断。",
+        "",
+        "### 自动观察",
+        "",
+        f"- 头部因子合计占全部非负模型得分的 **{top_importance_share:.2%}**。",
+        f"- 头部中联合回归重要性最高的是最终第 **{int(strongest_regression['final_rank'])}** 名，模型得分为 **{strongest_regression['model_score']:.6f}**，全池回归重要性排名第 **{int(strongest_regression['model_rank'])}**。",
+        f"- 头部中入选最持续的是最终第 **{int(most_persistent['final_rank'])}** 名，滚动窗口入选率为 **{most_persistent['selection_rate']:.2%}**。",
+        "",
+        *_chart(figures["04_regression_explainability"], output, "头部因子的联合回归重要性、排名对应与逐期权重"),
+        "### 前 20 名因子逐截面回归权重趋势",
+        "",
+        "按最终排名每 5 个因子分为一组，分别展示第 1–5、6–10、11–15 和 16–20 名。每组统一使用从深红、橙红、浅色到浅蓝、深蓝的五级渐变，对应组内排名由高到低。每条折线代表一个因子在各滚动回归截面上的有符号权重；权重跨越零线表示回归方向发生改变，曲线长期接近零表示该因子在相应阶段贡献较弱或未被模型选择。",
+        "",
+        *_chart(figures["04b_top20_weight_trends"], output, "最终榜前20名因子的分组回归权重趋势"),
+        "### 头部因子回归解释表",
+        "",
+        _table(regression_diagnostic),
+        "",
+        "阅读顺序建议：先看模型得分和重要性排名，了解因子在联合模型中的权重表现；再看入选率和权重波动；最后看有符号权重的方向切换。是否具有不可替代的预测信息，应结合下一节的样本外增量贡献和相似因子组结果判断。",
+        "",
+        "## 5. 样本外增量贡献与信息独特性",
+        "",
+        "### 怎么分析",
+        "",
+        f"使用过去 {CONFIG.incremental_train_window} 个交易日训练完整 ElasticNet，并在随后 {CONFIG.incremental_test_window} 个交易日测试；随后分别删除单个因子和整个相似因子组重新拟合。`平均增量IC`为完整模型样本外 IC 减去删除后的样本外 IC，正值表示该因子或因子组提供了不可被剩余因子完全替代的未来预测信息。独特性定义为 `1 - 最相似若干同类因子的平均截面绝对相关`。",
+        "",
+        "### 自动观察",
+        "",
+        *(incremental_observations if incremental_observations else [
+            "- **NOT_PROVIDED**：尚未生成样本外增量贡献结果，需要在可查询未来收益数据的环境运行 `analyze_incremental_contribution`。"
+        ]),
+        "",
+        *_chart(figures["05_incremental_contribution"], output, "因子样本外增量贡献、独特性与相似组替代关系"),
+        "### 前20名逐窗口增量贡献",
+        "",
+        "每条曲线表示删除该因子后，完整模型相对于删除模型的样本外 IC 改善。曲线持续高于零表示因子在多个未来窗口中稳定提供增量信息；围绕零波动表示容易被其他因子替代；持续低于零则意味着删除该因子后模型反而更好。",
+        "",
+        *_chart(figures["05b_top20_incremental_trends"], output, "最终榜前20名的滚动样本外增量IC"),
+        "### 前20名增量贡献与独特性明细",
+        "",
+        _table(incremental_diagnostic) if incremental_available else "_尚未生成增量贡献结果。_",
+        "",
+        "## 6. BARRA 风格暴露",
         "",
         "本节统一使用更直观的**抽样交易日平均值**：风格相关表示各抽样日截面绝对相关的平均值，"
         "回归 R² 表示各抽样日暴露解释度的平均值。每个因子只归入平均绝对相关最高的主风格；"
@@ -610,20 +1022,24 @@ def generate_markdown_report(
         ])
 
     lines.extend([
-        "## 5. 因子相似度",
+        "## 7. 因子相似度",
         "",
         "### 怎么分析",
         "",
-        f"全量绝对相关分布用于提供背景，明细只展示至少一端属于最终榜前 {len(top_final)} 名的因子对，并按绝对相关性从高到低排列。重点看头部选手彼此之间、以及头部选手与全池其他因子的最高相似关系；高相关仍需结合全量数据、参赛方关系、代码实现和经济含义判断。",
+        f"全量绝对相关分布用于提供背景，明细只展示至少一端属于最终榜前 {len(top_final)} 名的因子对，并按绝对相关性从高到低排列。重点看头部选手彼此之间、以及头部选手与全池其他因子的最高相似关系；高相关仍需结合参赛方关系、代码实现和经济含义判断。",
         "",
-        f"从最多 {max_similarity_samples:,} 个样本计算两两 Pearson 相关。高相似阈值为 `{high_correlation:.2f}`，命中 **{len(high_similarity)}** 对。",
+        (
+            f"相似度先在每个交易日做截面 Pearson 相关，再对每日绝对相关取均值；高相似阈值为 `{high_correlation:.2f}`，命中 **{len(high_similarity)}** 对。"
+            if using_cross_similarity else
+            f"从最多 {max_similarity_samples:,} 个样本计算两两 Pearson 相关。高相似阈值为 `{high_correlation:.2f}`，命中 **{len(high_similarity)}** 对。"
+        ),
         "",
         *_chart(figures["08_factor_similarity"], output, "全量相似度背景与头部选手最高相似关系"),
         f"### 涉及最终榜前 {len(top_final)} 名的最高相似因子对",
         "",
         _table(similarity_top),
         "",
-        "## 6. 自动建议",
+        "## 8. 自动建议",
         "",
     ])
 
@@ -643,7 +1059,7 @@ def generate_markdown_report(
     lines.extend(f"{index}. {item}" for index, item in enumerate(recommendations, start=1))
     lines.extend([
         "",
-        "## 7. 输入路径",
+        "## 9. 输入路径",
         "",
         f"- 运行目录：`{paths.run_dir}`",
         f"- 预处理目录：`{paths.prepared_dir}`",

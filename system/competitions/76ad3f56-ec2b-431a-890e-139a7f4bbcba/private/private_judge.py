@@ -151,8 +151,11 @@ class PrivateJudge(JudgeBase):
                 raise RuntimeError(f"续跑批次缺少 manifest.json: {self.run_dir}")
             with open(self.manifest_path, encoding="utf-8") as reader:
                 previous_manifest = json.load(reader)
-            if previous_manifest.get("published"):
-                raise RuntimeError("已发布批次不允许续跑或重跑，请创建新批次")
+            if previous_manifest.get("published") and not self.rerun_submission_ids:
+                raise RuntimeError(
+                    "已发布批次不允许普通断点续跑；请通过 RERUN_SUBMISSION_IDS "
+                    "明确指定需要重跑的 submission"
+                )
             # 同一批次必须沿用首次启动时确定的评估结束日，避免跨日续跑改变口径。
             self.DATE_END = previous_manifest.get("date_end") or self.DATE_END
 
@@ -398,6 +401,7 @@ class PrivateJudge(JudgeBase):
                 status="resuming",
                 resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 rerun_submission_ids=sorted(self.rerun_submission_ids),
+                previously_published=bool(previous_manifest.get("published")),
                 selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
         else:
@@ -511,6 +515,8 @@ class PrivateJudge(JudgeBase):
                 status="review_pending",
                 completed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 elapsed_seconds=batch_elapsed_seconds,
+                # 只有全量排名和待发布快照成功生成后，才把纠错批次重新置为待发布。
+                published=False,
             )
             self.log.info(
                 "private_batch.finish",
