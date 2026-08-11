@@ -16,7 +16,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 USE_LOCAL = True
 COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-RUN_ID = "20260810_151358"
+RUN_ID = "20260811_102014"
 CHECK_START_DATE = "2025-01-01"
 CHECK_END_DATE = "2026-08-10"
 
@@ -158,7 +158,6 @@ class CheckPaths:
     @property
     def incremental_dir(self) -> Path:
         return self.artifacts_dir / INCREMENTAL_DIRNAME
-
 
 @dataclass(frozen=True)
 class ManualCheckConfig:

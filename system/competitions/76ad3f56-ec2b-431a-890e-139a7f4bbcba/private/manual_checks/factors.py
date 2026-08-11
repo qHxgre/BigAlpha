@@ -148,6 +148,7 @@ def analyze_cross_sectional_similarity(
         daily.to_parquet(paths.incremental_dir / FACTOR_SIMILARITY_DAILY_FILENAME, index=False)
         summary.to_csv(paths.incremental_dir / FACTOR_SIMILARITY_SUMMARY_FILENAME, index=False)
         clusters.to_csv(paths.incremental_dir / FACTOR_CLUSTERS_FILENAME, index=False)
+        print(f"截面相似度数据已保存: {paths.incremental_dir}")
     print(
         f"截面相似度: {len(factor_cols)} 个因子，{daily['date'].nunique()} 个交易日，"
         f"{len(summary)} 个因子对，{int(summary.get('high_similarity', pd.Series(dtype=bool)).sum())} 对高相似"

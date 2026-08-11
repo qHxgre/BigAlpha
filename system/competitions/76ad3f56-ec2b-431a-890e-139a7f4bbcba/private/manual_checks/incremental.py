@@ -265,7 +265,6 @@ def analyze_incremental_contribution(
             f"增量贡献窗口 {window_id}: train {train_days[0].date()}~{train_days[-1].date()}, "
             f"test {test_days[0].date()}~{test_days[-1].date()}"
         )
-
     factor_by_window = pd.DataFrame(factor_records)
     group_by_window = pd.DataFrame(group_records)
     factor_summary = _summarize_incremental(factor_by_window, id_column="submission_id")
@@ -295,6 +294,7 @@ def analyze_incremental_contribution(
         (paths.incremental_dir / INCREMENTAL_METADATA_FILENAME).write_text(
             json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        print(f"增量贡献数据已保存: {paths.incremental_dir}")
     print(
         f"增量贡献完成: {len(factor_cols)} 个因子，"
         f"{factor_by_window['window_id'].nunique() if not factor_by_window.empty else 0} 个样本外窗口"

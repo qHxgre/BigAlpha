@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import re
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -108,6 +109,24 @@ def _extract_phone(data: object) -> str:
     if isinstance(contact, dict):
         return _extract_phone(contact)
     return ""
+
+
+def _classify_error(value: object) -> str:
+    """提取稳定的报错类型，避免耗时、submission ID 等动态值拆散同类错误。"""
+    error = _display_value(value).strip()
+    if error == "-":
+        return "未记录错误"
+
+    exited = re.fullmatch(r"user code exited with code (-?\d+)", error)
+    if exited:
+        return f"user code exited with code {exited.group(1)}"
+    if re.fullmatch(r"user code timed out after [\d.]+s", error):
+        return "user code timed out"
+    if re.fullmatch(
+        r"submission \S+ 包含 \d+ 个 notebook，要求恰好 \d+ 个", error
+    ):
+        return "notebook 数量不符合要求"
+    return error
 
 
 def _load_phones(cid: str) -> dict[str, str]:
@@ -208,10 +227,12 @@ def _build_failure_tables(
     failed["stdout_path"] = failed["submission_id"].map(
         lambda sid: str(run_dir / "submissions" / str(sid) / "stdout")
     )
+    failed["error_type"] = failed["error"].map(_classify_error)
     output_columns = [
         "submission_id",
         "code_file",
         "status",
+        "error_type",
         "error",
         "participant_type",
         "participant_name",
@@ -236,12 +257,7 @@ def _write_full_log(
     output_path: Path,
     total_count: int,
 ) -> None:
-    error_counts = (
-        by_submission["error"]
-        .fillna("未记录错误")
-        .astype(str)
-        .value_counts(dropna=False)
-    )
+    error_groups = list(by_submission.groupby("error_type", sort=False, dropna=False))
     lines = [
         "失败 Submission 日志汇总",
         "=" * 100,
@@ -251,35 +267,54 @@ def _write_full_log(
         f"失败提交数: {len(by_submission)}",
         f"涉及参赛方: {by_submission['participant_name'].nunique(dropna=True)}",
         "",
-        "错误类型统计:",
+        "错误类型汇总:",
     ]
-    lines.extend(f"  {count:>4}  {error}" for error, count in error_counts.items())
+    for error_type, group in error_groups:
+        submission_ids = group["submission_id"].astype(str).tolist()
+        lines.extend([
+            f"  {len(group):>4}  {_display_value(error_type)}",
+            f"        submission_ids: {json.dumps(submission_ids, ensure_ascii=False)}",
+        ])
 
     with output_path.open("w", encoding="utf-8") as output:
         output.write("\n".join(lines).rstrip() + "\n")
-        for index, row in enumerate(by_submission.itertuples(index=False), start=1):
-            stdout_path = Path(row.stdout_path)
-            block = [
+        submission_index = 0
+        for group_index, (error_type, group) in enumerate(error_groups, start=1):
+            submission_ids = group["submission_id"].astype(str).tolist()
+            group_header = [
                 "",
-                "#" * 100,
-                f"[{index}/{len(by_submission)}] submission_id: {row.submission_id}",
-                "#" * 100,
-                f"participant: {_display_value(row.participant_name)} "
-                f"({_display_value(row.participant_type)})",
-                f"contacts: {_display_value(row.contact_names)}",
-                f"phones: {_display_value(row.contact_phones)}",
-                f"contact_user_ids: {_display_value(row.contact_user_ids)}",
-                f"code_file: {_display_value(row.code_file)}",
-                f"status: {_display_value(row.status)}",
-                f"error: {_display_value(row.error)}",
-                f"elapsed_seconds: {_display_value(row.elapsed_seconds)}",
-                f"stdout_path: {stdout_path}",
-                "-" * 100,
-                "STDOUT (完整日志)",
-                "-" * 100,
-                _read_stdout(stdout_path).rstrip(),
+                "=" * 100,
+                f"错误组 [{group_index}/{len(error_groups)}]: {_display_value(error_type)}",
+                f"提交数: {len(group)}",
+                f"submission_ids: {json.dumps(submission_ids, ensure_ascii=False)}",
+                "=" * 100,
             ]
-            output.write("\n".join(block).rstrip() + "\n")
+            output.write("\n".join(group_header).rstrip() + "\n")
+
+            for row in group.itertuples(index=False):
+                submission_index += 1
+                stdout_path = Path(row.stdout_path)
+                block = [
+                    "",
+                    "#" * 100,
+                    f"[{submission_index}/{len(by_submission)}] submission_id: {row.submission_id}",
+                    "#" * 100,
+                    f"participant: {_display_value(row.participant_name)} "
+                    f"({_display_value(row.participant_type)})",
+                    f"contacts: {_display_value(row.contact_names)}",
+                    f"phones: {_display_value(row.contact_phones)}",
+                    f"contact_user_ids: {_display_value(row.contact_user_ids)}",
+                    f"code_file: {_display_value(row.code_file)}",
+                    f"status: {_display_value(row.status)}",
+                    f"error: {_display_value(row.error)}",
+                    f"elapsed_seconds: {_display_value(row.elapsed_seconds)}",
+                    f"stdout_path: {stdout_path}",
+                    "-" * 100,
+                    "STDOUT (完整日志)",
+                    "-" * 100,
+                    _read_stdout(stdout_path).rstrip(),
+                ]
+                output.write("\n".join(block).rstrip() + "\n")
 
 
 def _write_public_markdown(
