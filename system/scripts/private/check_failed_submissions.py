@@ -1,4 +1,4 @@
-"""检查私榜批次中的失败 submission，并输出包含联系方式的完整日志。
+"""检查私榜批次中的失败 submission，并输出内部日志和公开通知。
 
 日常使用时只需修改下方 ``competition_id`` 和 ``batch_id``，然后运行：
 
@@ -6,11 +6,17 @@
 
 输出文件：
     system/files/scripts/private/<competition_id>__<batch_id>__failed_submissions.log
+    system/files/scripts/private/<competition_id>__<batch_id>__failed_submissions.md
+
+``.log`` 仅供主办方内部排查，包含联系方式和运行日志；``.md`` 可直接用于
+通知参赛者，仅列出 submission ID 和参赛方名称，不包含联系方式、用户 ID、
+报错详情或文件路径等敏感信息。
 """
 
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +27,7 @@ import pandas as pd
 # 运行配置：每次只需修改这两个值。
 # ---------------------------------------------------------------------------
 competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-batch_id = "20260810_151358"
+batch_id = "20260811_102014"
 
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
@@ -82,6 +88,12 @@ def _read_stdout(path: Path) -> str:
 
 def _display_value(value: object) -> str:
     return "-" if pd.isna(value) or str(value) == "" else str(value)
+
+
+def _markdown_cell(value: object) -> str:
+    """将动态内容安全地放入 Markdown 表格单元格。"""
+    normalized = " ".join(_display_value(value).splitlines())
+    return escape(normalized, quote=False).replace("|", "\\|")
 
 
 def _extract_phone(data: object) -> str:
@@ -270,6 +282,63 @@ def _write_full_log(
             output.write("\n".join(block).rstrip() + "\n")
 
 
+def _write_public_markdown(
+    by_submission: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """生成可公开转发的失败通知，仅公开提交与参赛方的对应关系。"""
+    failed_submission_count = len(by_submission)
+    submissions_by_participant: dict[str, list[object]] = {}
+    for row in by_submission.itertuples(index=False):
+        participant_name = _display_value(row.participant_name)
+        submission_ids = submissions_by_participant.setdefault(participant_name, [])
+        if row.submission_id not in submission_ids:
+            submission_ids.append(row.submission_id)
+    failed_participant_count = len(submissions_by_participant)
+
+    if failed_submission_count == 0:
+        lines = [
+            "# 提交运行结果通知",
+            "",
+            "本次检查未发现运行失败的提交，无需参赛者进行额外处理。",
+        ]
+    else:
+        lines = [
+            "# 提交运行异常通知",
+            "",
+            "本次检查发现部分参赛者的提交未能成功完成运行。",
+            "",
+            f"- 受影响提交数：{failed_submission_count}",
+            f"- 受影响参赛方数：{failed_participant_count}",
+            "",
+            "## 运行失败的提交",
+            "",
+            "| 参赛方 | Submission IDs |",
+            "| --- | --- |",
+        ]
+        for participant_name, submission_ids in submissions_by_participant.items():
+            escaped_name = _markdown_cell(participant_name)
+            escaped_ids = "<br>".join(
+                _markdown_cell(submission_id) for submission_id in submission_ids
+            )
+            lines.append(f"| {escaped_name} | {escaped_ids} |")
+
+        lines.extend([
+            "",
+            "## 请受影响的参赛者及时处理",
+            "",
+            "请主动联系主办方，确认提交失败的具体原因及后续处理方式。联系时，"
+            "请私聊主办方并提供必要信息，不要在公开群聊或公开文档中"
+            "发送账号、手机号、代码、日志等敏感内容。",
+            "",
+            "> 本通知为公开版汇总，除上述 Submission ID 和参赛方名称外，不包含"
+            "联系方式、用户 ID、错误详情或内部文件路径。具体情况请以主办方核查"
+            "结果为准。",
+        ])
+
+    output_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
 def main() -> None:
     cid = competition_id.strip()
     bid = batch_id.strip()
@@ -297,12 +366,15 @@ def main() -> None:
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     log_path = OUTPUT_ROOT / f"{cid}__{bid}__failed_submissions.log"
+    markdown_path = OUTPUT_ROOT / f"{cid}__{bid}__failed_submissions.md"
     _write_full_log(by_submission, log_path, len(summary))
+    _write_public_markdown(by_submission, markdown_path)
 
     print(f"总提交数: {len(summary)}")
     print(f"未跑成功提交: {len(by_submission)}")
     print(f"需联系参赛方: {by_submission['participant_name'].nunique(dropna=True)}")
     print(f"完整日志: {log_path}")
+    print(f"公开通知: {markdown_path}")
 
 
 if __name__ == "__main__":
