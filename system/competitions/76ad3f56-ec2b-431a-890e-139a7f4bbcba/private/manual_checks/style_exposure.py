@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -142,7 +143,6 @@ def analyze_style_exposure(
     max_abs_style_corr: float = CONFIG.max_abs_style_correlation,
     max_regression_r2: float = CONFIG.max_style_regression_r2,
     sample_interval: int = 5,
-    progress_every: int = 10,
     display: bool = True,
     output_dir: str | Path | None = None,
     plot: bool = False,
@@ -166,8 +166,6 @@ def analyze_style_exposure(
     sample_interval:
         每隔多少个交易日抽取一个截面；同时始终保留首日、末日和每月最后一个
         交易日。告警因子也不会自动回退到全交易日检查。
-    progress_every:
-        每处理多少个抽样交易日输出一次进度；设为 0 时不输出逐日进度。
     display:
         是否在 Notebook 中展示汇总结果。
     output_dir:
@@ -184,9 +182,6 @@ def analyze_style_exposure(
         raise ValueError(f"start_date 不能晚于 end_date: {start_date} > {end_date}")
     if sample_interval < 1:
         raise ValueError(f"sample_interval 必须大于等于 1，实际为 {sample_interval}")
-    if progress_every < 0:
-        raise ValueError(f"progress_every 不能小于 0，实际为 {progress_every}")
-
     stage_started_at = perf_counter()
     print(f"[风格暴露] 1/5 读取因子池: {paths.factor_pool_path}", flush=True)
     pool = pd.read_parquet(paths.factor_pool_path)
@@ -261,6 +256,10 @@ def analyze_style_exposure(
     correlation_rows: list[dict] = []
     grouped_dates = merged.groupby("date", sort=True)
     total_sampled_days = grouped_dates.ngroups
+    progress_checkpoints = {
+        math.ceil(total_sampled_days * percentage / 100)
+        for percentage in range(20, 101, 20)
+    }
     compute_started_at = perf_counter()
     print(
         f"[风格暴露] 4/5 开始计算: {total_sampled_days} 个抽样交易日",
@@ -320,11 +319,7 @@ def analyze_style_exposure(
                 "max_abs_residual_corr": max_finite(residual_correlations),
             })
 
-        if progress_every and (
-            completed_days == 1
-            or completed_days % progress_every == 0
-            or completed_days == total_sampled_days
-        ):
+        if completed_days in progress_checkpoints:
             elapsed = perf_counter() - compute_started_at
             remaining = (
                 elapsed / completed_days * (total_sampled_days - completed_days)
