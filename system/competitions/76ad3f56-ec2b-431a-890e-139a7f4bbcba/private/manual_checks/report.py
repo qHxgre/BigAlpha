@@ -56,6 +56,40 @@ def _table(data: pd.DataFrame, *, limit: int | None = None) -> str:
     return "\n".join(lines)
 
 
+def _dominant_style_classification(
+    style_summary: pd.DataFrame,
+    style_detail: pd.DataFrame,
+    *,
+    threshold: float,
+) -> pd.DataFrame:
+    """将每个因子唯一归入最强风格；未超过阈值的归入 OTHER。"""
+    factor_ids = style_summary["submission_id"].astype(str)
+    if style_detail.empty:
+        return pd.DataFrame({
+            "submission_id": factor_ids,
+            "dominant_style": "OTHER",
+            "dominant_mean_abs_correlation": np.nan,
+        })
+    strongest = (
+        style_detail.sort_values("mean_abs_correlation", ascending=False)
+        .drop_duplicates("submission_id")
+        [["submission_id", "style", "mean_abs_correlation"]]
+        .rename(columns={
+            "style": "dominant_style",
+            "mean_abs_correlation": "dominant_mean_abs_correlation",
+        })
+    )
+    classified = pd.DataFrame({"submission_id": factor_ids}).merge(
+        strongest, on="submission_id", how="left"
+    )
+    classified.loc[
+        classified["dominant_mean_abs_correlation"].isna()
+        | classified["dominant_mean_abs_correlation"].le(threshold),
+        "dominant_style",
+    ] = "OTHER"
+    return classified
+
+
 def _require_inputs(paths: CheckPaths) -> None:
     required = [
         paths.summary_path,
@@ -221,32 +255,50 @@ def _generate_report_figures(
     ax.legend(ncol=3, loc="lower right")
     save("03_top_ranking_comparison", fig)
 
-    # 风格暴露：左侧看当前因子池各风格分布，右侧聚焦最终榜前 N 名。
-    fig, axes = plt.subplots(1, 2, figsize=(17, 6))
-    if not style_summary.empty and not style_detail.empty:
-        style_pool = style_detail.groupby("style")["p95_abs_correlation"].agg(
-            median="median", p95=lambda values: values.quantile(.95)
-        ).sort_values("p95", ascending=False)
-        sx = np.arange(len(style_pool))
-        axes[0].bar(sx, style_pool["p95"], color="#4C78A8", label="cross-factor P95")
-        axes[0].plot(sx, style_pool["median"], marker="o", color="#F58518", label="median")
-        axes[0].set(title="Factor-pool style exposure distribution", ylabel="P95 abs correlation",
-                    xticks=sx, xticklabels=style_pool.index, xlabel="BARRA style")
-        axes[0].tick_params(axis="x", rotation=45)
-        axes[0].legend()
-        heatmap = style_detail.loc[style_detail["submission_id"].isin(top_ids)].pivot(
-            index="submission_id", columns="style", values="p95_abs_correlation"
-        ).reindex(top_ids)
-        image = axes[1].imshow(heatmap, aspect="auto", cmap="YlOrRd", vmin=0)
-        axes[1].set_xticks(range(len(heatmap.columns)), heatmap.columns, rotation=45, ha="right")
-        axes[1].set_yticks(range(len(heatmap.index)), [f"#{rank_map.get(i, '?')} {i[:8]}" for i in heatmap.index])
-        axes[1].set_title("Top finalists: P95 exposure by style")
-        fig.colorbar(image, ax=axes[1], label="P95 abs correlation")
-    else:
-        for ax in axes:
-            ax.text(.5, .5, "NOT PROVIDED\nNo BARRA exposure detail", ha="center", va="center", fontsize=15)
-            ax.set(xticks=[], yticks=[])
-    save("07_style_exposure", fig)
+    def plot_style_group(group_summary: pd.DataFrame, title_prefix: str, figure_name: str) -> None:
+        """按相同口径绘制主风格数量与平均暴露强度。"""
+        fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
+        if not group_summary.empty and not style_detail.empty:
+            classified = _dominant_style_classification(
+                group_summary,
+                style_detail,
+                threshold=CONFIG.max_abs_style_correlation,
+            )
+            style_counts = classified["dominant_style"].value_counts().sort_values(ascending=False)
+            sx = np.arange(len(style_counts))
+            bars = axes[0].bar(sx, style_counts.values, color="#4C78A8")
+            axes[0].set(
+                title=f"{title_prefix}: dominant style count (total={int(style_counts.sum())})",
+                ylabel="factor count",
+                xticks=sx,
+                xticklabels=style_counts.index,
+                xlabel=f"OTHER if strongest mean abs correlation <= {CONFIG.max_abs_style_correlation:.2f}",
+            )
+            axes[0].tick_params(axis="x", rotation=45)
+            axes[0].bar_label(bars, padding=2)
+
+            axes[1].scatter(
+                group_summary["mean_max_abs_style_corr"],
+                group_summary["mean_regression_r2"],
+                color="#E45756",
+                alpha=.75,
+            )
+            axes[1].axvline(CONFIG.max_abs_style_correlation, color="grey", linestyle="--")
+            axes[1].axhline(CONFIG.max_style_regression_r2, color="grey", linestyle="--")
+            axes[1].set(
+                title=f"{title_prefix}: average exposure strength",
+                xlabel="average daily maximum style correlation",
+                ylabel="average daily exposure regression R²",
+            )
+        else:
+            for ax in axes:
+                ax.text(.5, .5, "NOT PROVIDED\nNo BARRA exposure detail", ha="center", va="center", fontsize=15)
+                ax.set(xticks=[], yticks=[])
+        save(figure_name, fig)
+
+    plot_style_group(style_summary, "Full factor pool", "07_style_exposure")
+    top_style_summary = style_summary.loc[style_summary["submission_id"].isin(top_ids)].copy()
+    plot_style_group(top_style_summary, f"Top {len(top_ids)} finalists", "07b_top_style_exposure")
 
     # 相似度：保留全量背景，右侧专门展示涉及头部选手的最高相似关系。
     fig, axes = plt.subplots(1, 2, figsize=(17, 5.5))
@@ -495,11 +547,16 @@ def generate_markdown_report(
         "",
         "## 4. BARRA 风格暴露",
         "",
-        "### 怎么分析",
+        "本节统一使用更直观的**抽样交易日平均值**：风格相关表示各抽样日截面绝对相关的平均值，"
+        "回归 R² 表示各抽样日暴露解释度的平均值。每个因子只归入平均绝对相关最高的主风格；"
+        f"最高值不超过 `{CONFIG.max_abs_style_correlation:.2f}` 时归为 `OTHER`。",
         "",
-        f"先看整个因子池在十类 BARRA 风格上的暴露分布，识别因子池整体更容易残留的风格；再重点比较最终榜前 {len(top_final)} 名的逐风格暴露热力图、回归 R² 和样本覆盖。头部因子若在同一风格上集中偏高，即使尚未越过告警阈值，也值得结合名次差异复核。",
+        "### 全部因子池",
         "",
-        *_chart(figures["07_style_exposure"], output, "因子池风格分布与头部选手暴露"),
+        *_chart(figures["07_style_exposure"], output, "全部因子池主风格分布与平均暴露强度"),
+        f"### 最终榜前 {len(top_final)} 名",
+        "",
+        *_chart(figures["07b_top_style_exposure"], output, f"最终榜前 {len(top_final)} 名主风格分布与平均暴露强度"),
     ]
 
     if style_summary.empty:
@@ -511,62 +568,46 @@ def generate_markdown_report(
         ])
     else:
         style_top = style_summary.loc[style_summary["submission_id"].isin(top_ids), [
-            "submission_id", "trading_days", "valid_days", "median_sample_count",
-            "p95_regression_r2", "p95_max_abs_style_corr",
-            "max_abs_residual_corr", "style_exposure_warning",
+            "submission_id", "mean_regression_r2", "mean_max_abs_style_corr",
         ]].copy()
-        style_top.insert(0, "final_rank", style_top["submission_id"].map(rank_map))
-        style_top = style_top.sort_values("final_rank")
-        style_pool_distribution = (
-            style_detail.groupby("style")["p95_abs_correlation"]
-            .agg(
-                factor_count="count",
-                median="median",
-                p75=lambda values: values.quantile(.75),
-                p95=lambda values: values.quantile(.95),
-                maximum="max",
-            )
-            .sort_values("p95", ascending=False)
-            .reset_index()
-            if not style_detail.empty else pd.DataFrame()
-        )
-        top_style_detail = style_detail.loc[
+        final_score_lookup = ranked_final.set_index("submission_id")["final_score"]
+        style_top.insert(0, "最终得分排名", style_top["submission_id"].map(rank_map))
+        style_top.insert(2, "最终得分", style_top["submission_id"].map(final_score_lookup))
+        top_style_rows = []
+        for submission_id, group in style_detail.loc[
             style_detail["submission_id"].isin(top_ids)
-        ].pivot(index="submission_id", columns="style", values="p95_abs_correlation").reindex(top_ids)
-        if not top_style_detail.empty:
-            top_style_detail.insert(0, "final_rank", [rank_map.get(index) for index in top_style_detail.index])
-            top_style_detail = top_style_detail.reset_index()
+        ].groupby("submission_id"):
+            ranked = group.sort_values("mean_abs_correlation", ascending=False).head(3)
+            labels = [
+                f"{row.style}({'+' if row.mean_correlation >= 0 else '-'}) {row.mean_abs_correlation:.3f}"
+                for row in ranked.itertuples(index=False)
+            ]
+            dominant = (
+                labels[0]
+                if labels and ranked.iloc[0]["mean_abs_correlation"] > CONFIG.max_abs_style_correlation
+                else "OTHER"
+            )
+            top_style_rows.append({
+                "submission_id": submission_id,
+                "主要风格": dominant,
+                "前三风格": "；".join(labels),
+            })
+        style_top = style_top.merge(
+            pd.DataFrame(top_style_rows, columns=["submission_id", "主要风格", "前三风格"]),
+            on="submission_id",
+            how="left",
+        )
+        style_top["明显风格"] = style_top["主要风格"].ne("OTHER")
+        style_top = style_top.rename(columns={
+            "mean_regression_r2": "平均暴露回归R²",
+            "mean_max_abs_style_corr": "平均最大风格相关",
+        }).sort_values(["最终得分", "最终得分排名"], ascending=[False, True])
         lines.extend([
-            f"- 检查因子数：{len(style_summary)}。",
-            f"- 风格暴露告警因子数：{style_warnings}。",
-            f"- 检查周期：{style_metadata.get('start_date')} 至 {style_metadata.get('end_date')}。"
-            if style_metadata else "- 检查周期：元数据未提供。",
-            f"- 抽样交易日：{style_metadata.get('sampled_trading_days')} / {style_metadata.get('total_trading_days')}。"
-            if style_metadata else "- 抽样交易日：元数据未提供。",
-            "",
-            "### 当前因子池的风格分布",
-            "",
-            _table(style_pool_distribution),
-            "",
-            f"### 最终榜前 {len(top_final)} 名汇总",
-            "",
             _table(style_top),
             "",
-            f"### 最终榜前 {len(top_final)} 名逐风格 P95 绝对相关",
-            "",
-            _table(top_style_detail),
+            f"全部因子池共 {len(style_summary)} 个因子；前 {len(top_final)} 名图使用完全相同的分类与阈值口径。",
             "",
         ])
-        if style_figure_path.is_file():
-            figure_reference = Path(
-                Path(style_figure_path).relative_to(output.parent)
-                if style_figure_path.is_relative_to(output.parent)
-                else style_figure_path
-            ).as_posix()
-            lines.extend([
-                f"![BARRA 风格暴露概览]({figure_reference})",
-                "",
-            ])
 
     lines.extend([
         "## 5. 因子相似度",
