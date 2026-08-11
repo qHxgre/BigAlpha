@@ -65,12 +65,14 @@ def plot_regression_overview(paths: CheckPaths, *, top_n: int = 30) -> pd.DataFr
 def rerun_regression_explanation(
     paths: CheckPaths,
     *,
+    sd: str | pd.Timestamp | None = "2025-01-01",
+    ed: str | pd.Timestamp | None = "2026-08-10",
     top_n: int = 20,
     output_dir: str | Path | None = None,
     tolerance: float = 1e-8,
     plot: bool = True,
 ) -> dict[str, pd.DataFrame]:
-    """复跑正式滚动回归；可导出结果包供本地报告读取。"""
+    """复跑正式滚动回归；默认周期为 2025-01-01 至 2026-08-10。"""
     if paths.bigalpha_eval_src is None:
         raise ValueError("CheckPaths.bigalpha_eval_src 未配置")
     add_to_sys_path(paths.bigalpha_eval_src)
@@ -78,7 +80,19 @@ def rerun_regression_explanation(
 
     pool = pd.read_parquet(paths.factor_pool_path)
     pool["date"] = pd.to_datetime(pool["date"])
-    analyzer = ElasticNetRegress(pool["date"].min().strftime("%Y-%m-%d"), pool["date"].max().strftime("%Y-%m-%d"))
+    if pool["date"].isna().all():
+        raise ValueError("因子池 date 列没有有效日期")
+
+    start_date = pool["date"].min() if sd is None else pd.to_datetime(sd)
+    end_date = pool["date"].max() if ed is None else pd.to_datetime(ed)
+    if pd.isna(start_date) or pd.isna(end_date):
+        raise ValueError("sd 和 ed 必须是有效日期")
+    if start_date > end_date:
+        raise ValueError(f"sd 不能晚于 ed：sd={start_date.date()}，ed={end_date.date()}")
+
+    start_date_text = start_date.strftime("%Y-%m-%d")
+    end_date_text = end_date.strftime("%Y-%m-%d")
+    analyzer = ElasticNetRegress(start_date_text, end_date_text)
     rerun = analyzer.score(pool, plot=False)
     scores, weights = rerun.per_factor_scores.copy(), rerun.weights_history.copy()
     official = read_regression(paths)
@@ -99,7 +113,8 @@ def rerun_regression_explanation(
     mismatch_count = int(check["rerun_mismatch"].sum())
     print(
         f"解释性复跑与正式回归最大字段差异: {max_delta:.3e}；"
-        f"差异因子: {mismatch_count}；滚动窗口: {len(weights)}"
+        f"差异因子: {mismatch_count}；滚动窗口: {len(weights)}；"
+        f"回归周期: {start_date_text} 至 {end_date_text}"
     )
     if plot:
         analyzer.plot()
@@ -112,6 +127,8 @@ def rerun_regression_explanation(
         weights.to_parquet(export_dir / "regression_rerun_weights_history.parquet", index=False)
         summary = {
             "status": "PASS" if mismatch_count == 0 else "BLOCK",
+            "start_date": start_date_text,
+            "end_date": end_date_text,
             "tolerance": tolerance,
             "official_factor_count": int(len(official)),
             "rerun_factor_count": int(len(scores)),
