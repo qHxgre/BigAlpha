@@ -1,6 +1,6 @@
 """私榜人工复核工具，面向 Notebook 的统一导入入口。"""
 
-from .config import CheckPaths
+from .config import CONFIG, PATHS, ManualCheckConfig, CheckPaths
 from .factors import analyze_factor_similarity
 from .ranking import (
     analyze_a_metric_sensitivity,
@@ -24,7 +24,8 @@ def generate_markdown_report(*args, **kwargs):
     return generate(*args, **kwargs)
 
 __all__ = [
-    "CheckPaths", "check_score_consistency", "analyze_rank_conflicts",
+    "CONFIG", "PATHS", "ManualCheckConfig", "CheckPaths",
+    "check_score_consistency", "analyze_rank_conflicts",
     "analyze_ab_weight_sensitivity", "analyze_a_metric_sensitivity",
     "check_regression_integrity", "analyze_regression_stability",
     "analyze_factor_similarity",

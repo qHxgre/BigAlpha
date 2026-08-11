@@ -8,20 +8,12 @@ import numpy as np
 import pandas as pd
 
 from .common import show
-from .config import CheckPaths
-
-
-STYLE_COLUMNS = (
-    "SIZE", "BETA", "MOMENTUM", "RESVOL", "SIZENL", "BTOP", "LIQUIDTY",
-    "EARNYILD", "GROWTH", "LEVERAGE",
-)
-
-INDUSTRY_COLUMNS = (
-    "AGRIFOREST", "MINING", "CHEM", "IRONSTEEL", "NONFERMETAL", "ELECTRONICS",
-    "AUTO", "HOUSEAPP", "FOODBEVER", "TEXTILE", "LIGHTINDUS", "HEALTH",
-    "UTILITIES", "TRANSPORTATION", "REALESTATE", "COMMETRADE", "LEISERVICE",
-    "BANK", "NONBANKFINAN", "CONGLOMERATES", "CONMAT", "BUILDDECO", "ELECEQP",
-    "AERODEF", "COMPUTER", "MEDIA", "TELECOM", "COAL", "PETRO", "ENVP", "BEAUTY",
+from .config import CONFIG, EXPOSURE_COLUMNS, PATHS, STYLE_COLUMNS, CheckPaths
+from .exposure import (
+    calculate_residual,
+    max_finite,
+    query_exposures,
+    safe_correlation,
 )
 
 
@@ -34,47 +26,13 @@ class StyleExposureCheckResult:
     daily: pd.DataFrame
 
 
-def _residual(y: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """与评测预处理一致，加入截距后用最小二乘回归取残差。"""
-    design = np.column_stack([np.ones(len(x), dtype=float), x])
-    beta = np.linalg.lstsq(design, y, rcond=None)[0]
-    return y - design @ beta
-
-
-def _safe_corr(left: np.ndarray, right: np.ndarray) -> float:
-    mask = np.isfinite(left) & np.isfinite(right)
-    if mask.sum() < 5:
-        return np.nan
-    x = left[mask]
-    y = right[mask]
-    if np.std(x) == 0 or np.std(y) == 0:
-        return np.nan
-    return float(np.corrcoef(x, y)[0, 1])
-
-
-def _query_exposures(start_date: str, end_date: str) -> pd.DataFrame:
-    """查询与 ``DataProcess.neutralize`` 相同的风格和行业数据。"""
-    try:
-        import dai
-    except ImportError as exc:  # pragma: no cover - 本地环境通常没有云端数据依赖
-        raise RuntimeError("风格暴露检查需要在安装了 dai 的 BigQuant 云端环境运行") from exc
-
-    columns = ",\n            ".join((*STYLE_COLUMNS, *INDUSTRY_COLUMNS))
-    sql = f"""
-        SELECT
-            date,
-            instrument,
-            {columns}
-        FROM bigalpha_2026_exposure
-    """
-    return dai.query(sql, filters={"date": [start_date, end_date]}).df()
-
-
 def analyze_style_exposure(
-    paths: CheckPaths,
+    paths: CheckPaths = PATHS,
+    start_date: str = CONFIG.start_date,
+    end_date: str = CONFIG.end_date,
     *,
-    max_abs_style_corr: float = 0.10,
-    max_regression_r2: float = 0.10,
+    max_abs_style_corr: float = CONFIG.max_abs_style_correlation,
+    max_regression_r2: float = CONFIG.max_style_regression_r2,
     display: bool = True,
 ) -> StyleExposureCheckResult:
     """检查因子池的风格暴露残留。
@@ -87,6 +45,8 @@ def analyze_style_exposure(
     ----------
     paths:
         私榜人工复核路径。
+    start_date, end_date:
+        检查周期，格式为 ``YYYY-MM-DD``，首尾日期均包含。
     max_abs_style_corr:
         单日最大绝对风格相关性的告警阈值。
     max_regression_r2:
@@ -94,6 +54,11 @@ def analyze_style_exposure(
     display:
         是否在 Notebook 中展示汇总结果。
     """
+    start = pd.Timestamp(start_date).normalize()
+    end = pd.Timestamp(end_date).normalize()
+    if start > end:
+        raise ValueError(f"start_date 不能晚于 end_date: {start_date} > {end_date}")
+
     pool = pd.read_parquet(paths.factor_pool_path).copy()
     required = {"date", "instrument"}
     missing = required.difference(pool.columns)
@@ -105,13 +70,15 @@ def analyze_style_exposure(
         raise ValueError("factor_pool 中没有可检查的因子列")
 
     pool["date"] = pd.to_datetime(pool["date"]).dt.normalize()
-    start_date = pool["date"].min().strftime("%Y-%m-%d")
-    end_date = pool["date"].max().strftime("%Y-%m-%d")
-    exposures = _query_exposures(start_date, end_date)
+    pool = pool.loc[pool["date"].between(start, end)].copy()
+    if pool.empty:
+        raise ValueError(f"factor_pool 在 {start_date} ~ {end_date} 内没有数据")
+
+    exposures = query_exposures(start_date, end_date)
     exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
 
-    exposure_columns = [*STYLE_COLUMNS, *INDUSTRY_COLUMNS]
-    missing_exposures = set(exposure_columns).difference(exposures.columns)
+    exposure_columns = list(EXPOSURE_COLUMNS)
+    missing_exposures = set(EXPOSURE_COLUMNS).difference(exposures.columns)
     if missing_exposures:
         raise ValueError(f"暴露数据缺少必要列: {sorted(missing_exposures)}")
 
@@ -145,7 +112,7 @@ def analyze_style_exposure(
 
             valid_y = y[mask]
             valid_x = x[mask]
-            residual = _residual(valid_y, valid_x)
+            residual = calculate_residual(valid_y, valid_x)
             total_ss = float(np.sum((valid_y - valid_y.mean()) ** 2))
             residual_ss = float(np.sum(residual ** 2))
             r2 = np.nan if total_ss == 0 else 1.0 - residual_ss / total_ss
@@ -153,8 +120,8 @@ def analyze_style_exposure(
             raw_correlations = []
             residual_correlations = []
             for index, exposure in enumerate(exposure_columns):
-                raw_corr = _safe_corr(valid_y, valid_x[:, index])
-                residual_corr = _safe_corr(residual, valid_x[:, index])
+                raw_corr = safe_correlation(valid_y, valid_x[:, index])
+                residual_corr = safe_correlation(residual, valid_x[:, index])
                 if exposure in STYLE_COLUMNS:
                     raw_correlations.append(abs(raw_corr) if np.isfinite(raw_corr) else np.nan)
                     correlation_rows.append({
@@ -173,8 +140,8 @@ def analyze_style_exposure(
                 "submission_id": str(factor),
                 "sample_count": sample_count,
                 "regression_r2": r2,
-                "max_abs_style_corr": np.nanmax(raw_correlations),
-                "max_abs_residual_corr": np.nanmax(residual_correlations),
+                "max_abs_style_corr": max_finite(raw_correlations),
+                "max_abs_residual_corr": max_finite(residual_correlations),
             })
 
     daily = pd.DataFrame(daily_rows)
@@ -184,9 +151,9 @@ def analyze_style_exposure(
         valid_days=("regression_r2", "count"),
         median_sample_count=("sample_count", "median"),
         mean_regression_r2=("regression_r2", "mean"),
-        p95_regression_r2=("regression_r2", lambda value: value.quantile(0.95)),
+        p95_regression_r2=("regression_r2", lambda value: value.quantile(CONFIG.style_quantile)),
         mean_max_abs_style_corr=("max_abs_style_corr", "mean"),
-        p95_max_abs_style_corr=("max_abs_style_corr", lambda value: value.quantile(0.95)),
+        p95_max_abs_style_corr=("max_abs_style_corr", lambda value: value.quantile(CONFIG.style_quantile)),
         max_abs_residual_corr=("max_abs_residual_corr", "max"),
     )
     summary["style_exposure_warning"] = (
@@ -204,7 +171,7 @@ def analyze_style_exposure(
         valid_days=("correlation", "count"),
         mean_correlation=("correlation", "mean"),
         mean_abs_correlation=("abs_correlation", "mean"),
-        p95_abs_correlation=("abs_correlation", lambda value: value.quantile(0.95)),
+        p95_abs_correlation=("abs_correlation", lambda value: value.quantile(CONFIG.style_quantile)),
         max_abs_correlation=("abs_correlation", "max"),
     ).sort_values(
         ["submission_id", "p95_abs_correlation"], ascending=[True, False]

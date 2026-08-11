@@ -7,10 +7,7 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from .config import CheckPaths
-
-METRICS = ("ic_mean", "ic_ir", "sharpe_ratio", "stress_ic_ir")
-REGRESSION_METRICS = ("model_score", "abs_weight_mean", "abs_weight_std", "selection_rate")
+from .config import CheckPaths, METRICS, REGRESSION_METRICS
 
 
 def read_summary(paths: CheckPaths) -> pd.DataFrame:

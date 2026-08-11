@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +9,15 @@ from pathlib import Path
 import pandas as pd
 
 from .common import read_final, read_regression, read_summary
-from .config import CheckPaths
+from .config import (
+    CONFIG,
+    MAX_AB_RANK_GAP,
+    MAX_FINAL_RANK_CHANGE,
+    PATHS,
+    RERUN_COMPARISON_FILENAME,
+    RERUN_SUMMARY_FILENAME,
+    CheckPaths,
+)
 from .factors import analyze_factor_similarity
 from .ranking import (
     analyze_a_metric_sensitivity,
@@ -64,17 +71,17 @@ def _require_inputs(paths: CheckPaths) -> None:
 
 
 def generate_markdown_report(
-    paths: CheckPaths,
+    paths: CheckPaths = PATHS,
     output_path: str | Path | None = None,
     *,
-    high_correlation: float = 0.95,
-    max_similarity_samples: int = 50_000,
-    top_n: int = 20,
+    high_correlation: float = CONFIG.high_correlation,
+    max_similarity_samples: int = CONFIG.max_similarity_samples,
+    top_n: int = CONFIG.report_top_n,
     regression_rerun_dir: str | Path | None = None,
 ) -> Path:
     """运行全部非绘图检查，将结果写入 Markdown，并返回报告路径。"""
     _require_inputs(paths)
-    output = Path(output_path) if output_path else paths.artifacts_dir / "manual_check_report.md"
+    output = Path(output_path) if output_path else paths.report_path
     output = output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -98,10 +105,10 @@ def generate_markdown_report(
     rerun_dir = (
         Path(regression_rerun_dir).expanduser().resolve()
         if regression_rerun_dir is not None
-        else paths.artifacts_dir / "regression_rerun"
+        else paths.regression_rerun_dir
     )
-    rerun_summary_path = rerun_dir / "regression_rerun_summary.json"
-    rerun_comparison_path = rerun_dir / "regression_rerun_comparison.csv"
+    rerun_summary_path = rerun_dir / RERUN_SUMMARY_FILENAME
+    rerun_comparison_path = rerun_dir / RERUN_COMPARISON_FILENAME
     rerun_summary = None
     rerun_comparison = pd.DataFrame()
     if rerun_summary_path.is_file():
@@ -171,9 +178,11 @@ def generate_markdown_report(
         "## 4. 排名冲突与敏感性",
         "",
         f"- 最大 A/B 排名差：{rank_conflicts['a_b_rank_gap'].max():.0f} 名。",
-        f"- A/B 排名差不低于 20 名：{int(rank_conflicts['a_b_rank_gap'].ge(20).sum())} 个提交。",
+        f"- A/B 排名差不低于 {MAX_AB_RANK_GAP} 名："
+        f"{int(rank_conflicts['a_b_rank_gap'].ge(MAX_AB_RANK_GAP).sum())} 个提交。",
         f"- 最大 A/B 权重扫描名次跨度：{ab_sensitivity['rank_span'].max():.0f} 名。",
-        f"- 权重扫描名次跨度不低于 20 名：{int(ab_sensitivity['rank_span'].ge(20).sum())} 个提交。",
+        f"- 权重扫描名次跨度不低于 {MAX_AB_RANK_GAP} 名："
+        f"{int(ab_sensitivity['rank_span'].ge(MAX_AB_RANK_GAP).sum())} 个提交。",
         f"- 逐项移除 A 指标后的最大名次变化：{a_metric_sensitivity['max_abs_rank_change'].max():.0f} 名。",
         "",
         "### A/B 权重最敏感提交",
@@ -210,8 +219,8 @@ def generate_markdown_report(
             "",
             "至少需要下载以下文件：",
             "",
-            "- `regression_rerun_summary.json`",
-            "- `regression_rerun_comparison.csv`",
+            f"- `{RERUN_SUMMARY_FILENAME}`",
+            f"- `{RERUN_COMPARISON_FILENAME}`",
             "",
         ])
     else:
@@ -251,7 +260,8 @@ def generate_markdown_report(
         "",
         f"- 最大 B 排名变化：{b_robustness['max_b_rank_change'].max():.0f} 名。",
         f"- 最大最终排名变化：{b_robustness['max_final_rank_change'].max():.0f} 名。",
-        f"- 最终名次变化不低于 10 名：{int(b_robustness['max_final_rank_change'].ge(10).sum())} 个提交。",
+        f"- 最终名次变化不低于 {MAX_FINAL_RANK_CHANGE} 名："
+        f"{int(b_robustness['max_final_rank_change'].ge(MAX_FINAL_RANK_CHANGE).sum())} 个提交。",
         "",
         _table(robust_b),
         "",
@@ -274,9 +284,9 @@ def generate_markdown_report(
         recommendations.append("云端回归复跑与正式结果不一致，应检查环境、数据版本和回归确定性。")
     if len(high_similarity):
         recommendations.append(f"对 {len(high_similarity)} 组高相似因子执行全量相关、参赛方关系和代码人工核验。")
-    if int(ab_sensitivity["rank_span"].ge(20).sum()):
+    if int(ab_sensitivity["rank_span"].ge(MAX_AB_RANK_GAP).sum()):
         recommendations.append("确认 A/B 权重已经在赛事规则中固定，并专项查看获奖线附近的局部权重敏感性。")
-    if int(b_robustness["max_final_rank_change"].ge(10).sum()):
+    if int(b_robustness["max_final_rank_change"].ge(MAX_FINAL_RANK_CHANGE).sum()):
         recommendations.append("复核 B 分只使用 model_score 百分位的口径是否符合赛事设计预期。")
     if not recommendations:
         recommendations.append("未发现需处置项，可以进入人工签署阶段。")
@@ -297,31 +307,9 @@ def generate_markdown_report(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="生成私榜人工复核 Markdown 报告")
-    parser.add_argument("--run-dir", required=True, type=Path)
-    parser.add_argument("--prepared-dir", required=True, type=Path)
-    parser.add_argument("--private-code-dir", required=True, type=Path)
-    parser.add_argument("--bigalpha-eval-src", type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--high-correlation", type=float, default=0.95)
-    parser.add_argument("--max-similarity-samples", type=int, default=50_000)
-    parser.add_argument("--top-n", type=int, default=20)
-    parser.add_argument("--regression-rerun-dir", type=Path)
-    args = parser.parse_args()
-    paths = CheckPaths(
-        run_dir=args.run_dir,
-        prepared_dir=args.prepared_dir,
-        private_code_dir=args.private_code_dir,
-        bigalpha_eval_src=args.bigalpha_eval_src,
-    )
-    generate_markdown_report(
-        paths,
-        args.output,
-        high_correlation=args.high_correlation,
-        max_similarity_samples=args.max_similarity_samples,
-        top_n=args.top_n,
-        regression_rerun_dir=args.regression_rerun_dir,
-    )
+    """直接使用 ``config.py`` 的统一配置生成报告。"""
+    CONFIG.activate()
+    generate_markdown_report(CONFIG.paths)
 
 
 if __name__ == "__main__":

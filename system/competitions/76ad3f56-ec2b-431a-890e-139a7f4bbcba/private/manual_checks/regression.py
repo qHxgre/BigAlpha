@@ -6,10 +6,12 @@ import numpy as np
 import pandas as pd
 
 from .common import REGRESSION_METRICS, read_final, read_regression, read_summary, show
-from .config import CheckPaths
+from .config import PATHS, CheckPaths
 
 
-def check_regression_integrity(paths: CheckPaths, *, display: bool = True) -> dict[str, pd.DataFrame]:
+def check_regression_integrity(
+    paths: CheckPaths = PATHS, *, display: bool = True
+) -> dict[str, pd.DataFrame]:
     """检查提交、因子池、回归结果的集合一致性和字段合法性。"""
     summary = read_summary(paths)
     regression = read_regression(paths)
@@ -51,7 +53,9 @@ def check_regression_integrity(paths: CheckPaths, *, display: bool = True) -> di
     return {"set_problems": set_problems, "field_problems": field_problems}
 
 
-def analyze_regression_stability(paths: CheckPaths, *, display: bool = True) -> pd.DataFrame:
+def analyze_regression_stability(
+    paths: CheckPaths = PATHS, *, display: bool = True
+) -> pd.DataFrame:
     """计算权重波动、稳定性得分并标记建议优先复核的因子。"""
     result = read_regression(paths)
     result["weight_cv"] = result["abs_weight_std"].div(result["abs_weight_mean"].replace(0, np.nan))
@@ -78,7 +82,9 @@ def analyze_regression_stability(paths: CheckPaths, *, display: bool = True) -> 
     return result
 
 
-def analyze_b_score_robustness(paths: CheckPaths, *, display: bool = True) -> pd.DataFrame:
+def analyze_b_score_robustness(
+    paths: CheckPaths = PATHS, *, display: bool = True
+) -> pd.DataFrame:
     """用三种替代 B 口径进行排名压力测试。"""
     final, regression = read_final(paths), read_regression(paths)
     data = final.loc[final["final_score"] >= 0].merge(

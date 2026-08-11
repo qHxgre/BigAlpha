@@ -5,10 +5,10 @@ from __future__ import annotations
 import pandas as pd
 
 from .common import METRICS, add_to_sys_path, read_final, read_summary, show
-from .config import CheckPaths
+from .config import CONFIG, PATHS, CheckPaths
 
 
-def check_score_consistency(paths: CheckPaths, *, display: bool = True) -> pd.DataFrame:
+def check_score_consistency(paths: CheckPaths = PATHS, *, display: bool = True) -> pd.DataFrame:
     """复算正式成绩，返回与存储结果不一致的提交。"""
     add_to_sys_path(paths.private_code_dir)
     from scoring import compute_a_scores, compute_b_scores, compute_final_scores
@@ -32,7 +32,7 @@ def check_score_consistency(paths: CheckPaths, *, display: bool = True) -> pd.Da
     return problems
 
 
-def analyze_rank_conflicts(paths: CheckPaths, *, display: bool = True) -> pd.DataFrame:
+def analyze_rank_conflicts(paths: CheckPaths = PATHS, *, display: bool = True) -> pd.DataFrame:
     """返回最终排名、各指标排名及排名冲突。"""
     summary, final = read_summary(paths), read_final(paths)
     table = final.merge(summary[["submission_id", "status", *METRICS]], on="submission_id", how="left")
@@ -56,7 +56,9 @@ def analyze_rank_conflicts(paths: CheckPaths, *, display: bool = True) -> pd.Dat
     return result
 
 
-def analyze_ab_weight_sensitivity(paths: CheckPaths, *, steps: int = 10, display: bool = True) -> pd.DataFrame:
+def analyze_ab_weight_sensitivity(
+    paths: CheckPaths = PATHS, *, steps: int = CONFIG.ab_weight_steps, display: bool = True
+) -> pd.DataFrame:
     """扫描 A/B 权重，返回每个提交可能出现的名次范围。"""
     successful = read_final(paths).loc[lambda x: x["final_score"] >= 0].copy().set_index("submission_id")
     ranks = {}
@@ -74,7 +76,7 @@ def analyze_ab_weight_sensitivity(paths: CheckPaths, *, steps: int = 10, display
     return result
 
 
-def analyze_a_metric_sensitivity(paths: CheckPaths, *, display: bool = True) -> pd.DataFrame:
+def analyze_a_metric_sensitivity(paths: CheckPaths = PATHS, *, display: bool = True) -> pd.DataFrame:
     """逐项移除 A 指标，返回最终名次变化。"""
     summary, final = read_summary(paths), read_final(paths)
     data = summary.loc[summary["status"].eq("success"), ["submission_id", *METRICS]].merge(

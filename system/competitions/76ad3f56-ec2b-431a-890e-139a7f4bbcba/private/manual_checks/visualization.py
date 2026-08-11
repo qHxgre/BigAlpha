@@ -9,10 +9,20 @@ import numpy as np
 import pandas as pd
 
 from .common import add_to_sys_path, read_regression, show
-from .config import CheckPaths
+from .config import (
+    CONFIG,
+    PATHS,
+    RERUN_COMPARISON_FILENAME,
+    RERUN_SCORES_FILENAME,
+    RERUN_SUMMARY_FILENAME,
+    RERUN_WEIGHTS_FILENAME,
+    CheckPaths,
+)
 
 
-def plot_regression_overview(paths: CheckPaths, *, top_n: int = 30) -> pd.DataFrame:
+def plot_regression_overview(
+    paths: CheckPaths = PATHS, *, top_n: int = CONFIG.regression_overview_top_n
+) -> pd.DataFrame:
     """仅依赖现有 leaderboard_reg.csv 绘制四组回归概览图。"""
     import matplotlib.pyplot as plt
 
@@ -63,16 +73,16 @@ def plot_regression_overview(paths: CheckPaths, *, top_n: int = 30) -> pd.DataFr
 
 
 def rerun_regression_explanation(
-    paths: CheckPaths,
+    paths: CheckPaths = PATHS,
     *,
-    sd: str | pd.Timestamp | None = "2025-01-01",
-    ed: str | pd.Timestamp | None = "2026-08-10",
-    top_n: int = 20,
+    sd: str | pd.Timestamp | None = CONFIG.start_date,
+    ed: str | pd.Timestamp | None = CONFIG.end_date,
+    top_n: int = CONFIG.report_top_n,
     output_dir: str | Path | None = None,
-    tolerance: float = 1e-8,
+    tolerance: float = CONFIG.regression_tolerance,
     plot: bool = True,
 ) -> dict[str, pd.DataFrame]:
-    """复跑正式滚动回归；默认周期为 2025-01-01 至 2026-08-10。"""
+    """按 ``config.py`` 配置的默认周期复跑正式滚动回归。"""
     if paths.bigalpha_eval_src is None:
         raise ValueError("CheckPaths.bigalpha_eval_src 未配置")
     add_to_sys_path(paths.bigalpha_eval_src)
@@ -122,9 +132,9 @@ def rerun_regression_explanation(
     if output_dir is not None:
         export_dir = Path(output_dir).expanduser().resolve()
         export_dir.mkdir(parents=True, exist_ok=True)
-        check.to_csv(export_dir / "regression_rerun_comparison.csv", index=False, encoding="utf-8-sig")
-        scores.to_csv(export_dir / "regression_rerun_scores.csv", index=False, encoding="utf-8-sig")
-        weights.to_parquet(export_dir / "regression_rerun_weights_history.parquet", index=False)
+        check.to_csv(export_dir / RERUN_COMPARISON_FILENAME, index=False, encoding="utf-8-sig")
+        scores.to_csv(export_dir / RERUN_SCORES_FILENAME, index=False, encoding="utf-8-sig")
+        weights.to_parquet(export_dir / RERUN_WEIGHTS_FILENAME, index=False)
         summary = {
             "status": "PASS" if mismatch_count == 0 else "BLOCK",
             "start_date": start_date_text,
@@ -145,7 +155,7 @@ def rerun_regression_explanation(
                 for metric in metrics
             },
         }
-        (export_dir / "regression_rerun_summary.json").write_text(
+        (export_dir / RERUN_SUMMARY_FILENAME).write_text(
             json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         print(f"回归复跑结果包已导出：{export_dir}")

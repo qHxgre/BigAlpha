@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 
 from .common import show
-from .config import CheckPaths
+from .config import CONFIG, PATHS, CheckPaths
 
 
 def analyze_factor_similarity(
-    paths: CheckPaths,
+    paths: CheckPaths = PATHS,
     *,
-    high_correlation: float = 0.95,
-    max_samples: int = 50_000,
+    high_correlation: float = CONFIG.high_correlation,
+    max_samples: int = CONFIG.max_similarity_samples,
     display: bool = True,
 ) -> pd.DataFrame:
     """基于合并后的因子池快速计算两两 Pearson 相关性。"""
