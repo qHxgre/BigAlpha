@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,8 @@ def analyze_style_exposure(
     *,
     max_abs_style_corr: float = CONFIG.max_abs_style_correlation,
     max_regression_r2: float = CONFIG.max_style_regression_r2,
+    sample_interval: int = 5,
+    progress_every: int = 10,
     display: bool = True,
 ) -> StyleExposureCheckResult:
     """检查因子池的风格暴露残留。
@@ -51,15 +54,27 @@ def analyze_style_exposure(
         单日最大绝对风格相关性的告警阈值。
     max_regression_r2:
         单日全暴露回归 R² 的告警阈值。
+    sample_interval:
+        每隔多少个交易日抽取一个截面；同时始终保留首日、末日和每月最后一个
+        交易日。告警因子也不会自动回退到全交易日检查。
+    progress_every:
+        每处理多少个抽样交易日输出一次进度；设为 0 时不输出逐日进度。
     display:
         是否在 Notebook 中展示汇总结果。
     """
+    started_at = perf_counter()
     start = pd.Timestamp(start_date).normalize()
     end = pd.Timestamp(end_date).normalize()
     if start > end:
         raise ValueError(f"start_date 不能晚于 end_date: {start_date} > {end_date}")
+    if sample_interval < 1:
+        raise ValueError(f"sample_interval 必须大于等于 1，实际为 {sample_interval}")
+    if progress_every < 0:
+        raise ValueError(f"progress_every 不能小于 0，实际为 {progress_every}")
 
-    pool = pd.read_parquet(paths.factor_pool_path).copy()
+    stage_started_at = perf_counter()
+    print(f"[风格暴露] 1/5 读取因子池: {paths.factor_pool_path}", flush=True)
+    pool = pd.read_parquet(paths.factor_pool_path)
     required = {"date", "instrument"}
     missing = required.difference(pool.columns)
     if missing:
@@ -74,14 +89,44 @@ def analyze_style_exposure(
     if pool.empty:
         raise ValueError(f"factor_pool 在 {start_date} ~ {end_date} 内没有数据")
 
+    all_dates = pd.DatetimeIndex(pool["date"].drop_duplicates().sort_values())
+    month_end_dates = (
+        pd.Series(all_dates, index=all_dates)
+        .groupby(all_dates.to_period("M"))
+        .max()
+    )
+    sampled_dates = pd.DatetimeIndex(all_dates[::sample_interval]).union(
+        pd.DatetimeIndex(month_end_dates)
+    ).union(pd.DatetimeIndex([all_dates[0], all_dates[-1]])).sort_values()
+    pool = pool.loc[pool["date"].isin(sampled_dates)].copy()
+    print(
+        f"[风格暴露] 因子池读取完成: {len(pool):,} 行，{len(factor_columns)} 个因子，"
+        f"抽样 {len(sampled_dates)}/{len(all_dates)} 个交易日，"
+        f"耗时 {perf_counter() - stage_started_at:.1f}s",
+        flush=True,
+    )
+
+    stage_started_at = perf_counter()
+    print(
+        f"[风格暴露] 2/5 查询 BARRA 暴露: {start_date} ~ {end_date}",
+        flush=True,
+    )
     exposures = query_exposures(start_date, end_date)
     exposures["date"] = pd.to_datetime(exposures["date"]).dt.normalize()
+    exposures = exposures.loc[exposures["date"].isin(sampled_dates)].copy()
+    print(
+        f"[风格暴露] 暴露查询完成: {len(exposures):,} 行，"
+        f"耗时 {perf_counter() - stage_started_at:.1f}s",
+        flush=True,
+    )
 
     exposure_columns = list(EXPOSURE_COLUMNS)
     missing_exposures = set(EXPOSURE_COLUMNS).difference(exposures.columns)
     if missing_exposures:
         raise ValueError(f"暴露数据缺少必要列: {sorted(missing_exposures)}")
 
+    stage_started_at = perf_counter()
+    print("[风格暴露] 3/5 合并因子池与暴露数据", flush=True)
     merged = pool.merge(
         exposures[["date", "instrument", *exposure_columns]],
         how="left",
@@ -91,10 +136,22 @@ def analyze_style_exposure(
     merged[exposure_columns] = merged[exposure_columns].apply(
         pd.to_numeric, errors="coerce"
     ).fillna(0.0)
+    print(
+        f"[风格暴露] 数据合并完成: {len(merged):,} 行，"
+        f"耗时 {perf_counter() - stage_started_at:.1f}s",
+        flush=True,
+    )
 
     daily_rows: list[dict] = []
     correlation_rows: list[dict] = []
-    for date, date_df in merged.groupby("date", sort=True):
+    grouped_dates = merged.groupby("date", sort=True)
+    total_sampled_days = grouped_dates.ngroups
+    compute_started_at = perf_counter()
+    print(
+        f"[风格暴露] 4/5 开始计算: {total_sampled_days} 个抽样交易日",
+        flush=True,
+    )
+    for completed_days, (date, date_df) in enumerate(grouped_dates, start=1):
         x = date_df[exposure_columns].to_numpy(dtype=float)
         x_finite = np.isfinite(x).all(axis=1)
 
@@ -120,7 +177,11 @@ def analyze_style_exposure(
             raw_correlations = []
             residual_correlations = []
             for index, exposure in enumerate(exposure_columns):
-                raw_corr = safe_correlation(valid_y, valid_x[:, index])
+                raw_corr = (
+                    safe_correlation(valid_y, valid_x[:, index])
+                    if exposure in STYLE_COLUMNS
+                    else np.nan
+                )
                 residual_corr = safe_correlation(residual, valid_x[:, index])
                 if exposure in STYLE_COLUMNS:
                     raw_correlations.append(abs(raw_corr) if np.isfinite(raw_corr) else np.nan)
@@ -144,6 +205,24 @@ def analyze_style_exposure(
                 "max_abs_residual_corr": max_finite(residual_correlations),
             })
 
+        if progress_every and (
+            completed_days == 1
+            or completed_days % progress_every == 0
+            or completed_days == total_sampled_days
+        ):
+            elapsed = perf_counter() - compute_started_at
+            remaining = (
+                elapsed / completed_days * (total_sampled_days - completed_days)
+            )
+            print(
+                f"[风格暴露] 计算进度 {completed_days}/{total_sampled_days} "
+                f"({completed_days / total_sampled_days:.1%})，"
+                f"当前日期 {date:%Y-%m-%d}，已用 {elapsed:.1f}s，"
+                f"预计剩余 {remaining:.1f}s",
+                flush=True,
+            )
+
+    print("[风格暴露] 5/5 汇总检查结果", flush=True)
     daily = pd.DataFrame(daily_rows)
     correlations = pd.DataFrame(correlation_rows)
     summary = daily.groupby("submission_id", as_index=False).agg(
@@ -178,8 +257,12 @@ def analyze_style_exposure(
     ).reset_index(drop=True)
 
     print(
-        f"因子数: {len(factor_columns)}，日期范围: {start_date} ~ {end_date}，"
-        f"告警因子数: {int(summary['style_exposure_warning'].sum())}"
+        f"[风格暴露] 完成: 因子数 {len(factor_columns)}，"
+        f"抽样交易日 {len(sampled_dates)}/{len(all_dates)}，"
+        f"日期范围 {start_date} ~ {end_date}，"
+        f"告警因子数 {int(summary['style_exposure_warning'].sum())}，"
+        f"总耗时 {perf_counter() - started_at:.1f}s",
+        flush=True,
     )
     if display:
         show(summary, exposure_summary)
