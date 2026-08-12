@@ -10,7 +10,12 @@ import pandas as pd
 
 from .common import read_final, read_score, read_summary
 from .config import CONFIG, METRICS, PATHS, CheckPaths
-from .ranking import analyze_metric_rank_conflicts, analyze_metric_sensitivity, check_score_consistency
+from .ranking import (
+    analyze_metric_rank_conflicts,
+    analyze_metric_sensitivity,
+    check_score_consistency,
+    compare_public_private_ranking,
+)
 from .similarity import analyze_prediction_similarity
 
 
@@ -75,11 +80,13 @@ def generate_markdown_report(
     score_problems = check_score_consistency(paths, display=False)
     conflicts = analyze_metric_rank_conflicts(paths, display=False)
     sensitivity = analyze_metric_sensitivity(paths, display=False)
+    public_private = compare_public_private_ranking(paths, display=False)
     similarity = analyze_prediction_similarity(paths, save=True, display=False) if run_similarity else pd.DataFrame()
     summary, score, final = read_summary(paths), read_score(paths), read_final(paths)
     participant = _participants(paths)
 
     ranking = conflicts.merge(participant, on="submission_id", how="left")
+    public_private = public_private.merge(participant, on="submission_id", how="left")
     sensitive = sensitivity.loc[
         sensitivity["max_abs_rank_change"].ge(CONFIG.max_final_rank_change)
     ].reset_index()
@@ -103,17 +110,29 @@ def generate_markdown_report(
         f"- 有效最低分：{valid_scores.min():.6f}" if not valid_scores.empty else "- 有效最低分：无", "",
         "## 2. 正式成绩复算", "",
         f"复算不一致记录数：**{len(score_problems)}**。", "", _table(score_problems), "",
-        "## 3. 综合榜单与指标排名", "",
+        "## 3. 公榜与私榜得分排名差异", "",
+        "以私榜 submission id 为基准匹配公榜成绩；`score_delta = private_score - public_score`，"
+        "`rank_delta = private_rank - public_rank`，因此排名差为正表示私榜名次下降。", "",
+        "下表展示私榜执行清单中的全部 submission id，不过滤失败提交，也不限制展示条数。", "",
+        f"匹配到公榜分数：**{int(public_private['public_score_found'].sum())}/{len(public_private)}**。", "",
+        f"私榜执行成功：**{int(public_private['status'].eq('success').sum())}**；"
+        f"私榜执行失败：**{int(public_private['status'].ne('success').sum())}**。", "",
+        _table(public_private[["private_rank", "public_rank", "rank_delta", "submission_id",
+                               "participant", "schools", "status", "failure_type", "error",
+                               "private_score", "public_score", "score_delta",
+                               "public_score_found"]]), "",
+        "## 4. 综合榜单与指标排名", "",
         _table(ranking[["final_rank", "submission_id", "participant", "schools", "score", *METRICS,
                         "metric_rank_spread", "max_metric_final_gap"]], CONFIG.report_top_n), "",
-        "## 4. 去除单项指标的排名敏感性", "",
+        "## 5. 去除单项指标的排名敏感性", "",
         f"名次最大变化达到 {CONFIG.max_final_rank_change} 的提交数：**{len(sensitive)}**。", "",
         _table(sensitive, CONFIG.report_top_n), "",
-        "## 5. 预测结果相似度", "",
+        "## 6. 预测结果相似度", "",
         f"绝对相关系数不低于 {CONFIG.high_correlation:.2f} 的提交对：**{len(high_similarity)}**。", "",
         _table(high_similarity, CONFIG.report_top_n), "",
-        "## 6. 人工确认清单", "",
+        "## 7. 人工确认清单", "",
         "- [ ] 正式成绩复算无不一致记录。",
+        "- [ ] 核查公榜与私榜得分、排名变化异常的提交。",
         "- [ ] 核查指标严重偏科、去除单项指标后名次大幅变化的头部提交。",
         "- [ ] 核查处理后或原始预测高度相似的提交对。",
         "- [ ] 确认无回归模型评价相关产物或发布字段。", "",

@@ -8,6 +8,7 @@ from .ranking import (
     analyze_ab_weight_sensitivity,
     analyze_rank_conflicts,
     check_score_consistency,
+    compare_public_private_ranking,
 )
 from .regression import (
     analyze_b_score_robustness,
@@ -34,6 +35,7 @@ def generate_markdown_report(*args, **kwargs):
 __all__ = [
     "CONFIG", "PATHS", "ManualCheckConfig", "CheckPaths",
     "check_score_consistency", "analyze_rank_conflicts",
+    "compare_public_private_ranking",
     "analyze_ab_weight_sensitivity", "analyze_a_metric_sensitivity",
     "check_regression_integrity", "analyze_regression_stability",
     "analyze_regression_explainability",

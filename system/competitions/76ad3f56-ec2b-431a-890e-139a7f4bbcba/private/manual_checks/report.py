@@ -34,6 +34,7 @@ from .ranking import (
     analyze_ab_weight_sensitivity,
     analyze_rank_conflicts,
     check_score_consistency,
+    compare_public_private_ranking,
 )
 
 
@@ -599,6 +600,7 @@ def generate_markdown_report(
     participants = _participant_lookup(paths)
     score_problems = check_score_consistency(paths, display=False)
     rank_conflicts = analyze_rank_conflicts(paths, display=False)
+    public_private = compare_public_private_ranking(paths, display=False)
     ab_sensitivity = analyze_ab_weight_sensitivity(paths, display=False)
     a_metric_sensitivity = analyze_a_metric_sensitivity(paths, display=False)
     cross_similarity_path = paths.incremental_dir / FACTOR_SIMILARITY_SUMMARY_FILENAME
@@ -741,6 +743,10 @@ def generate_markdown_report(
         ]
     ]
     top_comparison = top_comparison.merge(participants, on="submission_id", how="left")
+
+    public_private = public_private.merge(participants, on="submission_id", how="left")
+    public_private["participant"] = public_private["participant"].fillna("（未匹配）")
+    public_private["schools"] = public_private["schools"].fillna("（未匹配）")
     top_comparison["participant"] = top_comparison["participant"].fillna("（未匹配）")
     top_comparison["schools"] = top_comparison["schools"].fillna("（未匹配）")
     largest_score_divergence = top_comparison.loc[top_comparison["b_minus_a"].abs().idxmax()]
@@ -891,7 +897,25 @@ def generate_markdown_report(
         *_chart(figures["02_score_consistency"], output, "全量正式分数分布"),
         _table(score_problems, limit=top_n),
         "",
-        "## 3. 头部榜单得分结构与竞争区间",
+        "## 3. 公榜与私榜得分排名差异",
+        "",
+        "### 怎么分析",
+        "",
+        "以私榜执行清单中的 submission id 为主匹配公榜成绩，展示全部提交，包括私榜失败项。"
+        "`score_delta = private_score - public_score`；`rank_delta = private_rank - public_rank`，"
+        "排名差为正表示私榜名次下降。私榜总分使用 `final_score`，并同时保留 A 分和 B 分。",
+        "",
+        f"- 公榜分数匹配：**{int(public_private['public_score_found'].sum())}/{len(public_private)}**。",
+        f"- 私榜成功：**{int(public_private['status'].eq('success').sum())}**；"
+        f"私榜失败：**{int(public_private['status'].ne('success').sum())}**。",
+        "",
+        _table(public_private[[
+            "private_rank", "public_rank", "rank_delta", "submission_id", "participant",
+            "schools", "status", "error", "a_score", "b_score", "private_score",
+            "public_score", "score_delta", "public_score_found",
+        ]]),
+        "",
+        "## 4. 头部榜单得分结构与竞争区间",
         "",
         "### 怎么分析",
         "",
@@ -911,7 +935,7 @@ def generate_markdown_report(
         "",
         "字段说明：`submission` 展示完整 ID 的前 8 位；`B-A` 为正表示 B 分更高，为负表示 A 分更高；`A/B名次` 依次为 A 排名和 B 排名；`最近相邻分差` 取与前后名次分差中的较小值；`敏感性` 综合 A/B 权重扫描和 A 指标留一法标记为高、中、低。",
         "",
-        "## 4. 联合回归中的因子解释性",
+        "## 5. 联合回归中的因子解释性",
         "",
         "### 怎么分析",
         "",
@@ -935,7 +959,7 @@ def generate_markdown_report(
         "",
         "阅读顺序建议：先看模型得分和重要性排名，了解因子在联合模型中的权重表现；再看入选率和权重波动；最后看有符号权重的方向切换。是否具有不可替代的预测信息，应结合下一节的样本外增量贡献和相似因子组结果判断。",
         "",
-        "## 5. 样本外增量贡献与信息独特性",
+        "## 6. 样本外增量贡献与信息独特性",
         "",
         "### 怎么分析",
         "",
@@ -957,7 +981,7 @@ def generate_markdown_report(
         "",
         _table(incremental_diagnostic) if incremental_available else "_尚未生成增量贡献结果。_",
         "",
-        "## 6. BARRA 风格暴露",
+        "## 7. BARRA 风格暴露",
         "",
         "本节统一使用更直观的**抽样交易日平均值**：风格相关表示各抽样日截面绝对相关的平均值，"
         "回归 R² 表示各抽样日暴露解释度的平均值。每个因子只归入平均绝对相关最高的主风格；"
@@ -1022,7 +1046,7 @@ def generate_markdown_report(
         ])
 
     lines.extend([
-        "## 7. 因子相似度",
+        "## 8. 因子相似度",
         "",
         "### 怎么分析",
         "",
@@ -1039,7 +1063,7 @@ def generate_markdown_report(
         "",
         _table(similarity_top),
         "",
-        "## 8. 自动建议",
+        "## 9. 自动建议",
         "",
     ])
 
@@ -1059,7 +1083,7 @@ def generate_markdown_report(
     lines.extend(f"{index}. {item}" for index, item in enumerate(recommendations, start=1))
     lines.extend([
         "",
-        "## 9. 输入路径",
+        "## 10. 输入路径",
         "",
         f"- 运行目录：`{paths.run_dir}`",
         f"- 预处理目录：`{paths.prepared_dir}`",

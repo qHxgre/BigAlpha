@@ -5,6 +5,7 @@ from .ranking import (
     analyze_metric_rank_conflicts,
     analyze_metric_sensitivity,
     check_score_consistency,
+    compare_public_private_ranking,
 )
 from .similarity import analyze_prediction_similarity
 
@@ -19,6 +20,7 @@ def generate_markdown_report(*args, **kwargs):
 __all__ = [
     "CONFIG", "PATHS", "CheckPaths", "ManualCheckConfig",
     "check_score_consistency", "analyze_metric_rank_conflicts",
-    "analyze_metric_sensitivity", "analyze_prediction_similarity",
+    "analyze_metric_sensitivity", "compare_public_private_ranking",
+    "analyze_prediction_similarity",
     "generate_markdown_report",
 ]

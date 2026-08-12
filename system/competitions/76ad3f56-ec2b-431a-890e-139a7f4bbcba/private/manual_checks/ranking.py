@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .common import METRICS, add_to_sys_path, read_final, read_summary, show
+from .common import METRICS, add_to_sys_path, read_final, read_public_scores, read_summary, show
 from .config import CONFIG, PATHS, CheckPaths
 
 
@@ -97,4 +97,46 @@ def analyze_a_metric_sensitivity(paths: CheckPaths = PATHS, *, display: bool = T
     result = result.sort_values(["max_abs_rank_change", "base_rank"], ascending=[False, True])
     if display:
         show(result.style.background_gradient(subset=["max_abs_rank_change"], cmap="YlOrRd"))
+    return result
+
+
+def compare_public_private_ranking(
+    paths: CheckPaths = PATHS, *, display: bool = True
+) -> pd.DataFrame:
+    """以私榜执行清单为主，比较全部提交（含失败项）的公私榜得分和排名。"""
+    summary_columns = ["submission_id", "status", "error"]
+    summary = read_summary(paths)[summary_columns].copy()
+    private = summary.merge(
+        read_final(paths), on="submission_id", how="left", validate="one_to_one"
+    ).rename(columns={"final_score": "private_score"})
+    result = private.merge(
+        read_public_scores(paths), on="submission_id", how="left",
+        validate="one_to_one", indicator=True,
+    )
+
+    result["private_rank"] = result["private_score"].rank(
+        ascending=False, method="min", na_option="bottom"
+    ).astype("Int64")
+    result["public_rank"] = result["public_score"].rank(
+        ascending=False, method="min", na_option="keep"
+    ).astype("Int64")
+    result["score_delta"] = result["private_score"] - result["public_score"]
+    result["rank_delta"] = result["private_rank"] - result["public_rank"]
+    result["public_score_found"] = result["_merge"].eq("both") & result["public_score"].notna()
+    result = result.drop(columns="_merge").sort_values(
+        ["private_rank", "submission_id"], na_position="last"
+    )[
+        [
+            "private_rank", "public_rank", "rank_delta", "submission_id", "status", "error",
+            "a_score", "b_score", "private_score", "public_score", "score_delta",
+            "public_score_found",
+        ]
+    ]
+    if display:
+        print(
+            f"私榜提交数: {len(result)}，匹配到公榜分数: "
+            f"{int(result['public_score_found'].sum())}，未匹配: "
+            f"{int((~result['public_score_found']).sum())}"
+        )
+        show(result)
     return result
