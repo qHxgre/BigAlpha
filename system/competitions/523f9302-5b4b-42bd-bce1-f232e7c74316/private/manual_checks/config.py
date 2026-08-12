@@ -12,7 +12,7 @@ from pathlib import Path
 
 USE_LOCAL = True
 COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
-RUN_ID = "20260811_104853"
+RUN_ID = "20260812_142429"
 
 LOCAL_WORKSPACE_DIR = Path("/Users/xiehao/Desktop/workspace/BigAlpha")
 CLOUD_WORKSPACE_DIR = Path("/home/aiuser/work/workspace/BigAlpha")
