@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import time
+from collections import defaultdict
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +22,31 @@ from fileio import jsonable, write_json
 
 COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 DEFAULT_OUTPUT = os.path.join(FILE_DIR, COMPETITION_ID, "private", "prepared")
+
+
+def paginate(api: AlphathonAPI, path: str, **params) -> list[dict]:
+    """读取分页 API 的全部记录。"""
+    results = []
+    page = 1
+    while True:
+        response = api._request(
+            "GET", path, params={**params, "page": page, "size": 1000}
+        ).json()
+        items = ((response or {}).get("data") or {}).get("items") or []
+        results.extend(items)
+        if len(items) < 1000:
+            return results
+        page += 1
+
+
+def profile(user: dict | None, user_id: str) -> dict:
+    """提取检查失败 submission 时所需的参赛者公开资料。"""
+    data = (user or {}).get("data") or {}
+    return {
+        "user_id": user_id,
+        "name": data.get("name") or user_id,
+        "school": data.get("school") or "（未填写）",
+    }
 
 
 def submission_files(submission: dict) -> dict:
@@ -64,9 +90,29 @@ def main() -> int:
         print("没有 selected_for_private=True 的 submission", file=sys.stderr)
         return 1
 
+    users = paginate(api, "/users", competition_id=COMPETITION_ID)
+    teams = paginate(api, "/teams", competition_id=COMPETITION_ID)
+    users_by_id = {str(user.get("user_id")): user for user in users}
+
+    team_by_user: dict[str, str] = {}
+    teams_by_id: dict[str, tuple[dict, list[str]]] = {}
+    for team in teams:
+        team_id = str(team["id"])
+        roster = list(
+            dict.fromkeys(
+                [str(team.get("creator")), *(str(uid) for uid in team.get("members") or [])]
+            )
+        )
+        teams_by_id[team_id] = (team, roster)
+        for user_id in roster:
+            team_by_user[user_id] = team_id
+
+    selected_by_owner: dict[tuple[str, str], list[dict]] = defaultdict(list)
     records, errors = [], []
     for submission in selected:
         sid = str(submission["id"])
+        user_id = str(submission.get("user_id"))
+        team_id = team_by_user.get(user_id)
         destination = os.path.join(staging, "submissions", sid)
         os.makedirs(destination)
         downloaded, used = [], set()
@@ -77,14 +123,18 @@ def main() -> int:
                 name = safe_name(str(file_id), info, used)
                 api.get_submission_file(sid, str(file_id), info, save_to=os.path.join(destination, name))
                 downloaded.append({"file_id": str(file_id), "name": name})
-            records.append({
+            record = {
                 "submission_id": sid,
-                "user_id": str(submission.get("user_id")),
+                "user_id": user_id,
+                "team_id": team_id,
                 "public_score": submission.get("public_score"),
                 "relative_path": f"submissions/{sid}",
                 "files": downloaded,
                 "submission": jsonable(submission),
-            })
+            }
+            records.append(record)
+            owner = ("team", team_id) if team_id else ("individual", user_id)
+            selected_by_owner[owner].append(record)
         except Exception as exc:
             errors.append({"submission_id": sid, "error": f"{type(exc).__name__}: {exc}"})
             shutil.rmtree(destination, ignore_errors=True)
@@ -95,11 +145,46 @@ def main() -> int:
         print(f"{len(errors)} 个 submission 下载失败", file=sys.stderr)
         return 1
 
+    participants = []
+    for (participant_type, participant_id), owner_records in selected_by_owner.items():
+        if participant_type == "team":
+            team, roster = teams_by_id[participant_id]
+            participant = {
+                "type": "team",
+                "team_id": participant_id,
+                "team_name": team.get("name") or participant_id,
+                "members": [profile(users_by_id.get(uid), uid) for uid in roster],
+            }
+        else:
+            participant = {
+                "type": "individual",
+                "user": profile(users_by_id.get(participant_id), participant_id),
+            }
+        participant.update(
+            private_submission_count=len(owner_records),
+            private_submission_ids=[item["submission_id"] for item in owner_records],
+        )
+        participants.append(participant)
+    participants.sort(
+        key=lambda item: (
+            item["type"],
+            str(item.get("team_name") or (item.get("user") or {}).get("name") or ""),
+        )
+    )
+
     metadata = {
         "competition_id": COMPETITION_ID,
         "batch_id": args.batch_id,
         "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "summary": {"private_submission_count": len(records)},
+        "summary": {
+            "private_submission_count": len(records),
+            "private_participant_count": len(participants),
+            "private_team_count": sum(item["type"] == "team" for item in participants),
+            "private_individual_count": sum(
+                item["type"] == "individual" for item in participants
+            ),
+        },
+        "participants": participants,
         "submissions": records,
     }
     write_json(os.path.join(staging, "metadata.json"), metadata)
