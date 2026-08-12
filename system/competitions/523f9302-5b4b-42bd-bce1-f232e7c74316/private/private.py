@@ -40,7 +40,8 @@ class Judge(PrivateJudge):
     DATE_START = "2025-01-01 00:00:00"
 
     def __init__(self) -> None:
-        self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
+        # self.DATE_END = datetime.now().strftime("%Y-%m-%d 23:59:59")
+        self.DATE_END = "2026-08-10 23:59:59"
         super().__init__(self.INPUT_DIR, batch_id=BATCH_ID, resume=RESUME,
                          rerun_submission_ids=RERUN_SUBMISSION_IDS,
                          max_workers=MAX_WORKERS)
