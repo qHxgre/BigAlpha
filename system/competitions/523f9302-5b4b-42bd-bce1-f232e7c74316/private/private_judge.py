@@ -235,14 +235,28 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每用户最多两个提交: {by_user}")
         if self.resume:
             manifest = self._read(self.manifest_path)
-            if manifest.get("input_batch_id") != metadata.get("batch_id") or set(manifest.get("selected_submission_ids", [])) != current_ids:
-                raise RuntimeError("续跑批次的输入包或 submission 集合已改变")
+            previous_ids = set(manifest.get("selected_submission_ids", []))
+            if previous_ids != current_ids:
+                raise RuntimeError(
+                    "续跑批次的 submission 集合已改变："
+                    f"新增={sorted(current_ids - previous_ids)}，"
+                    f"移除={sorted(previous_ids - current_ids)}"
+                )
+            input_batch_changed = manifest.get("input_batch_id") != metadata.get("batch_id")
+            if input_batch_changed and not self.rerun_ids:
+                raise RuntimeError(
+                    "续跑批次的固化输入包已改变；普通断点续跑不允许混用输入包。"
+                    "如需使用当前 prepared 重跑，请通过 RERUN_SUBMISSION_IDS "
+                    "明确指定 submission"
+                )
             update_manifest(
                 self.manifest_path,
                 status="resuming",
                 resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 rerun_submission_ids=sorted(self.rerun_ids),
                 previously_published=bool(manifest.get("published")),
+                resumed_input_batch_id=metadata.get("batch_id"),
+                input_batch_changed=input_batch_changed,
             )
         else:
             update_manifest(self.manifest_path, competition_id=self.competition_id, mode="private",
