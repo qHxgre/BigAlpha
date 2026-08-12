@@ -1,133 +1,141 @@
-# 任务：静态审查参赛 submission
+# 任务：逐 submission 代码分析与统一汇总
 
-开始前必须读取规则摘要：
+本任务只分为两个阶段：
+
+1. 逐一分析 `prepared/submissions/` 下的每个 submission，并为每个 submission 生成一份 JSON。
+2. 读取全部 submission JSON，生成一份总 JSON 和一份 Markdown 分析报告。
+
+不要读取或使用 `prepared/metadata.json`，不要生成单 submission Markdown、团队报告或成员报告。
+
+## 一、固定路径
+
+submission 根目录：
+
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/prepared/submissions`
+
+规则摘要：
 
 `/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis/rules_summary.md`
 
-所有合规判断以该文件为准。若文件不存在、为空或无法读取，立即停止并说明原因；不得自行读取比赛文档或凭常识补充规则。
+参赛者信息：
 
-## 1. 确定分析范围
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/scripts/private/alphathon__user.csv`
 
-submission 位于：
+输出目录：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/prepared`
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis`
 
-- `metadata.json`：团队、成员、学校、分数和 submission 元数据。
-- `submissions/<submission_id>/`：submission 原始文件。
+JSON 模板：
 
-默认分析 `metadata.json` 中的全部 submission；若调用时指定 `team_id`、`member_id` 或 `submission_id`，仅分析对应范围。
+- 单 submission：`/Users/xiehao/Desktop/workspace/BigAlpha/system/competitions/523f9302-5b4b-42bd-bce1-f232e7c74316/private/prompt/submission_analysis_template.json`
+- 总汇总：`/Users/xiehao/Desktop/workspace/BigAlpha/system/competitions/523f9302-5b4b-42bd-bce1-f232e7c74316/private/prompt/summary_template.json`
 
-先根据 `metadata.json` 建立 team、member、submission 的关系，不得从目录名推断。使用有效数值分数计算团队和成员的最高分、平均分、最低分；无有效分数时明确说明，不得填 `0`。
+开始前必须读取 `rules_summary.md`。若文件不存在、为空或无法读取，立即停止并说明原因，不得自行从其他材料补充比赛规则。
 
-## 2. 静态审查要求
+## 二、阶段 1：逐一分析 submission
 
-只能阅读文件，禁止执行参赛代码、导入参赛模块，或加载/反序列化模型、pickle、joblib、torch、parquet、feather 等文件。二进制文件仅记录名称、类型和大小；无法从可信文本元数据确认的内容写“无法静态核验”。可以阅读源码、配置、依赖声明、JSON 模型描述及 notebook 的 JSON/代码单元，但不得执行。
+遍历 `prepared/submissions/` 的所有一级子目录。一级目录名就是 `submission_id`；每个目录独立分析，不依赖 `metadata.json`。
 
-### 2.1 文件、入口与调用链
+每完成一个 submission，立即输出：
 
-对每个 submission：
+`.../artifacts/coder_analysis/submissions/<submission_id>.json`
 
-1. 列出主要文件及大小，识别源码、notebook、配置、依赖、训练/推理脚本、权重和附带数据。
-2. 确认实际入口。通常从 `judge_runner.py` 的 `judge_runner_main()` 追踪到参赛者定义的 `main(datasources, start_date, end_date)`。
-3. 沿本地模块、函数、类、配置和权重路径继续追踪，直到最终生成 `date`、`instrument`、`score`，不得只看入口函数。
-4. 对动态导入、反射、`eval/exec`、运行时生成代码或隐藏/压缩源码，标明具体位置和静态核验障碍。
+不生成 `<submission_id>.md`。
 
-### 2.2 模型与数据流
+### 2.1 静态审查边界
 
-完整说明以下内容，材料不足时列出已确认信息和断点，不得用一句“无法分析”代替：
+只能静态阅读文件：
 
-- 总体方案：单模型或集成、预测目标及主要思路。
-- 输入与预处理：数据表、频率、原始字段、字段数、盘口档位、时间过滤、对齐、缺失处理、缩放/标准化及统计量来源。
-- 样本与标签：股票、时间点、历史区间、输入张量形状、标签定义、预测期限及输入和标签的时间关系。
-- 回看窗口：各频率窗口、最大实际依赖范围，并在可确认时换算为交易日。
-- 模型结构：输入投影/embedding、时序或横截面交互、主干网络、池化、输出头、关键超参和张量流转。
-- 训练：数据切分、损失、优化器、学习率、batch size、epoch、正则化、早停、随机种子、checkpoint 和模型选择。
-- 推理与输出：配置和权重加载、输入构造、批量预测、结果映射，以及排序、标准化、裁剪、取反或模型加权等后处理。
-- 设计影响：结合代码说明模型可能捕捉的关系和局限；推测必须使用“可能”“推测”或“从代码看”等限定语。
+- 可以阅读源码、配置、依赖文件、Markdown、文本、JSON，以及 notebook 的 JSON 内容和代码单元。
+- 禁止执行参赛代码、导入参赛模块、联网运行代码，或加载/反序列化模型与数据文件。
+- 不得加载 pickle、joblib、torch、parquet、feather 等文件。二进制文件只记录路径、类型和大小。
+- 不得声称已经运行模型、完成推理、加载权重或验证运行结果。
 
-### 2.3 参数量专项审计
+### 2.2 每个 submission 要分析的内容
 
-参数量为强制项。必须区分总参数量、实际从零训练的可训练参数量和冻结参数量，并给出计算依据：
+分析应围绕以下核心问题展开，不必机械撰写冗长章节，但结论必须有代码证据：
 
-1. 优先核对源码或可信文本元数据中的 parameter count、`numel`、模型 summary、参数清单或张量 shape。
-2. 若结构和维度静态确定，按框架定义逐层计算并汇总；重复层乘以层数，共享参数只计一次，集成模型分别报告子模型和整体。至少列出主要模块的公式或分项。
-3. 说明 Lazy 层、动态分支、条件专家、参数共享、自定义张量或模型外可训练变量对统计的影响。
-4. 只能确认部分数值时写“可确认下界/区间”。源码缺少必要维度且二进制权重不可读取时，写“参数量无法静态确认”，列出缺失信息和人工核验方法。不得直接按模型文件大小换算参数量。
-5. 对照规则给出 `符合`、`违规`、`可疑` 或 `无法核验` 结论，并引用规则边界和代码证据。
+1. **实现逻辑**：识别入口，追踪主要调用链，说明数据如何经过预处理、模型、推理和后处理，最终生成 `date`、`instrument`、`score`。
+2. **数据与特征**：使用哪些数据表、字段、频率、窗口、过滤、对齐、填充、标准化、特征工程、样本和标签。
+3. **模型与训练**：模型结构、关键超参数、张量流转、训练切分、损失、优化器、epoch、随机种子、checkpoint 和权重来源。
+4. **参数量**：区分总参数量、可训练参数量和冻结参数量。能静态计算时列出公式；不能确认时写明缺失信息，不得按模型文件大小估算。
+5. **代码质量**：评价正确性、完整性、可读性、健壮性、效率、可维护性、可复现性和训练—推理一致性。
+6. **规则合规**：严格按 `rules_summary.md` 逐项检查数据、字段、特征工程、回看窗口、参数量、外部资源、未来数据、泄漏、作弊风险、接口和提交材料要求。
+7. **创新与风险**：说明方法特点、优势、局限、可能失效场景，以及需要人工复核的具体问题。
 
-### 2.4 一致性、可复现性与合规
+重要判断必须给出证据，尽量包含 submission 内相对路径、函数/类/配置名和行号。明确区分：
 
-逐项检查：
+- 代码已证实；
+- 基于代码推测；
+- 材料不足，无法核验。
 
-- 训练数据表、字段顺序、时间区间、股票范围、标签、切分方式，以及是否污染验证或私榜区间。
-- 本地压缩数据与云端数据在单位、缺失值、盘口档位和 instrument 键上的一致性。
-- 标准化统计是否仅来自训练集并在推理时复用。
-- 训练与推理的窗口、结构、超参、dtype、权重 key/shape 是否一致。
-- 随机种子、依赖版本、设备、路径和入口是否足以从零重训；权重是否可追溯到提交的训练脚本，多个权重的选择逻辑是否明确。
-- 对照 `rules_summary.md` 检查字段数量和来源、禁止的人工特征工程、最大回看窗口、参数量上限、外部权重/数据/联网下载、未来数据或标签泄漏、硬编码答案或绕过评测、输出列和截面覆盖、训练材料缺失等风险。
+缺失材料时仍应记录已确认的链路、断点及影响，不能只写“无法分析”。高分不能作为代码优秀、创新或违规的证据；代码相似不能直接作为抄袭结论。
 
-### 2.5 创新性与公开方法对比
+### 2.3 单 submission JSON
 
-基于代码说明与常见 Transformer、RNN、TCN、MLP、图网络或模型集成方法的异同。必要时可查询论文、研报或公开代码，但来源必须可核验。不能因方法常见认定抄袭，也不能因分数高推断作弊；分别评价“方法差异”和“原创性是否可确认”。
+生成前读取 `submission_analysis_template.json`，输出必须严格使用该模板的对象结构：
 
-### 2.6 结论与证据标准
+- 不删除、重命名或新增对象字段。
+- 数组可按实际情况复制或删除示例元素；空数组写 `[]`。
+- 无数据使用 `null`、`[]` 或 `{}`，不要用说明性文字冒充空值。
+- JSON 必须是合法 UTF-8 JSON，不得含注释、Markdown 围栏、`NaN` 或 `Infinity`。
+- 因不读取 `metadata.json`，无法从 submission 材料确认的团队、成员、比赛分数和正式排名字段写 `null`，不得猜测。
 
-所有检查项使用以下等级之一：
+固定枚举：
 
-- `符合`：证据充分，满足规则。
-- `违规`：有明确规则和代码证据证明违规。
-- `可疑`：存在具体风险线索，但不足以认定违规。
-- `无法核验`：因代码、模型、训练材料或规则缺失无法判断。
-- `不适用`：与该 submission 无关。
+- 分析状态：`完成`、`部分完成`、`无法分析`
+- 置信度：`高`、`中`、`低`
+- 方案类型：`单模型`、`集成模型`、`规则方法`、`混合方法`、`无法确认`
+- 参数统计类型：`精确值`、`可确认下界`、`可确认区间`、`无法静态确认`
+- 质量等级：`优秀`、`良好`、`一般`、`较差`、`无法评价`
+- 合规状态：`符合`、`违规`、`可疑`、`无法核验`、`不适用`
+- 风险等级：`高`、`中`、`低`、`无法核验`
+- 人工复核优先级：`高`、`中`、`低`
+- `rank_source`：本任务不使用排名，统一为 `unavailable`
 
-重要结论必须附证据：优先引用相对 submission 目录的文件路径、函数/类名和行号，并解释证据与结论的关系。关键词命中只能作为线索，须阅读上下文。自行计算的字段数、窗口和参数量必须说明依据。材料缺失不能直接判为违规。
+“违规”必须同时具备明确的规则条款和 submission 文件证据；只有风险线索时写“可疑”，信息不足时写“无法核验”。
 
-## 3. 输出 submission 报告
+## 三、阶段 2：生成统一汇总
 
-写入：
+所有 submission JSON 完成后，读取它们并生成且只生成：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis/submissions/<submission_id>.md`
+- `.../artifacts/coder_analysis/summary.json`
+- `.../artifacts/coder_analysis/summary.md`
 
-每份报告包含：
+汇总以 `submission_id` 升序排列，不生成或推导赛事排名，不按质量评分重新排名。`ranking_basis.entity` 写 `submission`，`ranking_basis.source` 写 `unavailable`，相关排名和赛事分数字段写 `null`。
 
-1. 审查摘要：用数个完整句子概括架构、数据流、参数规模、合规风险和可复现性。
-2. 基本信息与文件清单。
-3. 执行入口与完整调用链。
-4. 模型关键数据表：模型类型、输入数据/张量、回看窗口、预处理、结构超参、参数量、训练设置、权重和输出。
-5. 参数量专项审计：分项依据、总量、可训练量、冻结量、规则结论和不确定项。
-6. 输入字段与特征工程审计。
-7. 回看窗口审计。
-8. 模型逻辑：完整覆盖输入、样本、结构、训练、推理和输出。
-9. 训练过程、可复现性及训练—推理一致性。
-10. 规则合规检查表。
-11. 作弊与数据泄漏风险。
-12. 创新性与公开方法对比。
-13. 已确认问题、疑点、无法核验事项（分开列出）。
-14. 人工复核建议：指出优先文件、函数、问题及建议的动态核验方式。
+### 3.1 补充参赛者信息
 
-## 4. 输出团队报告
+汇总阶段可以读取 `alphathon__user.csv`。该 CSV 的 `data` 列是 JSON 字符串，可提供姓名、邮箱、电话、学校、专业、学历等信息。
 
-不生成单独成员报告。按 `team_id` 汇总团队成员及其 submission，写入：
+匹配规则：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis/teams/<team_id>/<team_id>.md`
+1. 仅在 submission 文件或单 submission JSON 中存在可核验的 `user_id`、姓名、邮箱、电话等标识时进行匹配。
+2. 优先使用唯一标识精确匹配：`user_id`，其次是邮箱、电话，再其次是姓名。
+3. 只接受唯一匹配；出现零条或多条候选时不得猜测，相关字段写 `null`，并在汇总的无法核验事项中说明。
+4. CSV 只用于补充参赛者资料，不用于判断代码质量、合规性或赛事排名。
+5. 在 `summary.json` 和 `summary.md` 中加入能够匹配到的姓名、学校、专业、学历、邮箱和电话。注意这些是个人敏感信息，仅写入指定的私有输出文件，不在终端回复中展示。
 
-团队报告包含：
+### 3.2 summary.json
 
-1. 团队名称、成员姓名和学校、submission 数量，以及最高分、平均分、最低分和最高分对应的 member/submission；无有效分数时明确说明。
-2. 详细总结最高分 submission 的输入、结构、参数量、训练/推理、合规性、可复现性、作弊风险和创新性，不得仅引用详细报告。
-3. 按成员分节列出基本信息和分数，并概括各 submission 的核心方法、参数规模和结论；有两个 submission 时说明演进、重复点和差异。
-4. 总结团队 submission 的共性、差异、演进及成员间的代码/模型/思路复用迹象；相似性不能直接作为抄袭结论。
-5. 分开列出已确认问题、疑点和无法核验事项，并给出具体的人工复核建议。
+生成前读取 `summary_template.json`，并严格遵循其结构。`rankings` 中每个元素代表一个 submission，而不是正式名次：
 
-## 5. 完成检查与执行摘要
+- `rank`、`team_score`、`submission_rank` 写 `null`。
+- `submissions` 数组只放当前 submission。
+- `members` 填入 CSV 唯一匹配得到的信息；无法匹配时使用空数组或 `null` 字段。
+- `submission_markdown` 写 `null`。
+- `submission_json` 写对应 JSON 的相对或绝对路径。
 
-完成前确认：
+汇总数据必须直接来自单 submission JSON，不要重新分析代码，也不要在汇总阶段改变单份分析结论。
 
-- 本次范围内每个 submission 都有详细报告，每个团队都有团队报告，每位成员均在所属团队报告中出现，且关系与 metadata 一致。
-- submission 报告包含关键数据表、参数量、字段数、回看窗口和完整模型逻辑。
-- 分数统计和最高分 submission 选择正确；无分数不填 `0`。
-- “违规”同时具备明确规则和文件/行号证据；缺失材料仅判为“可疑”或“无法核验”。
-- 不声称运行过代码、导入过模块或成功加载过模型。
-- 外部资料来源可核验，团队报告与 submission 报告的数据一致。
+### 3.3 summary.md
 
-最后输出简短执行摘要，说明分析范围、生成文件数、参数量无法核验的 submission 数量、主要风险和待人工复核事项。
+Markdown 报告应可独立阅读，包含：
+
+1. 分析范围、submission 数量、完成情况和规则依据。
+2. 总览表：submission ID、参赛者、学校、专业、学历、电话、邮箱、方案类型、参数量、质量评分、总体合规状态和主要风险。
+3. 每个 submission 的简明分析：核心逻辑、数据与特征、模型、训练与推理、参数量、代码质量、合规结论、主要证据、问题、疑点、无法核验事项和人工复核建议。
+4. 全局横向比较：方案类型、数据使用、模型规模、代码质量、可复现性、创新性和风险。
+5. 按严重度整理的全局风险与人工复核清单。
+
+不要把所有单 submission JSON 原样粘贴进 Markdown；应提炼关键信息，但不能只写一句结论。

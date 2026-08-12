@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "submission_id": null,
+  "team": {"team_id": null, "team_name": null},
+  "member": {"member_id": null, "member_name": null, "school": null},
+  "competition_result": {"score": null, "official_rank": null, "rank_source": "unavailable"},
+  "analysis_scope": {"status": "无法分析", "confidence": "低", "confidence_reason": null, "unreadable_or_binary_files": []},
+  "solution_overview": {
+    "summary": null,
+    "prediction_target": null,
+    "approach_type": "无法确认",
+    "model_families": [],
+    "core_ideas": [],
+    "execution_flow": [{"step": null, "component": null, "file": null, "symbol": null, "lines": null, "input": null, "operation": null, "output": null}]
+  },
+  "files": [{"path": null, "size_bytes": null, "category": null, "purpose": null, "readable": null}],
+  "data_and_features": {
+    "datasources": [],
+    "frequencies": [],
+    "raw_fields": [],
+    "raw_field_count": null,
+    "instrument_scope": null,
+    "time_scope": null,
+    "preprocessing_steps": [],
+    "feature_engineering": [],
+    "normalization": null,
+    "missing_value_handling": null,
+    "sample_definition": null,
+    "label_definition": null,
+    "prediction_horizon": null,
+    "input_shapes": []
+  },
+  "lookback_analysis": {"windows": [{"frequency": null, "window_size": null, "unit": null, "evidence": null}], "maximum_dependency": null, "rule_limit": null, "status": "无法核验", "reason": null},
+  "model_analysis": {
+    "architecture_summary": null,
+    "components": [{"name": null, "type": null, "input_shape": null, "output_shape": null, "key_hyperparameters": {}, "purpose": null, "evidence": null}],
+    "tensor_flow": [],
+    "ensemble_strategy": null,
+    "design_strengths": [],
+    "design_limitations": [],
+    "failure_scenarios": []
+  },
+  "parameter_audit": {
+    "total_parameters": null,
+    "trainable_parameters": null,
+    "frozen_parameters": null,
+    "count_type": "无法静态确认",
+    "calculation_items": [{"module": null, "formula": null, "parameters": null, "evidence": null}],
+    "uncertainties": [],
+    "rule_limit": null,
+    "status": "无法核验",
+    "reason": null
+  },
+  "training_analysis": {
+    "data_split": null,
+    "loss": null,
+    "optimizer": null,
+    "learning_rate": null,
+    "batch_size": null,
+    "epochs": null,
+    "regularization": null,
+    "early_stopping": null,
+    "random_seed": null,
+    "checkpoint_selection": null,
+    "weight_provenance": null,
+    "retrainability": null
+  },
+  "inference_analysis": {
+    "weight_loading": null,
+    "input_construction": null,
+    "batching": null,
+    "postprocessing": [],
+    "output_mapping": null,
+    "output_contract": null
+  },
+  "quality_assessment": {
+    "overall_quality_score": null,
+    "overall_level": "无法评价",
+    "score_confidence": "低",
+    "dimensions": [{"dimension": null, "level": "无法评价", "analysis": null, "evidence": []}],
+    "strengths": [],
+    "weaknesses": [],
+    "improvement_suggestions": []
+  },
+  "consistency_and_reproducibility": {
+    "training_inference_consistency": null,
+    "data_consistency": null,
+    "dependency_completeness": null,
+    "path_and_device_portability": null,
+    "reproducibility_level": "无法评价",
+    "issues": []
+  },
+  "compliance_checks": [{"rule_id": null, "rule_name": null, "rule_requirement": null, "status": "无法核验", "analysis": null, "evidence": [{"type": null, "location": null, "description": null}]}],
+  "risk_assessment": {"data_leakage_risk": "无法核验", "cheating_risk": "无法核验", "external_resource_risk": "无法核验", "risks": [{"category": null, "severity": "无法核验", "status": "无法核验", "description": null, "evidence": []}]},
+  "innovation_analysis": {
+    "common_method_comparison": null,
+    "novelty_level": "无法评价",
+    "method_differences": [],
+    "originality_confirmable": false,
+    "originality_reason": null
+  },
+  "findings": {"confirmed_issues": [], "suspicions": [], "unverifiable_items": [], "manual_review_recommendations": [{"priority": null, "target": null, "question": null, "suggested_method": null}]},
+  "final_assessment": {
+    "logic_summary": null,
+    "quality_summary": null,
+    "compliance_overall_status": "无法核验",
+    "compliance_summary": null,
+    "key_reasons": []
+  }
+}
