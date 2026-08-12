@@ -36,28 +36,13 @@ RESUME = True
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
 # leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和 pending_publish.jsonl。
 RERUN_SUBMISSION_IDS: list[str] = [
-    "b1300d11-f96a-4c6b-bdc6-5faf3e69317d",
-    "b588ed81-da1e-47fb-aa83-040dff363666",
-    "8333a825-2694-487c-9805-18f687405acf",
-    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9",
-    "bc2d7876-1e07-4846-960d-b3c456b04e8e",
-    "8a8f9af5-fbbf-42ed-859f-0aa4e73699b4",
-    "7f8311ec-f7af-4867-ac95-49876c88bdc8",
-    "c8ade1b2-a81f-4cd0-b7fe-3c6cbe0cca1f",
-    "1841a2f1-47a1-41ef-a4bc-3ceb68c76c8a",
-    "3cadb1fb-14c0-4514-adcc-1ea7d2c6d133",
-    "404912d0-ea18-4cb0-a037-2a598fb15120",
-    "8b120d01-e592-4864-9a4c-69bc065bf66b",
-    "528f67b9-49be-466a-8a6c-842ffbafe82e",
-    "e2d9bd42-8504-45e1-b60e-ad97e8a3473f",
-    "e56057ff-be9e-4a90-95be-4cc2d58f621f",
-    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509",
-    "14d53226-8a07-45b3-9515-dde022cd0925",
-    "1f0cdf7d-6d1b-4820-9c47-4fd42ba19e69",
-    "4e504ccc-765b-43b0-90f4-2df2c58c83c8",
-    "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313",
-    "dad2b2fd-8e90-430f-ac6e-2f84498e91e5",
+    "993c4dbd-5035-4c6c-8543-2b20cbfd51e2", 
+    "4e504ccc-765b-43b0-90f4-2df2c58c83c8", 
+    "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313", 
+    "dad2b2fd-8e90-430f-ac6e-2f84498e91e5", 
     "ded7a92a-a8a2-43b8-bdc9-8ffa260a9781"
+    "bc2d7876-1e07-4846-960d-b3c456b04e8e",
+    "e1267c29-aab4-449b-80f1-8dd7fa28699a"
 ]
 
 # 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
