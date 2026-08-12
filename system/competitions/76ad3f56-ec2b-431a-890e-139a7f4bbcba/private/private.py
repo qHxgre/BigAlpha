@@ -26,28 +26,27 @@ from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 
 # 新批次默认使用启动时间创建目录。
 # 断点续跑/指定重跑时，必须改成目标批次目录名，例如 "20260806_172301"。
-BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
-# BATCH_ID = "20260811_102014"
+# BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+BATCH_ID = "20260812_180129"
 
 # False：创建新批次；True：断点续跑或指定重跑 BATCH_ID 对应的已有批次。
-RESUME = False
+RESUME = True
 
 # 仅在 RESUME = True 时生效。程序会删除这些 submission 的旧运行目录并强制重跑；
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
 # leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和 pending_publish.jsonl。
-RERUN_SUBMISSION_IDS: list[str] = []
-# RERUN_SUBMISSION_IDS: list[str] = [
-#     "993c4dbd-5035-4c6c-8543-2b20cbfd51e2", 
-#     "4e504ccc-765b-43b0-90f4-2df2c58c83c8", 
-#     "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313", 
-#     "dad2b2fd-8e90-430f-ac6e-2f84498e91e5", 
-#     "ded7a92a-a8a2-43b8-bdc9-8ffa260a9781"
-#     "bc2d7876-1e07-4846-960d-b3c456b04e8e",
-#     "e1267c29-aab4-449b-80f1-8dd7fa28699a"
-# ]
+# RERUN_SUBMISSION_IDS: list[str] = []
+RERUN_SUBMISSION_IDS: list[str] = [
+    "b588ed81-da1e-47fb-aa83-040dff363666", 
+    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9", 
+    "7f8311ec-f7af-4867-ac95-49876c88bdc8", 
+    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509",
+    "bc2d7876-1e07-4846-960d-b3c456b04e8e",
+    "7cf535a1-590c-41d8-929d-c5749f379463"
+]
 
 # 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
-MAX_WORKERS = 5
+MAX_WORKERS = 1
 
 
 class Judge(PrivateJudge):
