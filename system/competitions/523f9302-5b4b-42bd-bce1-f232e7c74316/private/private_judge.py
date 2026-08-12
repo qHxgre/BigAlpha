@@ -87,8 +87,11 @@ class PrivateJudge(JudgeBase):
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
         if self.resume:
             manifest = self._read(self.manifest_path)
-            if manifest.get("published"):
-                raise RuntimeError("已发布批次不可续跑")
+            if manifest.get("published") and not self.rerun_ids:
+                raise RuntimeError(
+                    "已发布批次不允许普通断点续跑；请通过 RERUN_SUBMISSION_IDS "
+                    "明确指定需要重跑的 submission"
+                )
             self.DATE_END = manifest.get("date_end") or self.DATE_END
 
     @staticmethod
@@ -234,6 +237,13 @@ class PrivateJudge(JudgeBase):
             manifest = self._read(self.manifest_path)
             if manifest.get("input_batch_id") != metadata.get("batch_id") or set(manifest.get("selected_submission_ids", [])) != current_ids:
                 raise RuntimeError("续跑批次的输入包或 submission 集合已改变")
+            update_manifest(
+                self.manifest_path,
+                status="resuming",
+                resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                rerun_submission_ids=sorted(self.rerun_ids),
+                previously_published=bool(manifest.get("published")),
+            )
         else:
             update_manifest(self.manifest_path, competition_id=self.competition_id, mode="private",
                             batch_id=self.batch_id, status="preparing", date_start=self.DATE_START,
@@ -281,7 +291,8 @@ class PrivateJudge(JudgeBase):
             ordered = [rows[str(s["id"])] for s in submissions]
             self._save_scores(ordered)
             update_manifest(self.manifest_path, status="review_pending",
-                            completed_at=datetime.now().astimezone().isoformat(timespec="seconds"))
+                            completed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                            published=False)
         except Exception as exc:
             update_manifest(self.manifest_path, status="failed", error=str(exc))
             raise
