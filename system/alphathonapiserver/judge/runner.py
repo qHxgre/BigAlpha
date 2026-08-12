@@ -74,7 +74,7 @@ class LocalProcessUserRunner(UserCodeRunner):
             errors="replace",
             bufsize=1,
         )
-        timeout = 6 * 60 * 60
+        timeout = 3 * 60 * 60
         start = time.time()
         log_path = os.path.join(self.runner_dir, "stdout")
 

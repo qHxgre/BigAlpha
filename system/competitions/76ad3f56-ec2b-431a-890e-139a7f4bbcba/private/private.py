@@ -26,11 +26,11 @@ from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 
 # 新批次默认使用启动时间创建目录。
 # 断点续跑/指定重跑时，必须改成目标批次目录名，例如 "20260806_172301"。
-# BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
-BATCH_ID = "20260811_102014"
+BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+# BATCH_ID = "20260811_102014"
 
 # False：创建新批次；True：断点续跑或指定重跑 BATCH_ID 对应的已有批次。
-RESUME = True
+RESUME = False
 
 # 仅在 RESUME = True 时生效。程序会删除这些 submission 的旧运行目录并强制重跑；
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
@@ -55,6 +55,7 @@ class Judge(PrivateJudge):
     INPUT_DIR = os.path.join(PRIVATE_FILES_DIR, "prepared")
 
     def __init__(self) -> None:
+        self.DATE_START = "2025-12-01 00:00:00"
         self.DATE_END = "2026-08-10 23:59:59"
         super().__init__(
             input_dir=self.INPUT_DIR,
