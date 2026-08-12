@@ -17,14 +17,15 @@ for path in reversed((HERE, PUBLIC_DIR, API_SERVER)):
 
 from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 
-# BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
-BATCH_ID = "20260811_104853"
-RESUME = True
-RERUN_SUBMISSION_IDS: list[str] = [
-    "6d652e75-9566-487e-b27e-4f8639373ad1",
-    "70061f15-d76f-408a-a31c-c19421328d86",
-    "edc61f35-c386-456c-8567-34b0b7b8b581"
-]
+BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+# BATCH_ID = "20260811_104853"
+RESUME = False
+RERUN_SUBMISSION_IDS: list[str] = []
+# RERUN_SUBMISSION_IDS: list[str] = [
+#     "6d652e75-9566-487e-b27e-4f8639373ad1",
+#     "70061f15-d76f-408a-a31c-c19421328d86",
+#     "edc61f35-c386-456c-8567-34b0b7b8b581"
+# ]
 # 单机一张 GPU；端到端模型默认串行，避免两个模型同时抢占显存。
 MAX_WORKERS = 1
 
