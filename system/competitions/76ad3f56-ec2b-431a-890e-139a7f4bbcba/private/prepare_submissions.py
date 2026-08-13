@@ -231,6 +231,7 @@ def main() -> int:
             }
         participant.update(
             public_score=board.get("public_score"),
+            public_score_data=board.get("public_score_data") or {},
             public_rank=public_ranks.get(key),
             private_submission_count=len(records),
             private_submission_ids=[item["submission_id"] for item in records],
