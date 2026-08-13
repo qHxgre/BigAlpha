@@ -294,9 +294,15 @@ class PrivateJudge(JudgeBase):
         return row
 
     def _failed_sfa_result(self, submission: dict) -> dict | None:
-        """旧 submission 没有私榜结果时，复用其明确失败的 SFA 状态。"""
+        """旧 submission 没有私榜结果时，复用公榜运行目录中的失败状态。"""
         sid = str(submission["id"])
-        path = os.path.join(self.submission_path(submission), "sfa_status.json")
+        path = os.path.join(
+            FILE_DIR,
+            self.competition_id,
+            "submissions",
+            sid,
+            "sfa_status.json",
+        )
         failure_statuses = {
             "failed",
             "user_error",
