@@ -36,14 +36,7 @@ RESUME = True
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
 # leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和 pending_publish.jsonl。
 # RERUN_SUBMISSION_IDS: list[str] = []
-RERUN_SUBMISSION_IDS: list[str] = [
-    "b588ed81-da1e-47fb-aa83-040dff363666", 
-    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9", 
-    "7f8311ec-f7af-4867-ac95-49876c88bdc8", 
-    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509",
-    "bc2d7876-1e07-4846-960d-b3c456b04e8e",
-    "7cf535a1-590c-41d8-929d-c5749f379463"
-]
+RERUN_SUBMISSION_IDS: list[str] = []
 
 # 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
 MAX_WORKERS = 1

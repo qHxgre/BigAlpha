@@ -151,11 +151,6 @@ class PrivateJudge(JudgeBase):
                 raise RuntimeError(f"续跑批次缺少 manifest.json: {self.run_dir}")
             with open(self.manifest_path, encoding="utf-8") as reader:
                 previous_manifest = json.load(reader)
-            if previous_manifest.get("published") and not self.rerun_submission_ids:
-                raise RuntimeError(
-                    "已发布批次不允许普通断点续跑；请通过 RERUN_SUBMISSION_IDS "
-                    "明确指定需要重跑的 submission"
-                )
             # 同一批次必须沿用首次启动时确定的评估结束日，避免跨日续跑改变口径。
             self.DATE_END = previous_manifest.get("date_end") or self.DATE_END
 
@@ -398,21 +393,43 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每个用户最多选择两个 submission: {violations}")
 
         write_json(os.path.join(self.run_dir, "submissions.json"), submissions)
+        new_submission_ids: set[str] = set(current_id_set)
         if self.resume:
             with open(self.manifest_path, encoding="utf-8") as reader:
                 previous_manifest = json.load(reader)
             if previous_manifest.get("competition_id") != self.competition_id:
                 raise RuntimeError("续跑批次的 competition_id 不匹配")
-            if previous_manifest.get("input_batch_id") != metadata.get("batch_id"):
-                raise RuntimeError("续跑批次使用的固化输入包已变化，拒绝混用")
-            if set(previous_manifest.get("selected_submission_ids") or []) != current_id_set:
-                raise RuntimeError("续跑批次的 submission 集合已变化，拒绝混用")
+            previous_ids = {
+                str(sid) for sid in (previous_manifest.get("selected_submission_ids") or [])
+            }
+            removed_ids = sorted(previous_ids - current_id_set)
+            if removed_ids:
+                raise RuntimeError(
+                    "续跑批次不能删除已有 submission，缺少: "
+                    f"{removed_ids}"
+                )
+            new_submission_ids = current_id_set - previous_ids
+            if (
+                previous_manifest.get("published")
+                and not new_submission_ids
+                and not self.rerun_submission_ids
+            ):
+                raise RuntimeError(
+                    "已发布批次没有新增 submission；如需重跑，请通过 "
+                    "RERUN_SUBMISSION_IDS 明确指定 submission"
+                )
             update_manifest(
                 self.manifest_path,
                 status="resuming",
                 resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 rerun_submission_ids=sorted(self.rerun_submission_ids),
+                new_submission_ids=sorted(new_submission_ids),
                 previously_published=bool(previous_manifest.get("published")),
+                input_dir=self.input_dir,
+                input_batch_id=metadata.get("batch_id"),
+                input_summary=metadata.get("summary"),
+                submission_count=len(submissions),
+                selected_submission_ids=sorted(current_id_set),
                 selected_submissions_verified_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
         else:
@@ -453,6 +470,7 @@ class PrivateJudge(JudgeBase):
                 remaining=len(submissions),
                 resume=self.resume,
                 rerun_submission_ids=sorted(self.rerun_submission_ids),
+                new_submission_ids=sorted(new_submission_ids),
                 max_workers=self.max_workers,
                 msg="私榜批次开始",
             )
@@ -480,6 +498,12 @@ class PrivateJudge(JudgeBase):
                     )
                     rows_by_id[sid] = completed
                     continue
+                if self.resume and sid not in new_submission_ids and sid not in self.rerun_submission_ids:
+                    raise RuntimeError(
+                        f"批次中已有 submission {sid} 缺少完整 result.json，"
+                        "为避免自动重跑旧 submission，已停止；如需重跑请加入 "
+                        "RERUN_SUBMISSION_IDS"
+                    )
                 pending.append((position, submission))
 
             worker_count = min(self.max_workers, len(pending))
