@@ -1,4 +1,4 @@
-"""固化私榜提交；未主动选择者自动取公榜得分最高的两份。"""
+"""固化私榜提交；未主动选择者自动取公榜得分最高的一份。"""
 from __future__ import annotations
 
 import argparse
@@ -75,7 +75,7 @@ def select_submissions(
     explicitly_selected: list[dict],
     team_by_user: dict[str, str],
 ) -> tuple[list[dict], dict[str, str]]:
-    """按参赛者归组，未主动选择者自动取公榜得分最高的两份。"""
+    """按参赛者归组，未主动选择者自动取公榜得分最高的一份。"""
     explicit_ids = {str(item["id"]) for item in explicitly_selected}
 
     def owner(submission: dict) -> tuple[str, str]:
@@ -103,12 +103,12 @@ def select_submissions(
             ),
             reverse=True,
         )
-        fallback.extend(submissions[:2])
+        fallback.extend(submissions[:1])
 
     selected = [*explicitly_selected, *fallback]
     sources = {
         str(item["id"]): (
-            "selected_for_private" if str(item["id"]) in explicit_ids else "public_top_2"
+            "selected_for_private" if str(item["id"]) in explicit_ids else "public_top_1"
         )
         for item in selected
     }
