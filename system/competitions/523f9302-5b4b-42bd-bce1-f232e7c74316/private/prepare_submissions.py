@@ -1,4 +1,4 @@
-"""下载并固化所有 selected_for_private=True 的提交。"""
+"""固化私榜提交；未主动选择者自动取公榜得分最高的两份。"""
 from __future__ import annotations
 
 import argparse
@@ -70,6 +70,51 @@ def safe_name(file_id: str, info: dict | None, used: set[str]) -> str:
     return candidate
 
 
+def select_submissions(
+    all_submissions: list[dict],
+    explicitly_selected: list[dict],
+    team_by_user: dict[str, str],
+) -> tuple[list[dict], dict[str, str]]:
+    """按参赛者归组，未主动选择者自动取公榜得分最高的两份。"""
+    explicit_ids = {str(item["id"]) for item in explicitly_selected}
+
+    def owner(submission: dict) -> tuple[str, str]:
+        user_id = str(submission.get("user_id"))
+        team_id = team_by_user.get(user_id)
+        return ("team", team_id) if team_id else ("individual", user_id)
+
+    explicitly_selected_owners = {owner(item) for item in explicitly_selected}
+    fallback_by_owner: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for submission in all_submissions:
+        submission_owner = owner(submission)
+        if submission_owner in explicitly_selected_owners:
+            continue
+        if submission.get("public_score") is None:
+            continue
+        fallback_by_owner[submission_owner].append(submission)
+
+    fallback = []
+    for submissions in fallback_by_owner.values():
+        submissions.sort(
+            key=lambda item: (
+                float(item["public_score"]),
+                str(item.get("created_at") or ""),
+                str(item["id"]),
+            ),
+            reverse=True,
+        )
+        fallback.extend(submissions[:2])
+
+    selected = [*explicitly_selected, *fallback]
+    sources = {
+        str(item["id"]): (
+            "selected_for_private" if str(item["id"]) in explicit_ids else "public_top_2"
+        )
+        for item in selected
+    }
+    return selected, sources
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", default=DEFAULT_OUTPUT)
@@ -81,14 +126,11 @@ def main() -> int:
     os.makedirs(os.path.join(staging, "submissions"))
 
     api = AlphathonAPI()
-    selected = api.query_submissions(
+    explicitly_selected = api.query_submissions(
         competition_id=COMPETITION_ID,
         constraints={"selected_for_private": True},
     )
-    if not selected:
-        shutil.rmtree(staging, ignore_errors=True)
-        print("没有 selected_for_private=True 的 submission", file=sys.stderr)
-        return 1
+    all_submissions = api.query_submissions(competition_id=COMPETITION_ID)
 
     users = paginate(api, "/users", competition_id=COMPETITION_ID)
     teams = paginate(api, "/teams", competition_id=COMPETITION_ID)
@@ -106,6 +148,14 @@ def main() -> int:
         teams_by_id[team_id] = (team, roster)
         for user_id in roster:
             team_by_user[user_id] = team_id
+
+    selected, selection_sources = select_submissions(
+        all_submissions, explicitly_selected, team_by_user
+    )
+    if not selected:
+        shutil.rmtree(staging, ignore_errors=True)
+        print("没有主动选择或可按公榜得分自动选择的 submission", file=sys.stderr)
+        return 1
 
     selected_by_owner: dict[tuple[str, str], list[dict]] = defaultdict(list)
     records, errors = [], []
@@ -128,6 +178,7 @@ def main() -> int:
                 "user_id": user_id,
                 "team_id": team_id,
                 "public_score": submission.get("public_score"),
+                "selection_source": selection_sources[sid],
                 "relative_path": f"submissions/{sid}",
                 "files": downloaded,
                 "submission": jsonable(submission),
@@ -178,6 +229,8 @@ def main() -> int:
         "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "summary": {
             "private_submission_count": len(records),
+            "explicit_submission_count": len(explicitly_selected),
+            "fallback_submission_count": len(records) - len(explicitly_selected),
             "private_participant_count": len(participants),
             "private_team_count": sum(item["type"] == "team" for item in participants),
             "private_individual_count": sum(

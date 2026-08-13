@@ -64,6 +64,50 @@ def _public_ranks(entries: list[dict], rank_order: str) -> dict[tuple[str, str],
     }
 
 
+def _select_submissions(
+    all_submissions: list[dict],
+    explicitly_selected: list[dict],
+    team_by_user: dict[str, str],
+) -> tuple[list[dict], dict[str, str]]:
+    """未主动选择私榜提交的参赛者，自动取公榜得分最高的两份。"""
+    explicit_ids = {str(item["id"]) for item in explicitly_selected}
+
+    def owner(submission: dict) -> tuple[str, str]:
+        user_id = str(submission.get("user_id"))
+        team_id = team_by_user.get(user_id)
+        return ("team", team_id) if team_id else ("individual", user_id)
+
+    explicitly_selected_owners = {owner(item) for item in explicitly_selected}
+    fallback_by_owner: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for submission in all_submissions:
+        if owner(submission) in explicitly_selected_owners:
+            continue
+        if submission.get("public_score") is None:
+            continue
+        fallback_by_owner[owner(submission)].append(submission)
+
+    fallback = []
+    for submissions in fallback_by_owner.values():
+        submissions.sort(
+            key=lambda item: (
+                float(item["public_score"]),
+                str(item.get("created_at") or ""),
+                str(item["id"]),
+            ),
+            reverse=True,
+        )
+        fallback.extend(submissions[:2])
+
+    selected = [*explicitly_selected, *fallback]
+    selection_sources = {
+        str(item["id"]): (
+            "selected_for_private" if str(item["id"]) in explicit_ids else "public_top_2"
+        )
+        for item in selected
+    }
+    return selected, selection_sources
+
+
 def _submission_files(submission: dict) -> dict:
     """兼容 files 位于 data 内或提交顶层的 API 返回。"""
     data = submission.get("data") or {}
@@ -126,13 +170,11 @@ def main() -> int:
 
     api = AlphathonAPI()
     competition = api.get_competition_by_id(COMPETITION_ID) or {}
-    selected = api.query_submissions(
+    explicitly_selected = api.query_submissions(
         competition_id=COMPETITION_ID,
         constraints={"selected_for_private": True},
     )
-    if not selected:
-        print("没有 selected_for_private=True 的 submission", file=sys.stderr)
-        return 1
+    all_submissions = api.query_submissions(competition_id=COMPETITION_ID)
 
     users = _paginate(api, "/users", competition_id=COMPETITION_ID)
     teams = _paginate(api, "/teams", competition_id=COMPETITION_ID)
@@ -155,6 +197,13 @@ def main() -> int:
         teams_by_id[tid] = (team, roster)
         for uid in roster:
             team_by_user[uid] = tid
+
+    selected, selection_sources = _select_submissions(
+        all_submissions, explicitly_selected, team_by_user
+    )
+    if not selected:
+        print("没有主动选择或可按公榜得分自动选择的 submission", file=sys.stderr)
+        return 1
 
     selected_by_owner = defaultdict(list)
     submission_records = []
@@ -184,6 +233,7 @@ def main() -> int:
             "team_id": tid,
             "public_score": submission.get("public_score"),
             "created_at": submission.get("created_at"),
+            "selection_source": selection_sources[sid],
             "relative_path": f"submissions/{sid}",
             "files": files,
             "submission": submission,
@@ -248,6 +298,8 @@ def main() -> int:
         "rank_order": rank_order,
         "summary": {
             "private_submission_count": len(selected),
+            "explicit_submission_count": len(explicitly_selected),
+            "fallback_submission_count": len(selected) - len(explicitly_selected),
             "private_user_count": len(user_counts),
             "private_team_count": sum(x["type"] == "team" for x in participant_records),
             "private_individual_count": sum(x["type"] == "individual" for x in participant_records),
