@@ -1,4 +1,4 @@
-"""生成包含团队全部提交、得分细节和团队内相关性的私榜报告。
+"""生成包含团队和个人全部提交、得分细节和主体内相关性的私榜报告。
 
 可直接运行：
 
@@ -131,14 +131,26 @@ def build_team_private_report(paths: CheckPaths = PATHS) -> dict[str, Any]:
     public_regression = read_public_regression(paths).set_index("factor", drop=False)
     similarity = _load_similarity(paths)
 
-    teams: list[dict[str, Any]] = []
+    participants: list[dict[str, Any]] = []
     all_private_scores = pd.to_numeric(detail.get("final_score"), errors="coerce")
     submission_rank = all_private_scores.rank(ascending=False, method="min", na_option="bottom")
     rank_by_id = dict(zip(detail["submission_id"].astype(str), submission_rank))
 
     for participant in metadata.get("participants", []):
-        if participant.get("type") != "team":
+        participant_type = participant.get("type")
+        if participant_type not in {"team", "individual"}:
             continue
+        if participant_type == "team":
+            participant_id = str(participant.get("team_id"))
+            participant_name = participant.get("team_name") or "（未命名队伍）"
+            members = participant.get("members") or []
+            team_id = participant.get("team_id")
+        else:
+            user = participant.get("user") or {}
+            participant_id = str(user.get("user_id") or "")
+            participant_name = f"个人：{user.get('name') or participant_id or '未命名'}"
+            members = [user]
+            team_id = None
         submission_ids = [str(value) for value in participant.get("private_submission_ids") or []]
         submission_rows: list[dict[str, Any]] = []
         for submission_id in submission_ids:
@@ -195,10 +207,14 @@ def build_team_private_report(paths: CheckPaths = PATHS) -> dict[str, Any]:
         )
         best = next((item for item in submission_rows if item["private_score"] is not None), None)
         correlations = _team_correlations(submission_ids, similarity)
-        teams.append({
-            "team_id": participant.get("team_id"),
-            "team_name": participant.get("team_name") or "（未命名队伍）",
-            "members": participant.get("members") or [],
+        participants.append({
+            "participant_type": participant_type,
+            "participant_id": participant_id,
+            "participant_name": participant_name,
+            # 保留原字段，兼容现有 JSON/CSV/报告消费者。
+            "team_id": team_id,
+            "team_name": participant_name,
+            "members": members,
             "submission_count": len(submission_ids),
             "metadata_submission_count": participant.get("private_submission_count"),
             "public_rank": _clean(participant.get("public_rank")),
@@ -210,20 +226,32 @@ def build_team_private_report(paths: CheckPaths = PATHS) -> dict[str, Any]:
             "submissions": submission_rows,
         })
 
-    scores = pd.Series([team["best_private_score"] for team in teams], dtype="float64")
+    scores = pd.Series([item["best_private_score"] for item in participants], dtype="float64")
     ranks = scores.rank(ascending=False, method="min", na_option="bottom")
-    for team, rank in zip(teams, ranks):
-        team["private_rank"] = _clean(rank)
-    teams.sort(key=lambda item: (item["private_rank"] is None, item["private_rank"] or 10**9, item["team_name"]))
+    for participant, rank in zip(participants, ranks):
+        participant["private_rank"] = _clean(rank)
+    participants.sort(
+        key=lambda item: (
+            item["private_rank"] is None,
+            item["private_rank"] or 10**9,
+            item["participant_name"],
+        )
+    )
+    team_count = sum(item["participant_type"] == "team" for item in participants)
+    individual_count = sum(item["participant_type"] == "individual" for item in participants)
     return {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "competition_id": metadata.get("competition_id"),
         "competition_name": metadata.get("competition_name"),
         "batch_id": metadata.get("batch_id"),
-        "team_count": len(teams),
-        "submission_count": sum(team["submission_count"] for team in teams),
-        "correlation_method": "团队内 submission 两两日截面 Pearson 相关的汇总",
-        "teams": teams,
+        "participant_count": len(participants),
+        "team_count": team_count,
+        "individual_count": individual_count,
+        "submission_count": sum(item["submission_count"] for item in participants),
+        "correlation_method": "同一参赛主体内 submission 两两日截面 Pearson 相关的汇总",
+        "participants": participants,
+        # 保留 teams 键兼容旧调用；现在其中包含团队和个人两类参赛主体。
+        "teams": participants,
     }
 
 
@@ -234,6 +262,9 @@ def build_compact_team_private_report(report: dict[str, Any]) -> dict[str, Any]:
         correlation = team["correlation_summary"]
         top_pair = correlation.get("top_pair") or {}
         teams.append({
+            "participant_type": team["participant_type"],
+            "participant_id": team["participant_id"],
+            "participant_name": team["participant_name"],
             "private_rank": team["private_rank"],
             "team_id": team["team_id"],
             "team_name": team["team_name"],
@@ -284,7 +315,8 @@ def build_compact_team_private_report(report: dict[str, Any]) -> dict[str, Any]:
         key: report[key]
         for key in (
             "generated_at", "competition_id", "competition_name", "batch_id",
-            "team_count", "submission_count", "correlation_method",
+            "participant_count", "team_count", "individual_count",
+            "submission_count", "correlation_method",
         )
     }
     compact["teams"] = teams
@@ -336,18 +368,21 @@ def _fmt(value: Any, digits: int = 5) -> str:
 
 def _markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# 团队私榜完整报告", "",
+        "# 参赛主体私榜完整报告", "",
+        f"- 参赛主体数：**{report['participant_count']}**",
         f"- 团队数：**{report['team_count']}**",
+        f"- 个人数：**{report['individual_count']}**",
         f"- 提交数：**{report['submission_count']}**",
         f"- 相关性口径：{report['correlation_method']}", "",
-        "## 团队概览", "",
-        "| 私榜排名 | 团队 | 提交数 | 私榜最高分 | 公榜排名 | 公榜分 | 平均绝对相关 | 最大绝对相关 | 高相关对 |",
-        "|---:|---|---:|---:|---:|---:|---:|---:|---:|",
+        "## 参赛主体概览", "",
+        "| 私榜排名 | 类型 | 队伍/个人 | 提交数 | 私榜最高分 | 公榜排名 | 公榜分 | 平均绝对相关 | 最大绝对相关 | 高相关对 |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for team in report["teams"]:
         corr = team["correlation_summary"]
         lines.append(
-            f"| {_fmt(team['private_rank'], 0)} | {team['team_name']} | {team['submission_count']} | "
+            f"| {_fmt(team['private_rank'], 0)} | {'团队' if team['participant_type'] == 'team' else '个人'} | "
+            f"{team['participant_name']} | {team['submission_count']} | "
             f"{_fmt(team['best_private_score'])} | {_fmt(team['public_rank'], 0)} | {_fmt(team['public_score'])} | "
             f"{_fmt(corr['mean_abs_correlation'])} | {_fmt(corr['max_abs_correlation'])} | "
             f"{corr['high_correlation_pair_count']} |"
@@ -356,7 +391,8 @@ def _markdown(report: dict[str, Any]) -> str:
         corr = team["correlation_summary"]
         lines.extend(["", f"## {team['private_rank']}. {team['team_name']}", "",
             f"成员：{_members_cell(team['members']) or '—'}  ",
-            f"提交数：{team['submission_count']}；团队内相关对：{corr['pair_count']}/{corr['expected_pair_count']}；"
+            f"类型：{'团队' if team['participant_type'] == 'team' else '个人'}；"
+            f"提交数：{team['submission_count']}；主体内相关对：{corr['pair_count']}/{corr['expected_pair_count']}；"
             f"平均绝对相关：{_fmt(corr['mean_abs_correlation'])}；最大绝对相关：{_fmt(corr['max_abs_correlation'])}。",
             "", "| 最佳 | submission_id | 状态 | 私榜排名 | 榜单 | IC均值 | ICIR | 夏普 | 压力ICIR | A分 | B分 | final |",
             "|:---:|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|",
@@ -390,7 +426,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"{_fmt(sub['public_b_detail'].get('selection_rate'))} |",
             ])
         if team["correlation_pairs"]:
-            lines.extend(["", "### 团队内 submission 相关性", "",
+            lines.extend(["", "### 主体内 submission 相关性", "",
                 "| submission 1 | submission 2 | 平均相关 | 平均绝对相关 | P95 绝对相关 | 有效天数 |",
                 "|---|---|---:|---:|---:|---:|"])
             for pair in team["correlation_pairs"]:
@@ -455,7 +491,7 @@ def main() -> int:
         output=args.output, json_output=args.json_output, markdown_output=args.markdown_output
     )
     for kind, path in outputs.items():
-        print(f"团队私榜 {kind} 已生成：{path}")
+        print(f"参赛主体私榜 {kind} 已生成：{path}")
     return 0
 
 

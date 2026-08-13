@@ -752,17 +752,18 @@ def generate_markdown_report(
     ]
     b_driven_count = int(top_comparison["b_minus_a"].gt(0).sum())
     high_sensitivity_count = int(top_comparison["sensitivity"].eq("高").sum())
-    team_rows = []
-    for team in team_private_report["teams"]:
-        correlation = team["correlation_summary"]
+    participant_rows = []
+    for participant in team_private_report["participants"]:
+        correlation = participant["correlation_summary"]
         top_pair = correlation.get("top_pair") or {}
-        team_rows.append({
-            "私榜排名": int(team["private_rank"]) if team["private_rank"] is not None else pd.NA,
-            "团队": team["team_name"],
-            "提交数": team["submission_count"],
-            "私榜最高分": team["best_private_score"],
-            "公榜排名": team["public_rank"],
-            "公榜分": team["public_score"],
+        participant_rows.append({
+            "私榜排名": int(participant["private_rank"]) if participant["private_rank"] is not None else pd.NA,
+            "类型": "团队" if participant["participant_type"] == "team" else "个人",
+            "队伍/个人": participant["participant_name"],
+            "提交数": participant["submission_count"],
+            "私榜最高分": participant["best_private_score"],
+            "公榜排名": participant["public_rank"],
+            "公榜分": participant["public_score"],
             "平均绝对相关": correlation["mean_abs_correlation"],
             "最大绝对相关": correlation["max_abs_correlation"],
             "高相关对": correlation["high_correlation_pair_count"],
@@ -772,24 +773,30 @@ def generate_markdown_report(
                 if top_pair else ""
             ),
         })
-    team_diagnostic = pd.DataFrame(team_rows)
-    teams_with_multiple_submissions = team_diagnostic.loc[team_diagnostic["提交数"].gt(1)]
-    teams_with_high_correlation = team_diagnostic.loc[team_diagnostic["高相关对"].gt(0)]
-    valid_team_correlations = teams_with_multiple_submissions.dropna(subset=["最大绝对相关"])
-    highest_team_correlation = (
-        valid_team_correlations.loc[valid_team_correlations["最大绝对相关"].idxmax()]
-        if not valid_team_correlations.empty else None
+    participant_diagnostic = pd.DataFrame(participant_rows)
+    participants_with_multiple_submissions = participant_diagnostic.loc[
+        participant_diagnostic["提交数"].gt(1)
+    ]
+    participants_with_high_correlation = participant_diagnostic.loc[
+        participant_diagnostic["高相关对"].gt(0)
+    ]
+    valid_participant_correlations = participants_with_multiple_submissions.dropna(
+        subset=["最大绝对相关"]
     )
-    team_display = team_diagnostic.head(top_n)
+    highest_participant_correlation = (
+        valid_participant_correlations.loc[valid_participant_correlations["最大绝对相关"].idxmax()]
+        if not valid_participant_correlations.empty else None
+    )
+    participant_display = participant_diagnostic.head(top_n)
     submission_score_rows = []
-    for team in team_private_report["teams"]:
-        for submission in team["submissions"]:
+    for participant in team_private_report["participants"]:
+        for submission in participant["submissions"]:
             private = submission["private_score_detail"]
             public = submission["public_score_detail"]
             private_b = submission["private_b_detail"]
             public_b = submission["public_b_detail"]
             submission_score_rows.append({
-                "团队": team["team_name"],
+                "队伍/个人": participant["participant_name"],
                 "submission_id": submission["submission_id"],
                 "榜单": "私榜",
                 "IC均值": private.get("ic_mean"),
@@ -805,7 +812,7 @@ def generate_markdown_report(
                 "最终分": private.get("final_score"),
             })
             submission_score_rows.append({
-                "团队": team["team_name"],
+                "队伍/个人": participant["participant_name"],
                 "submission_id": submission["submission_id"],
                 "榜单": "公榜",
                 "IC均值": public.get("ic_mean"),
@@ -963,35 +970,37 @@ def generate_markdown_report(
         *_chart(figures["02_score_consistency"], output, "全量正式分数分布"),
         _table(score_problems, limit=top_n),
         "",
-        "## 3. 团队私榜提交与内部相关性",
+        "## 3. 参赛主体私榜提交与内部相关性",
         "",
         "### 怎么分析",
         "",
-        "每个团队按其所有入围私榜 submission 统计提交数，并以团队内最高 `final_score` 生成私榜排名。"
+        "每个团队或个人按其所有入围私榜 submission 统计提交数，并以主体内最高 `final_score` 生成私榜排名。"
         "相关性先在每个交易日对两个 submission 的股票截面因子值计算 Pearson 相关，"
-        "再跨交易日计算平均绝对相关；团队平均值和最大值均基于团队内部所有 submission 两两组合。"
+        "再跨交易日计算平均绝对相关；主体平均值和最大值均基于同一主体内部所有 submission 两两组合。"
         f"绝对相关达到 `{high_correlation:.2f}` 的组合记为高相关对。正负相关都代表较强线性关系，"
-        "因此团队汇总使用绝对值；相关方向仍保留在团队私榜 JSON 的最高相关提交对中。",
+        "因此主体汇总使用绝对值；相关方向仍保留在私榜 JSON 的最高相关提交对中。",
         "",
         "### 自动观察",
         "",
-        f"- 共 **{team_private_report['team_count']}** 个团队、**{team_private_report['submission_count']}** 个团队提交；"
-        f"其中 **{len(teams_with_multiple_submissions)}** 个团队有至少 2 个 submission，可计算团队内相关性。",
-        f"- 有 **{len(teams_with_high_correlation)}** 个团队至少存在一对平均绝对相关不低于 "
+        f"- 共 **{team_private_report['participant_count']}** 个参赛主体（"
+        f"**{team_private_report['team_count']}** 个团队、**{team_private_report['individual_count']}** 个个人），"
+        f"共 **{team_private_report['submission_count']}** 份提交；"
+        f"其中 **{len(participants_with_multiple_submissions)}** 个主体有至少 2 个 submission，可计算主体内相关性。",
+        f"- 有 **{len(participants_with_high_correlation)}** 个主体至少存在一对平均绝对相关不低于 "
         f"**{high_correlation:.2f}** 的 submission。",
         (
-            f"- 团队内最大相关性最高的是 **{highest_team_correlation['团队']}**，最大平均绝对相关为 "
-            f"**{highest_team_correlation['最大绝对相关']:.6f}**，对应提交对 "
-            f"`{highest_team_correlation['最高相关提交对']}`。"
-            if highest_team_correlation is not None else
-            "- 当前没有可用的团队内 submission 相关性结果。"
+            f"- 主体内最大相关性最高的是 **{highest_participant_correlation['队伍/个人']}**，最大平均绝对相关为 "
+            f"**{highest_participant_correlation['最大绝对相关']:.6f}**，对应提交对 "
+            f"`{highest_participant_correlation['最高相关提交对']}`。"
+            if highest_participant_correlation is not None else
+            "- 当前没有可用的主体内 submission 相关性结果。"
         ),
         "",
-        f"### 私榜前 {len(team_display)} 个团队概览",
+        f"### 私榜前 {len(participant_display)} 个参赛主体概览",
         "",
-        _table(team_display),
+        _table(participant_display),
         "",
-        "### 全部团队 submission 公榜/私榜逐项得分",
+        "### 全部参赛主体 submission 公榜/私榜逐项得分",
         "",
         _table(submission_score_detail),
         "",
