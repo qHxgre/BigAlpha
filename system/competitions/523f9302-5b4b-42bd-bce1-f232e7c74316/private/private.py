@@ -20,11 +20,10 @@ from runner import MemoryLimitedUserRunner
 # BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 BATCH_ID = "20260812_180115"
 RESUME = True
-# RERUN_SUBMISSION_IDS: list[str] = []
-RERUN_SUBMISSION_IDS: list[str] = [
-    "06810cc4-82dd-45fa-8ef5-fb6cbe518f10",
-    "fbd75c9a-17cf-46ef-95ea-c678db3d039d"
-]
+# 同一 BATCH_ID 续跑时，已有完整 result.json 的 submission 会自动跳过，
+# 只评测当前 prepared 输入包中尚未产出完整结果的 submission。
+# 如需强制重跑个别 submission，再把 ID 填入此列表。
+RERUN_SUBMISSION_IDS: list[str] = []
 # 单机一张 GPU；端到端模型默认串行，避免两个模型同时抢占显存。
 MAX_WORKERS = 1
 # 512 GiB 主机、单 worker：给用户子进程 400 GiB 虚拟地址空间，

@@ -87,11 +87,6 @@ class PrivateJudge(JudgeBase):
         self.pending_path = os.path.join(self.run_dir, "pending_publish.jsonl")
         if self.resume:
             manifest = self._read(self.manifest_path)
-            if manifest.get("published") and not self.rerun_ids:
-                raise RuntimeError(
-                    "已发布批次不允许普通断点续跑；请通过 RERUN_SUBMISSION_IDS "
-                    "明确指定需要重跑的 submission"
-                )
             self.DATE_END = manifest.get("date_end") or self.DATE_END
 
     @staticmethod
@@ -250,27 +245,30 @@ class PrivateJudge(JudgeBase):
         if self.resume:
             manifest = self._read(self.manifest_path)
             previous_ids = set(manifest.get("selected_submission_ids", []))
-            if previous_ids != prepared_ids:
-                raise RuntimeError(
-                    "续跑批次的 submission 集合已改变："
-                    f"新增={sorted(prepared_ids - previous_ids)}，"
-                    f"移除={sorted(previous_ids - prepared_ids)}"
-                )
+            added_ids = prepared_ids - previous_ids
+            removed_ids = previous_ids - prepared_ids
             input_batch_changed = manifest.get("input_batch_id") != metadata.get("batch_id")
-            if input_batch_changed and not self.rerun_ids:
+            completed_ids = {sid for sid in prepared_ids if self._result(sid) is not None}
+            missing_ids = prepared_ids - completed_ids
+            if manifest.get("published") and not missing_ids and not self.rerun_ids:
                 raise RuntimeError(
-                    "续跑批次的固化输入包已改变；普通断点续跑不允许混用输入包。"
-                    "如需使用当前 prepared 重跑，请通过 RERUN_SUBMISSION_IDS "
-                    "明确指定 submission"
+                    "已发布批次没有缺失的 submission；如需强制重跑，请通过 "
+                    "RERUN_SUBMISSION_IDS 明确指定 submission"
                 )
             update_manifest(
                 self.manifest_path,
                 status="resuming",
                 resumed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 rerun_submission_ids=sorted(self.rerun_ids),
+                added_submission_ids=sorted(added_ids),
+                removed_submission_ids=sorted(removed_ids),
+                missing_submission_ids=sorted(missing_ids),
                 previously_published=bool(manifest.get("published")),
                 resumed_input_batch_id=metadata.get("batch_id"),
                 input_batch_changed=input_batch_changed,
+                input_batch_id=metadata.get("batch_id"),
+                submission_count=len(ids),
+                selected_submission_ids=sorted(ids),
             )
         else:
             update_manifest(self.manifest_path, competition_id=self.competition_id, mode="private",
