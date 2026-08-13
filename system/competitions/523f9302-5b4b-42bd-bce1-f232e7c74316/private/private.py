@@ -6,26 +6,31 @@ import sys
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PUBLIC_DIR = os.path.abspath(os.path.join(HERE, "..", "public"))
 API_SERVER = os.path.abspath(os.path.join(HERE, "..", "..", "..", "alphathonapiserver"))
-# private 模块优先，public 次之（复用其 MemoryLimitedUserRunner），评测框架最后。
-# 使用明确顺序可避免误导入 alphathonapiserver 中同名的 runner 模块。
-for path in reversed((HERE, PUBLIC_DIR, API_SERVER)):
+# 私榜只加载 private 目录内的比赛模块；评测框架从 alphathonapiserver 加载。
+# 不把 public 加入 sys.path，避免私榜配置和公榜配置互相影响。
+for path in reversed((HERE, API_SERVER)):
     if path in sys.path:
         sys.path.remove(path)
     sys.path.insert(0, path)
 
 from private_judge import PRIVATE_FILES_DIR, PrivateJudge
+from runner import MemoryLimitedUserRunner
 
 # BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 BATCH_ID = "20260812_180115"
 RESUME = True
 # RERUN_SUBMISSION_IDS: list[str] = []
 RERUN_SUBMISSION_IDS: list[str] = [
-    "3f0339e2-8b62-4016-8fb3-253ab184517e"
+    "06810cc4-82dd-45fa-8ef5-fb6cbe518f10",
+    "fbd75c9a-17cf-46ef-95ea-c678db3d039d"
 ]
 # 单机一张 GPU；端到端模型默认串行，避免两个模型同时抢占显存。
 MAX_WORKERS = 1
+# 512 GiB 主机、单 worker：给用户子进程 400 GiB 虚拟地址空间，
+# 余下约 112 GiB 留给 judge、系统、CUDA 驱动及其它常驻进程。
+RUNNER_MEM_LIMIT_GIB = 400
+MemoryLimitedUserRunner.MEM_LIMIT = RUNNER_MEM_LIMIT_GIB * 1024**3
 
 
 class Judge(PrivateJudge):
