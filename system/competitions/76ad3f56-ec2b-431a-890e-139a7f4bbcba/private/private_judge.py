@@ -359,19 +359,30 @@ class PrivateJudge(JudgeBase):
         current_id_set = set(current_ids)
         if len(current_ids) != len(current_id_set):
             raise RuntimeError("API 返回了重复的 selected_for_private submission_id")
-        if prepared_id_set != current_id_set:
-            newly_selected = sorted(current_id_set - prepared_id_set)
-            no_longer_selected = sorted(prepared_id_set - current_id_set)
+        has_selection_sources = all("selection_source" in record for record in records)
+        explicitly_prepared_id_set = {
+            str(record["submission_id"])
+            for record in records
+            if record.get("selection_source") == "selected_for_private"
+        }
+        expected_selected_id_set = (
+            explicitly_prepared_id_set if has_selection_sources else prepared_id_set
+        )
+        if expected_selected_id_set != current_id_set:
+            newly_selected = sorted(current_id_set - expected_selected_id_set)
+            no_longer_selected = sorted(expected_selected_id_set - current_id_set)
             raise RuntimeError(
                 "线上 private submission 与固化输入包不一致，拒绝评测: "
                 f"线上新增={newly_selected}, 已取消选择={no_longer_selected}, "
-                f"线上数量={len(current_ids)}, 输入包数量={len(prepared_ids)}。"
+                f"线上主动选择数量={len(current_ids)}, "
+                f"输入包主动选择数量={len(expected_selected_id_set)}, "
+                f"输入包总数量={len(prepared_ids)}。"
                 "请重新运行 prepare_submissions.py。"
             )
 
         submissions = [dict(record["submission"]) for record in records]
         if not submissions:
-            raise RuntimeError("没有 selected_for_private=True 的 submission")
+            raise RuntimeError("没有主动选择或按公榜得分自动选择的 submission")
         unknown_rerun_ids = sorted(self.rerun_submission_ids - prepared_id_set)
         if unknown_rerun_ids:
             raise RuntimeError(

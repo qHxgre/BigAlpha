@@ -218,8 +218,22 @@ class PrivateJudge(JudgeBase):
         current = self.alphathon_api.query_submissions(
             competition_id=self.competition_id, constraints={"selected_for_private": True})
         current_ids = {str(s["id"]) for s in current}
-        if set(ids) != current_ids:
-            raise RuntimeError(f"线上私榜选择与输入包不一致：新增={sorted(current_ids-set(ids))}，取消={sorted(set(ids)-current_ids)}")
+        prepared_ids = set(ids)
+        has_selection_sources = all("selection_source" in record for record in records)
+        explicitly_prepared_ids = {
+            str(record["submission_id"])
+            for record in records
+            if record.get("selection_source") == "selected_for_private"
+        }
+        expected_selected_ids = (
+            explicitly_prepared_ids if has_selection_sources else prepared_ids
+        )
+        if expected_selected_ids != current_ids:
+            raise RuntimeError(
+                "线上私榜主动选择与输入包不一致："
+                f"新增={sorted(current_ids-expected_selected_ids)}，"
+                f"取消={sorted(expected_selected_ids-current_ids)}"
+            )
         if not records:
             raise RuntimeError("没有私榜提交")
         if self.rerun_ids - set(ids):
@@ -236,11 +250,11 @@ class PrivateJudge(JudgeBase):
         if self.resume:
             manifest = self._read(self.manifest_path)
             previous_ids = set(manifest.get("selected_submission_ids", []))
-            if previous_ids != current_ids:
+            if previous_ids != prepared_ids:
                 raise RuntimeError(
                     "续跑批次的 submission 集合已改变："
-                    f"新增={sorted(current_ids - previous_ids)}，"
-                    f"移除={sorted(previous_ids - current_ids)}"
+                    f"新增={sorted(prepared_ids - previous_ids)}，"
+                    f"移除={sorted(previous_ids - prepared_ids)}"
                 )
             input_batch_changed = manifest.get("input_batch_id") != metadata.get("batch_id")
             if input_batch_changed and not self.rerun_ids:
