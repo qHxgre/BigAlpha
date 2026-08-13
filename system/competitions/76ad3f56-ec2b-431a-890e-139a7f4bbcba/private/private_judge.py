@@ -293,13 +293,10 @@ class PrivateJudge(JudgeBase):
             return None
         return row
 
-    def _failed_sfa_result(self, submission: dict, record: dict) -> dict | None:
+    def _failed_sfa_result(self, submission: dict) -> dict | None:
         """旧 submission 没有私榜结果时，复用其明确失败的 SFA 状态。"""
         sid = str(submission["id"])
-        candidate_paths = [
-            os.path.join(self.submission_path(submission), "sfa_status.json"),
-            os.path.join(self.input_dir, record["relative_path"], "sfa_status.json"),
-        ]
+        path = os.path.join(self.submission_path(submission), "sfa_status.json")
         failure_statuses = {
             "failed",
             "user_error",
@@ -308,29 +305,27 @@ class PrivateJudge(JudgeBase):
             "env_error",
             "lookahead",
         }
-        for path in candidate_paths:
-            if not os.path.isfile(path):
-                continue
-            try:
-                with open(path, encoding="utf-8") as reader:
-                    status_data = json.load(reader)
-            except (OSError, json.JSONDecodeError):
-                continue
-            sfa_status = str(status_data.get("status") or "").strip().lower()
-            if sfa_status not in failure_statuses:
-                continue
-            error = status_data.get("error") or f"public SFA status: {sfa_status}"
-            return {
-                "submission_id": sid,
-                "user_id": submission.get("user_id"),
-                "status": "failed",
-                "error": error,
-                "sfa_status": sfa_status,
-                "elapsed_seconds": status_data.get("elapsed_seconds"),
-                "started_at": status_data.get("started_at"),
-                "finished_at": status_data.get("finished_at"),
-            }
-        return None
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, encoding="utf-8") as reader:
+                status_data = json.load(reader)
+        except (OSError, json.JSONDecodeError):
+            return None
+        sfa_status = str(status_data.get("status") or "").strip().lower()
+        if sfa_status not in failure_statuses:
+            return None
+        error = status_data.get("error") or f"public SFA status: {sfa_status}"
+        return {
+            "submission_id": sid,
+            "user_id": submission.get("user_id"),
+            "status": "failed",
+            "error": error,
+            "sfa_status": sfa_status,
+            "elapsed_seconds": status_data.get("elapsed_seconds"),
+            "started_at": status_data.get("started_at"),
+            "finished_at": status_data.get("finished_at"),
+        }
 
     def _save_scores(self, rows: list[dict]) -> None:
         a_scores = compute_a_scores(rows)
@@ -538,7 +533,7 @@ class PrivateJudge(JudgeBase):
                     rows_by_id[sid] = completed
                     continue
                 if self.resume and sid not in new_submission_ids and sid not in self.rerun_submission_ids:
-                    failed = self._failed_sfa_result(submission, records_by_id[sid])
+                    failed = self._failed_sfa_result(submission)
                     if failed is not None:
                         progress["completed"] += 1
                         rows_by_id[sid] = failed
