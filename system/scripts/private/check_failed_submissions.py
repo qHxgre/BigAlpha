@@ -33,7 +33,6 @@ batch_id = "20260812_180129"
 # competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 # batch_id = "20260812_180115"
 
-
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"
 OUTPUT_ROOT = FILES_DIR / "scripts" / "private"
