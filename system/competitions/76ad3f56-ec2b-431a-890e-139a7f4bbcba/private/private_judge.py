@@ -439,16 +439,14 @@ class PrivateJudge(JudgeBase):
                 previous_manifest = json.load(reader)
             if previous_manifest.get("competition_id") != self.competition_id:
                 raise RuntimeError("续跑批次的 competition_id 不匹配")
-            previous_ids = {
-                str(sid) for sid in (previous_manifest.get("selected_submission_ids") or [])
+            # manifest 记录的是当时选中的集合，不代表 submission 实际已经进入过
+            # 当前 batch。是否为新增提交，应以运行目录中是否已有对应目录为准。
+            existing_batch_ids = {
+                str(name)
+                for name in os.listdir(self.submission_dir)
+                if os.path.isdir(os.path.join(self.submission_dir, name))
             }
-            removed_ids = sorted(previous_ids - current_id_set)
-            if removed_ids:
-                raise RuntimeError(
-                    "续跑批次不能删除已有 submission，缺少: "
-                    f"{removed_ids}"
-                )
-            new_submission_ids = current_id_set - previous_ids
+            new_submission_ids = current_id_set - existing_batch_ids
             if (
                 previous_manifest.get("published")
                 and not new_submission_ids
