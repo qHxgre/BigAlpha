@@ -433,7 +433,11 @@ class PrivateJudge(JudgeBase):
             raise RuntimeError(f"每个用户最多选择两个 submission: {violations}")
 
         write_json(os.path.join(self.run_dir, "submissions.json"), submissions)
-        new_submission_ids: set[str] = set(current_id_set)
+        # submissions 包含主动选择和按公榜成绩自动入选的全部固化提交。
+        # current_id_set 只包含线上 selected_for_private=True 的主动选择项，不能
+        # 用它判断本批次新增提交，否则首次出现的自动入选 submission 会被误判为
+        # “批次中已有”，即使 submissions/<sid> 目录实际上并不存在。
+        new_submission_ids: set[str] = set(prepared_id_set)
         if self.resume:
             with open(self.manifest_path, encoding="utf-8") as reader:
                 previous_manifest = json.load(reader)
@@ -446,7 +450,7 @@ class PrivateJudge(JudgeBase):
                 for name in os.listdir(self.submission_dir)
                 if os.path.isdir(os.path.join(self.submission_dir, name))
             }
-            new_submission_ids = current_id_set - existing_batch_ids
+            new_submission_ids = prepared_id_set - existing_batch_ids
             if (
                 previous_manifest.get("published")
                 and not new_submission_ids
