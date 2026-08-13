@@ -107,10 +107,14 @@ class CheckPaths:
     run_dir: Path
     prepared_dir: Path
     private_code_dir: Path
+    public_leaderboard_dir: Path | None = None
     bigalpha_eval_src: Path | None = None
 
     def __post_init__(self) -> None:
-        for name in ("run_dir", "prepared_dir", "private_code_dir", "bigalpha_eval_src"):
+        for name in (
+            "run_dir", "prepared_dir", "private_code_dir", "public_leaderboard_dir",
+            "bigalpha_eval_src",
+        ):
             value = getattr(self, name)
             if value is not None:
                 object.__setattr__(self, name, _resolved(value))
@@ -151,6 +155,18 @@ class CheckPaths:
     @property
     def team_private_leaderboard_path(self) -> Path:
         return self.artifacts_dir / TEAM_PRIVATE_LEADERBOARD_FILENAME
+
+    @property
+    def public_summary_path(self) -> Path:
+        if self.public_leaderboard_dir is None:
+            raise ValueError("未配置公榜 leaderboard 目录")
+        return self.public_leaderboard_dir / SUMMARY_FILENAME
+
+    @property
+    def public_regression_path(self) -> Path:
+        if self.public_leaderboard_dir is None:
+            raise ValueError("未配置公榜 leaderboard 目录")
+        return self.public_leaderboard_dir / REGRESSION_FILENAME
 
     @property
     def regression_rerun_dir(self) -> Path:
@@ -212,6 +228,7 @@ def build_config() -> ManualCheckConfig:
         run_dir=competition_files / "private" / "runs" / RUN_ID,
         prepared_dir=competition_files / "private" / "prepared",
         private_code_dir=private_code_dir,
+        public_leaderboard_dir=files_dir / "public" / COMPETITION_ID / "leaderboard",
         bigalpha_eval_src=workspace / "eval" / "bigalpha_eval" / "src",
     )
     return ManualCheckConfig(paths=paths)

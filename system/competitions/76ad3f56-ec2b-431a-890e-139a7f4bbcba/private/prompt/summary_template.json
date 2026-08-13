@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "competition_id": "76ad3f56-ec2b-431a-890e-139a7f4bbcba",
+  "generated_at": null,
+  "ranking_basis": {"entity": null, "source": null, "description": null},
+  "statistics": {
+    "submission_count": 0,
+    "completed_count": 0,
+    "partial_count": 0,
+    "unanalyzable_count": 0,
+    "track_unverifiable_count": 0,
+    "future_data_risk_count": 0,
+    "compliance_status_counts": {"符合": 0, "违规": 0, "可疑": 0, "无法核验": 0, "不适用": 0}
+  },
+  "rankings": [{
+    "rank": null,
+    "team_id": null,
+    "team_name": null,
+    "team_score": null,
+    "members": [{"member_id": null, "member_name": null, "school": null, "major": null, "education": null, "email": null, "phone": null}],
+    "submissions": [{
+      "submission_id": null,
+      "member_id": null,
+      "score": null,
+      "submission_rank": null,
+      "declared_track": null,
+      "factor_name": null,
+      "approach_type": "无法确认",
+      "method_families": [],
+      "quality_score": null,
+      "quality_level": "无法评价",
+      "compliance_status": "无法核验",
+      "logic_summary": null,
+      "quality_summary": null,
+      "compliance_summary": null,
+      "key_risks": [],
+      "confirmed_issues": [],
+      "suspicions": [],
+      "unverifiable_items": [],
+      "submission_markdown": null,
+      "submission_json": null
+    }],
+    "ranking_summary": null
+  }],
+  "cross_submission_comparison": {
+    "track_patterns": [],
+    "approach_patterns": [],
+    "data_usage_patterns": [],
+    "temporal_and_leakage_comparison": [],
+    "quality_comparison": [],
+    "reproducibility_comparison": [],
+    "innovation_comparison": [],
+    "similarity_observations": []
+  },
+  "global_risks": [{"severity": null, "submission_id": null, "team_id": null, "category": null, "status": null, "description": null, "manual_review": null}]
+}

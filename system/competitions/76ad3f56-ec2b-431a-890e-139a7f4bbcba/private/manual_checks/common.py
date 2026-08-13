@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from collections.abc import Iterable
 
@@ -20,21 +19,19 @@ def read_final(paths: CheckPaths) -> pd.DataFrame:
 
 
 def read_public_scores(paths: CheckPaths) -> pd.DataFrame:
-    """从准备阶段元数据读取所选私榜提交对应的公榜分数。"""
-    metadata = json.loads(paths.metadata_path.read_text(encoding="utf-8"))
-    rows = [
-        {
-            "submission_id": str(item.get("submission_id") or ""),
-            "public_score": item.get("public_score"),
-        }
-        for item in metadata.get("submissions", [])
-        if item.get("submission_id")
-    ]
-    data = pd.DataFrame(rows, columns=["submission_id", "public_score"])
-    data["public_score"] = pd.to_numeric(data["public_score"], errors="coerce")
+    """从公榜 leaderboard 读取每个 submission 的完整得分明细。"""
+    path = paths.public_summary_path
+    if not path.is_file():
+        raise FileNotFoundError(f"公榜得分明细不存在: {path}")
+    columns = ["submission_id", *METRICS, "a_score", "b_score", "score"]
+    data = pd.read_csv(path, dtype={"submission_id": str}, usecols=columns).rename(
+        columns={"score": "public_score"}
+    )
+    for column in [*METRICS, "a_score", "b_score", "public_score"]:
+        data[column] = pd.to_numeric(data[column], errors="coerce")
     duplicates = data.loc[data["submission_id"].duplicated(keep=False), "submission_id"].unique()
     if len(duplicates):
-        raise ValueError(f"metadata.json 中存在重复 submission_id：{', '.join(duplicates)}")
+        raise ValueError(f"公榜 submissions_summary.csv 中存在重复 submission_id：{', '.join(duplicates)}")
     return data
 
 
@@ -42,6 +39,20 @@ def read_regression(paths: CheckPaths) -> pd.DataFrame:
     data = pd.read_csv(paths.regression_path, dtype={"factor": str}, encoding="utf-8-sig")
     for metric in REGRESSION_METRICS:
         data[metric] = pd.to_numeric(data.get(metric), errors="coerce")
+    return data
+
+
+def read_public_regression(paths: CheckPaths) -> pd.DataFrame:
+    """读取公榜 B 项逐 submission 回归指标。"""
+    path = paths.public_regression_path
+    if not path.is_file():
+        raise FileNotFoundError(f"公榜 B 项明细不存在: {path}")
+    data = pd.read_csv(path, dtype={"factor": str}, encoding="utf-8-sig")
+    for metric in REGRESSION_METRICS:
+        data[metric] = pd.to_numeric(data.get(metric), errors="coerce")
+    duplicates = data.loc[data["factor"].duplicated(keep=False), "factor"].unique()
+    if len(duplicates):
+        raise ValueError(f"公榜 leaderboard_reg.csv 中存在重复 factor：{', '.join(duplicates)}")
     return data
 
 

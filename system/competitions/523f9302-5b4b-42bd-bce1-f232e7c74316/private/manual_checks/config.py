@@ -31,6 +31,7 @@ PROCESS_POOL_FILENAME = "score_pool.parquet"
 RAW_POOL_FILENAME = "score_pool_raw.parquet"
 METADATA_FILENAME = "metadata.json"
 REPORT_FILENAME = "manual_check_report.md"
+TEAM_PRIVATE_LEADERBOARD_FILENAME = "team_private_leaderboard.csv"
 SIMILARITY_SUMMARY_FILENAME = "prediction_similarity_summary.csv"
 
 
@@ -43,10 +44,13 @@ class CheckPaths:
     run_dir: Path
     prepared_dir: Path
     private_code_dir: Path
+    public_leaderboard_dir: Path | None = None
 
     def __post_init__(self) -> None:
-        for name in ("run_dir", "prepared_dir", "private_code_dir"):
-            object.__setattr__(self, name, _resolved(getattr(self, name)))
+        for name in ("run_dir", "prepared_dir", "private_code_dir", "public_leaderboard_dir"):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, _resolved(value))
 
     @property
     def artifacts_dir(self) -> Path:
@@ -79,6 +83,16 @@ class CheckPaths:
     @property
     def report_path(self) -> Path:
         return self.artifacts_dir / REPORT_FILENAME
+
+    @property
+    def team_private_leaderboard_path(self) -> Path:
+        return self.artifacts_dir / TEAM_PRIVATE_LEADERBOARD_FILENAME
+
+    @property
+    def public_summary_path(self) -> Path:
+        if self.public_leaderboard_dir is None:
+            raise ValueError("未配置公榜 leaderboard 目录")
+        return self.public_leaderboard_dir / SUMMARY_FILENAME
 
     @property
     def similarity_path(self) -> Path:
@@ -114,6 +128,7 @@ def build_config() -> ManualCheckConfig:
         run_dir=competition_files / "private" / "runs" / RUN_ID,
         prepared_dir=competition_files / "private" / "prepared",
         private_code_dir=private_dir,
+        public_leaderboard_dir=files_dir / "public" / COMPETITION_ID / "leaderboard",
     ))
 
 

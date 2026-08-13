@@ -17,6 +17,7 @@ from .ranking import (
     compare_public_private_ranking,
 )
 from .similarity import analyze_prediction_similarity
+from .team_private_leaderboard import build_team_private_leaderboard
 
 
 def _format(value) -> str:
@@ -84,6 +85,7 @@ def generate_markdown_report(
     similarity = analyze_prediction_similarity(paths, save=True, display=False) if run_similarity else pd.DataFrame()
     summary, score, final = read_summary(paths), read_score(paths), read_final(paths)
     participant = _participants(paths)
+    participant_submission_detail = build_team_private_leaderboard(paths)
 
     ranking = conflicts.merge(participant, on="submission_id", how="left")
     public_private = public_private.merge(participant, on="submission_id", how="left")
@@ -121,6 +123,9 @@ def generate_markdown_report(
                                "participant", "schools", "status", "failure_type", "error",
                                "private_score", "public_score", "score_delta",
                                "public_score_found"]]), "",
+        "### 参赛方逐 submission 公榜/私榜指标明细", "",
+        "本比赛没有 A/B 或回归 B 项评分；下表展示实际评分使用的四项指标及总分。", "",
+        _table(participant_submission_detail), "",
         "## 4. 综合榜单与指标排名", "",
         _table(ranking[["final_rank", "submission_id", "participant", "schools", "score", *METRICS,
                         "metric_rank_spread", "max_metric_final_gap"]], CONFIG.report_top_n), "",

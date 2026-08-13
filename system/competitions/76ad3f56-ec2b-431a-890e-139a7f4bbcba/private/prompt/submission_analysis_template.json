@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.0.0",
+  "submission_id": null,
+  "team": {"team_id": null, "team_name": null},
+  "member": {"member_id": null, "member_name": null, "school": null},
+  "competition_result": {"score": null, "official_rank": null, "rank_source": "unavailable"},
+  "analysis_scope": {"status": "无法分析", "confidence": "低", "confidence_reason": null, "unreadable_or_binary_files": []},
+  "solution_overview": {
+    "summary": null,
+    "declared_track": null,
+    "factor_name": null,
+    "factor_direction": null,
+    "approach_type": "无法确认",
+    "method_families": [],
+    "economic_or_model_rationale": null,
+    "core_ideas": [],
+    "execution_flow": [{"step": null, "component": null, "file": null, "symbol": null, "lines": null, "input": null, "operation": null, "output": null}]
+  },
+  "files": [{"path": null, "size_bytes": null, "category": null, "purpose": null, "readable": null}],
+  "data_and_factor": {
+    "datasources": [],
+    "frequencies": [],
+    "raw_fields": [],
+    "instrument_scope": null,
+    "time_scope": null,
+    "preprocessing_steps": [],
+    "factor_construction": [],
+    "intraday_to_daily_aggregation": null,
+    "cross_sectional_processing": [],
+    "normalization": null,
+    "missing_value_handling": null,
+    "warmup_handling": null,
+    "output_frequency": null,
+    "output_contract": null
+  },
+  "temporal_analysis": {
+    "lookback_windows": [{"data_or_feature": null, "window_size": null, "unit": null, "evidence": null}],
+    "information_availability": [],
+    "pit_handling": null,
+    "date_alignment": null,
+    "future_data_risk": "无法核验",
+    "reason": null
+  },
+  "model_or_ai_analysis": {
+    "uses_model_or_ai": null,
+    "architecture_or_algorithm": null,
+    "features": [],
+    "label_definition": null,
+    "prediction_horizon": null,
+    "training_split": null,
+    "validation_and_selection": null,
+    "loss_or_objective": null,
+    "key_hyperparameters": {},
+    "random_seed": null,
+    "weight_or_artifact_provenance": null,
+    "ai_role_and_evidence": [],
+    "training_inference_consistency": null,
+    "retrainability": null
+  },
+  "quality_assessment": {
+    "overall_quality_score": null,
+    "overall_level": "无法评价",
+    "score_confidence": "低",
+    "dimensions": [{"dimension": null, "level": "无法评价", "analysis": null, "evidence": []}],
+    "strengths": [],
+    "weaknesses": [],
+    "improvement_suggestions": []
+  },
+  "consistency_and_reproducibility": {
+    "dependency_completeness": null,
+    "path_and_environment_portability": null,
+    "determinism": null,
+    "documentation_and_explainability": null,
+    "reproducibility_level": "无法评价",
+    "issues": []
+  },
+  "compliance_checks": [{"rule_id": null, "rule_name": null, "rule_requirement": null, "status": "无法核验", "analysis": null, "evidence": [{"type": null, "location": null, "description": null}]}],
+  "risk_assessment": {
+    "data_leakage_risk": "无法核验",
+    "external_data_risk": "无法核验",
+    "track_mismatch_risk": "无法核验",
+    "evaluation_gaming_risk": "无法核验",
+    "similarity_or_collusion_risk": "无法核验",
+    "risks": [{"category": null, "severity": "无法核验", "status": "无法核验", "description": null, "evidence": []}]
+  },
+  "innovation_analysis": {
+    "common_method_comparison": null,
+    "novelty_level": "无法评价",
+    "method_differences": [],
+    "economic_explainability": null,
+    "ai_application_depth": null,
+    "originality_confirmable": false,
+    "originality_reason": null
+  },
+  "findings": {"confirmed_issues": [], "suspicions": [], "unverifiable_items": [], "manual_review_recommendations": [{"priority": null, "target": null, "question": null, "suggested_method": null}]},
+  "final_assessment": {
+    "logic_summary": null,
+    "quality_summary": null,
+    "compliance_overall_status": "无法核验",
+    "compliance_summary": null,
+    "key_reasons": []
+  }
+}

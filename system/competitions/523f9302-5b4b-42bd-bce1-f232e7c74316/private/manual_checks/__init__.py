@@ -8,6 +8,11 @@ from .ranking import (
     compare_public_private_ranking,
 )
 from .similarity import analyze_prediction_similarity
+from .team_private_leaderboard import (
+    build_team_private_leaderboard,
+    build_team_private_report,
+    export_team_private_leaderboard,
+)
 
 
 def generate_markdown_report(*args, **kwargs):
@@ -22,5 +27,7 @@ __all__ = [
     "check_score_consistency", "analyze_metric_rank_conflicts",
     "analyze_metric_sensitivity", "compare_public_private_ranking",
     "analyze_prediction_similarity",
+    "build_team_private_leaderboard", "build_team_private_report",
+    "export_team_private_leaderboard",
     "generate_markdown_report",
 ]

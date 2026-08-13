@@ -29,12 +29,12 @@ from .config import (
 )
 from .factors import analyze_factor_similarity
 from .regression import analyze_regression_explainability
+from .team_private_leaderboard import build_team_private_report
 from .ranking import (
     analyze_a_metric_sensitivity,
     analyze_ab_weight_sensitivity,
     analyze_rank_conflicts,
     check_score_consistency,
-    compare_public_private_ranking,
 )
 
 
@@ -600,7 +600,7 @@ def generate_markdown_report(
     participants = _participant_lookup(paths)
     score_problems = check_score_consistency(paths, display=False)
     rank_conflicts = analyze_rank_conflicts(paths, display=False)
-    public_private = compare_public_private_ranking(paths, display=False)
+    team_private_report = build_team_private_report(paths)
     ab_sensitivity = analyze_ab_weight_sensitivity(paths, display=False)
     a_metric_sensitivity = analyze_a_metric_sensitivity(paths, display=False)
     cross_similarity_path = paths.incremental_dir / FACTOR_SIMILARITY_SUMMARY_FILENAME
@@ -744,9 +744,6 @@ def generate_markdown_report(
     ]
     top_comparison = top_comparison.merge(participants, on="submission_id", how="left")
 
-    public_private = public_private.merge(participants, on="submission_id", how="left")
-    public_private["participant"] = public_private["participant"].fillna("（未匹配）")
-    public_private["schools"] = public_private["schools"].fillna("（未匹配）")
     top_comparison["participant"] = top_comparison["participant"].fillna("（未匹配）")
     top_comparison["schools"] = top_comparison["schools"].fillna("（未匹配）")
     largest_score_divergence = top_comparison.loc[top_comparison["b_minus_a"].abs().idxmax()]
@@ -755,6 +752,75 @@ def generate_markdown_report(
     ]
     b_driven_count = int(top_comparison["b_minus_a"].gt(0).sum())
     high_sensitivity_count = int(top_comparison["sensitivity"].eq("高").sum())
+    team_rows = []
+    for team in team_private_report["teams"]:
+        correlation = team["correlation_summary"]
+        top_pair = correlation.get("top_pair") or {}
+        team_rows.append({
+            "私榜排名": int(team["private_rank"]) if team["private_rank"] is not None else pd.NA,
+            "团队": team["team_name"],
+            "提交数": team["submission_count"],
+            "私榜最高分": team["best_private_score"],
+            "公榜排名": team["public_rank"],
+            "公榜分": team["public_score"],
+            "平均绝对相关": correlation["mean_abs_correlation"],
+            "最大绝对相关": correlation["max_abs_correlation"],
+            "高相关对": correlation["high_correlation_pair_count"],
+            "最高相关提交对": (
+                f"{str(top_pair.get('submission_id_1', ''))[:8]} ↔ "
+                f"{str(top_pair.get('submission_id_2', ''))[:8]}"
+                if top_pair else ""
+            ),
+        })
+    team_diagnostic = pd.DataFrame(team_rows)
+    teams_with_multiple_submissions = team_diagnostic.loc[team_diagnostic["提交数"].gt(1)]
+    teams_with_high_correlation = team_diagnostic.loc[team_diagnostic["高相关对"].gt(0)]
+    valid_team_correlations = teams_with_multiple_submissions.dropna(subset=["最大绝对相关"])
+    highest_team_correlation = (
+        valid_team_correlations.loc[valid_team_correlations["最大绝对相关"].idxmax()]
+        if not valid_team_correlations.empty else None
+    )
+    team_display = team_diagnostic.head(top_n)
+    submission_score_rows = []
+    for team in team_private_report["teams"]:
+        for submission in team["submissions"]:
+            private = submission["private_score_detail"]
+            public = submission["public_score_detail"]
+            private_b = submission["private_b_detail"]
+            public_b = submission["public_b_detail"]
+            submission_score_rows.append({
+                "团队": team["team_name"],
+                "submission_id": submission["submission_id"],
+                "榜单": "私榜",
+                "IC均值": private.get("ic_mean"),
+                "ICIR": private.get("ic_ir"),
+                "夏普": private.get("sharpe_ratio"),
+                "压力ICIR": private.get("stress_ic_ir"),
+                "A分": private.get("a_score"),
+                "B分": private.get("b_score"),
+                "B模型得分": private_b.get("model_score"),
+                "B平均绝对权重": private_b.get("abs_weight_mean"),
+                "B权重标准差": private_b.get("abs_weight_std"),
+                "B入选率": private_b.get("selection_rate"),
+                "最终分": private.get("final_score"),
+            })
+            submission_score_rows.append({
+                "团队": team["team_name"],
+                "submission_id": submission["submission_id"],
+                "榜单": "公榜",
+                "IC均值": public.get("ic_mean"),
+                "ICIR": public.get("ic_ir"),
+                "夏普": public.get("sharpe_ratio"),
+                "压力ICIR": public.get("stress_ic_ir"),
+                "A分": public.get("a_score"),
+                "B分": public.get("b_score"),
+                "B模型得分": public_b.get("model_score"),
+                "B平均绝对权重": public_b.get("abs_weight_mean"),
+                "B权重标准差": public_b.get("abs_weight_std"),
+                "B入选率": public_b.get("selection_rate"),
+                "最终分": public.get("final_score"),
+            })
+    submission_score_detail = pd.DataFrame(submission_score_rows)
     top_diagnostic = pd.DataFrame({
         "排名": top_comparison["final_rank"].astype(int),
         "队伍/个人": top_comparison["participant"],
@@ -897,23 +963,42 @@ def generate_markdown_report(
         *_chart(figures["02_score_consistency"], output, "全量正式分数分布"),
         _table(score_problems, limit=top_n),
         "",
-        "## 3. 公榜与私榜得分排名差异",
+        "## 3. 团队私榜提交与内部相关性",
         "",
         "### 怎么分析",
         "",
-        "以私榜执行清单中的 submission id 为主匹配公榜成绩，展示全部提交，包括私榜失败项。"
-        "`score_delta = private_score - public_score`；`rank_delta = private_rank - public_rank`，"
-        "排名差为正表示私榜名次下降。私榜总分使用 `final_score`，并同时保留 A 分和 B 分。",
+        "每个团队按其所有入围私榜 submission 统计提交数，并以团队内最高 `final_score` 生成私榜排名。"
+        "相关性先在每个交易日对两个 submission 的股票截面因子值计算 Pearson 相关，"
+        "再跨交易日计算平均绝对相关；团队平均值和最大值均基于团队内部所有 submission 两两组合。"
+        f"绝对相关达到 `{high_correlation:.2f}` 的组合记为高相关对。正负相关都代表较强线性关系，"
+        "因此团队汇总使用绝对值；相关方向仍保留在团队私榜 JSON 的最高相关提交对中。",
         "",
-        f"- 公榜分数匹配：**{int(public_private['public_score_found'].sum())}/{len(public_private)}**。",
-        f"- 私榜成功：**{int(public_private['status'].eq('success').sum())}**；"
-        f"私榜失败：**{int(public_private['status'].ne('success').sum())}**。",
+        "### 自动观察",
         "",
-        _table(public_private[[
-            "private_rank", "public_rank", "rank_delta", "submission_id", "participant",
-            "schools", "status", "error", "a_score", "b_score", "private_score",
-            "public_score", "score_delta", "public_score_found",
-        ]]),
+        f"- 共 **{team_private_report['team_count']}** 个团队、**{team_private_report['submission_count']}** 个团队提交；"
+        f"其中 **{len(teams_with_multiple_submissions)}** 个团队有至少 2 个 submission，可计算团队内相关性。",
+        f"- 有 **{len(teams_with_high_correlation)}** 个团队至少存在一对平均绝对相关不低于 "
+        f"**{high_correlation:.2f}** 的 submission。",
+        (
+            f"- 团队内最大相关性最高的是 **{highest_team_correlation['团队']}**，最大平均绝对相关为 "
+            f"**{highest_team_correlation['最大绝对相关']:.6f}**，对应提交对 "
+            f"`{highest_team_correlation['最高相关提交对']}`。"
+            if highest_team_correlation is not None else
+            "- 当前没有可用的团队内 submission 相关性结果。"
+        ),
+        "",
+        f"### 私榜前 {len(team_display)} 个团队概览",
+        "",
+        _table(team_display),
+        "",
+        "### 全部团队 submission 公榜/私榜逐项得分",
+        "",
+        _table(submission_score_detail),
+        "",
+        "公榜 A 项明细读取自 `public_leaderboard_dir/submissions_summary.csv`，"
+        "B 项明细读取自 `public_leaderboard_dir/leaderboard_reg.csv`。"
+        "完整逐 submission 数据也保存在 `team_private_leaderboard.csv`；"
+        "精简后的团队摘要和 submission 得分保存在 `team_private_leaderboard.json`。",
         "",
         "## 4. 头部榜单得分结构与竞争区间",
         "",
