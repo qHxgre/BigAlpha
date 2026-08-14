@@ -1,10 +1,10 @@
 
 Competition_ID: `523f9302-5b4b-42bd-bce1-f232e7c74316`
-Batch_ID: `20260811_104853`
+Batch_ID: `20260812_180115`
 
 本次分析生成的全部文件统一保存到：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis`
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115/artifacts/coder_analysis`
 
 阅读以下赛道介绍，并据此生成一份供第二阶段审查 submission 使用的简明规则摘要：
 
@@ -28,6 +28,6 @@ Batch_ID: `20260811_104853`
 
 将规则摘要写入：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis/rules_summary.md`
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115/artifacts/coder_analysis/rules_summary.md`
 
 写入完成后，只输出规则摘要文件路径和一段简短说明，然后立即停止。此阶段严禁读取 `metadata.json`、submission 目录或参赛代码，也不得生成 submission 或团队分析报告。

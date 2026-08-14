@@ -17,7 +17,7 @@ submission 根目录：
 
 规则摘要：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis/rules_summary.md`
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115/artifacts/coder_analysis/rules_summary.md`
 
 参赛者信息：
 
@@ -29,7 +29,7 @@ submission、用户与团队关联信息：
 
 输出目录：
 
-`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260811_104853/artifacts/coder_analysis`
+`/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115/artifacts/coder_analysis`
 
 JSON 模板：
 
