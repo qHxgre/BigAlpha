@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 
 from .common import read_final, read_public_scores, read_score, read_summary
-from .config import METRICS, PATHS, TEAM_PRIVATE_LEADERBOARD_FILENAME, CheckPaths
+from .config import METRICS, PATHS, CheckPaths
 
 
 CSV_COLUMNS = [
@@ -19,6 +19,11 @@ CSV_COLUMNS = [
     "私榜排名（全部提交）", "是否参赛方最佳私榜提交", "评测状态", "失败类型", "评测错误",
     "私榜得分", *[f"私榜{metric}" for metric in METRICS],
     "公榜得分（submission）", *[f"公榜{metric}" for metric in METRICS], "私榜减公榜",
+]
+
+TEAM_SUMMARY_COLUMNS = [
+    "团队名", "团队成员及学校", "团队私榜提交数量", "团队私榜得分", "团队私榜排名",
+    "团队公榜得分", "团队公榜排名",
 ]
 
 
@@ -136,6 +141,40 @@ def build_team_private_leaderboard(paths: CheckPaths = PATHS) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CSV_COLUMNS)
 
 
+def build_team_leaderboard_summary(paths: CheckPaths = PATHS) -> pd.DataFrame:
+    """生成仅含团队的公私榜摘要；公榜分数取团队最佳私榜提交对应的公榜分。"""
+    report = build_team_private_report(paths)
+    rows = []
+    for participant in report["participants"]:
+        if participant["participant_type"] != "team":
+            continue
+        best_submission = next(
+            (
+                sub for sub in participant["submissions"]
+                if sub["submission_id"] == participant["best_private_submission_id"]
+            ),
+            None,
+        )
+        rows.append({
+            "团队名": participant["participant_name"],
+            "团队成员及学校": _members_cell(participant["members"]),
+            "团队私榜提交数量": participant["submission_count"],
+            "团队私榜得分": participant["best_private_score"],
+            "团队私榜排名": participant["private_rank"],
+            "团队公榜得分": best_submission["public_score"] if best_submission else None,
+            "团队公榜排名": None,
+        })
+    summary = pd.DataFrame(rows, columns=TEAM_SUMMARY_COLUMNS)
+    if not summary.empty:
+        summary["团队公榜排名"] = summary["团队公榜得分"].rank(
+            ascending=False, method="min", na_option="bottom"
+        )
+        summary = summary.sort_values(
+            ["团队私榜排名", "团队名"], na_position="last", kind="stable"
+        ).reset_index(drop=True)
+    return summary
+
+
 def _fmt(value: Any) -> str:
     if value is None or pd.isna(value):
         return "—"
@@ -175,14 +214,25 @@ def _markdown(report: dict[str, Any]) -> str:
 def export_team_private_leaderboard(
     paths: CheckPaths = PATHS, *, output: str | Path | None = None,
     json_output: str | Path | None = None, markdown_output: str | Path | None = None,
+    team_summary_output: str | Path | None = None,
 ) -> dict[str, Path]:
     csv_path = Path(output).expanduser().resolve() if output else paths.team_private_leaderboard_path
     json_path = Path(json_output).expanduser().resolve() if json_output else csv_path.with_suffix(".json")
     md_path = Path(markdown_output).expanduser().resolve() if markdown_output else csv_path.with_suffix(".md")
+    team_summary_path = (
+        Path(team_summary_output).expanduser().resolve()
+        if team_summary_output else paths.team_leaderboard_summary_path
+    )
     report = build_team_private_report(paths)
-    for path in (csv_path, json_path, md_path):
+    for path in (csv_path, json_path, md_path, team_summary_path):
         path.parent.mkdir(parents=True, exist_ok=True)
     build_team_private_leaderboard(paths).to_csv(csv_path, index=False, encoding="utf-8-sig")
+    build_team_leaderboard_summary(paths).to_csv(
+        team_summary_path, index=False, encoding="utf-8-sig"
+    )
     json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     md_path.write_text(_markdown(report), encoding="utf-8")
-    return {"csv": csv_path, "json": json_path, "markdown": md_path}
+    return {
+        "csv": csv_path, "json": json_path, "markdown": md_path,
+        "team_summary_csv": team_summary_path,
+    }

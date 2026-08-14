@@ -23,6 +23,12 @@ from .style_exposure import (
     plot_style_exposure_results,
     save_style_exposure_results,
 )
+from .team_private_leaderboard import (
+    build_team_leaderboard_summary,
+    build_team_private_leaderboard,
+    build_team_private_report,
+    export_team_private_leaderboard,
+)
 from .visualization import plot_regression_overview, rerun_regression_explanation
 
 
@@ -45,4 +51,6 @@ __all__ = [
     "load_style_exposure_results", "plot_style_exposure_results", "save_style_exposure_results",
     "analyze_b_score_robustness", "plot_regression_overview",
     "rerun_regression_explanation", "generate_markdown_report",
+    "build_team_leaderboard_summary", "build_team_private_leaderboard",
+    "build_team_private_report", "export_team_private_leaderboard",
 ]

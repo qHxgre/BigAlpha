@@ -32,6 +32,7 @@ RAW_POOL_FILENAME = "score_pool_raw.parquet"
 METADATA_FILENAME = "metadata.json"
 REPORT_FILENAME = "manual_check_report.md"
 TEAM_PRIVATE_LEADERBOARD_FILENAME = "team_private_leaderboard.csv"
+TEAM_LEADERBOARD_SUMMARY_FILENAME = "team_leaderboard_summary.csv"
 SIMILARITY_SUMMARY_FILENAME = "prediction_similarity_summary.csv"
 
 
@@ -87,6 +88,10 @@ class CheckPaths:
     @property
     def team_private_leaderboard_path(self) -> Path:
         return self.artifacts_dir / TEAM_PRIVATE_LEADERBOARD_FILENAME
+
+    @property
+    def team_leaderboard_summary_path(self) -> Path:
+        return self.artifacts_dir / TEAM_LEADERBOARD_SUMMARY_FILENAME
 
     @property
     def public_summary_path(self) -> Path:

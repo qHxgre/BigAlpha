@@ -42,6 +42,11 @@ CSV_COLUMNS = [
     "私榜减公榜",
 ]
 
+TEAM_SUMMARY_COLUMNS = [
+    "参赛类型", "团队名", "团队成员及学校", "团队私榜提交数量", "团队私榜得分",
+    "团队私榜排名", "团队公榜得分", "团队公榜排名",
+]
+
 
 def _clean(value: Any) -> Any:
     """把 numpy/pandas 标量和缺失值转换为可序列化的原生值。"""
@@ -360,6 +365,39 @@ def build_team_private_leaderboard(paths: CheckPaths = PATHS) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CSV_COLUMNS)
 
 
+def build_team_leaderboard_summary(paths: CheckPaths = PATHS) -> pd.DataFrame:
+    """生成团队和个人的公私榜摘要；公榜分取最佳私榜提交对应的公榜分。"""
+    report = build_team_private_report(paths)
+    rows: list[dict[str, Any]] = []
+    for participant in report["participants"]:
+        best_submission = next(
+            (
+                submission for submission in participant["submissions"]
+                if submission["submission_id"] == participant["best_private_submission_id"]
+            ),
+            None,
+        )
+        rows.append({
+            "参赛类型": "团队" if participant["participant_type"] == "team" else "个人",
+            "团队名": participant["participant_name"],
+            "团队成员及学校": _members_cell(participant["members"]),
+            "团队私榜提交数量": participant["submission_count"],
+            "团队私榜得分": participant["best_private_score"],
+            "团队私榜排名": participant["private_rank"],
+            "团队公榜得分": best_submission["public_score"] if best_submission else None,
+            "团队公榜排名": None,
+        })
+    summary = pd.DataFrame(rows, columns=TEAM_SUMMARY_COLUMNS)
+    if not summary.empty:
+        summary["团队公榜排名"] = summary["团队公榜得分"].rank(
+            ascending=False, method="min", na_option="bottom"
+        )
+        summary = summary.sort_values(
+            ["团队私榜排名", "参赛类型", "团队名"], na_position="last", kind="stable"
+        ).reset_index(drop=True)
+    return summary
+
+
 def _fmt(value: Any, digits: int = 5) -> str:
     if value is None or pd.isna(value):
         return "—"
@@ -442,12 +480,17 @@ def _markdown(report: dict[str, Any]) -> str:
 def export_team_private_leaderboard(
     paths: CheckPaths = PATHS, *, output: str | Path | None = None,
     json_output: str | Path | None = None, markdown_output: str | Path | None = None,
+    team_summary_output: str | Path | None = None,
 ) -> dict[str, Path]:
-    """同时生成 JSON、Markdown、CSV，返回三个输出路径。"""
+    """同时生成完整报告和团队公私榜摘要，返回各输出路径。"""
     csv_path = Path(output).expanduser().resolve() if output else paths.artifacts_dir / TEAM_PRIVATE_LEADERBOARD_FILENAME
     json_path = Path(json_output).expanduser().resolve() if json_output else csv_path.with_suffix(".json")
     md_path = Path(markdown_output).expanduser().resolve() if markdown_output else csv_path.with_suffix(".md")
-    for path in (csv_path, json_path, md_path):
+    team_summary_path = (
+        Path(team_summary_output).expanduser().resolve()
+        if team_summary_output else paths.team_leaderboard_summary_path
+    )
+    for path in (csv_path, json_path, md_path, team_summary_path):
         path.parent.mkdir(parents=True, exist_ok=True)
     report = build_team_private_report(paths)
     compact_report = build_compact_team_private_report(report)
@@ -478,7 +521,13 @@ def export_team_private_leaderboard(
                 "私榜减公榜": sub["score_delta"],
             })
     pd.DataFrame(rows, columns=CSV_COLUMNS).to_csv(csv_path, index=False, encoding="utf-8-sig")
-    return {"json": json_path, "markdown": md_path, "csv": csv_path}
+    build_team_leaderboard_summary(paths).to_csv(
+        team_summary_path, index=False, encoding="utf-8-sig"
+    )
+    return {
+        "json": json_path, "markdown": md_path, "csv": csv_path,
+        "team_summary_csv": team_summary_path,
+    }
 
 
 def main() -> int:
@@ -486,9 +535,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="CSV 输出路径；JSON/Markdown 默认使用同名后缀")
     parser.add_argument("--json-output", type=Path, help="JSON 输出路径")
     parser.add_argument("--markdown-output", type=Path, help="Markdown 输出路径")
+    parser.add_argument("--team-summary-output", type=Path, help="团队公私榜摘要 CSV 输出路径")
     args = parser.parse_args()
     outputs = export_team_private_leaderboard(
-        output=args.output, json_output=args.json_output, markdown_output=args.markdown_output
+        output=args.output, json_output=args.json_output, markdown_output=args.markdown_output,
+        team_summary_output=args.team_summary_output,
     )
     for kind, path in outputs.items():
         print(f"参赛主体私榜 {kind} 已生成：{path}")

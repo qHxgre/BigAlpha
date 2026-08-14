@@ -762,6 +762,7 @@ def generate_markdown_report(
             "队伍/个人": participant["participant_name"],
             "提交数": participant["submission_count"],
             "私榜最高分": participant["best_private_score"],
+            "私榜最高分 submission id": participant["best_private_submission_id"],
             "公榜排名": participant["public_rank"],
             "公榜分": participant["public_score"],
             "平均绝对相关": correlation["mean_abs_correlation"],
@@ -787,7 +788,7 @@ def generate_markdown_report(
         valid_participant_correlations.loc[valid_participant_correlations["最大绝对相关"].idxmax()]
         if not valid_participant_correlations.empty else None
     )
-    participant_display = participant_diagnostic.head(top_n)
+    participant_display = participant_diagnostic
     submission_score_rows = []
     for participant in team_private_report["participants"]:
         for submission in participant["submissions"]:
@@ -996,7 +997,7 @@ def generate_markdown_report(
             "- 当前没有可用的主体内 submission 相关性结果。"
         ),
         "",
-        f"### 私榜前 {len(participant_display)} 个参赛主体概览",
+        "### 全部参赛主体概览",
         "",
         _table(participant_display),
         "",

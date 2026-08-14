@@ -74,6 +74,7 @@ REGRESSION_FILENAME = "leaderboard_reg.csv"
 METADATA_FILENAME = "metadata.json"
 REPORT_FILENAME = "manual_check_report.md"
 TEAM_PRIVATE_LEADERBOARD_FILENAME = "team_private_leaderboard.csv"
+TEAM_LEADERBOARD_SUMMARY_FILENAME = "team_leaderboard_summary.csv"
 REGRESSION_RERUN_DIRNAME = "regression_rerun"
 RERUN_SUMMARY_FILENAME = "regression_rerun_summary.json"
 RERUN_COMPARISON_FILENAME = "regression_rerun_comparison.csv"
@@ -155,6 +156,10 @@ class CheckPaths:
     @property
     def team_private_leaderboard_path(self) -> Path:
         return self.artifacts_dir / TEAM_PRIVATE_LEADERBOARD_FILENAME
+
+    @property
+    def team_leaderboard_summary_path(self) -> Path:
+        return self.artifacts_dir / TEAM_LEADERBOARD_SUMMARY_FILENAME
 
     @property
     def public_summary_path(self) -> Path:
