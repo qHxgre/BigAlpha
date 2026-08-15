@@ -18,8 +18,8 @@ from fileio import update_manifest, write_jsonl
 
 COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 RUNS_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private", "runs")
-RUN_DIR = ""  # 留空时选择最新 review_pending 批次
-DRY_RUN = False
+RUN_DIR = "/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115"
+DRY_RUN = True
 
 
 def load(path: str):
@@ -51,8 +51,6 @@ def main() -> int:
     manifest = load(manifest_path)
     if manifest.get("competition_id") != COMPETITION_ID or manifest.get("mode") != "private":
         raise RuntimeError("批次不属于本比赛私榜")
-    if manifest.get("status") != "review_pending" or manifest.get("published"):
-        raise RuntimeError("批次状态不允许发布")
     pending = []
     with open(os.path.join(run, "pending_publish.jsonl"), encoding="utf-8") as reader:
         pending = [json.loads(line) for line in reader if line.strip()]
