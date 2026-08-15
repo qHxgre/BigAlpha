@@ -70,8 +70,14 @@ class Publisher:
             raise RuntimeError(f"runs directory does not exist: {self.RUNS_DIR}")
 
         candidates = []
-        for name in os.listdir(self.RUNS_DIR):
-            run_dir = os.path.join(self.RUNS_DIR, name)
+        for root, dirs, _files in os.walk(self.RUNS_DIR):
+            # submissions/artifacts 等内部目录不可能是批次根目录，无需继续递归。
+            dirs[:] = [
+                name
+                for name in dirs
+                if name not in {"submissions", "artifacts", "logs", "analyze"}
+            ]
+            run_dir = root
             manifest_path = os.path.join(run_dir, "manifest.json")
             pending_path = os.path.join(run_dir, "pending_publish.jsonl")
             if not os.path.isfile(manifest_path) or not os.path.isfile(pending_path):

@@ -102,9 +102,17 @@ RERUN_SUBMISSION_IDS = [
 其他原始文件只作为运行附件保留；私榜不会重新通过 API 下载文件，也不依赖预先生成的
 `submission_code.py`。
 
-程序会在
-`/home/aiuser/work/workspace/BigAlpha/system/files/76ad3f56-ec2b-431a-890e-139a7f4bbcba/private/runs/<batch_id>/`
-下保存批次产物：
+程序会按评测日期自动生成周期子目录，并在
+`/home/aiuser/work/workspace/BigAlpha/system/files/76ad3f56-ec2b-431a-890e-139a7f4bbcba/private/runs/<batch_id>/<YYYYMMDD_YYYYMMDD>/`
+下保存批次产物。例如 `2025-03-01` 至 `2025-11-30` 会写入
+`<batch_id>/20250301_20251130/`。因此同一个 `BATCH_ID` 可以保存多个独立周期，修改
+`DATE_START/DATE_END` 不会复用其他周期的 `result.json`。
+
+历史版本已经直接写在 `<batch_id>/` 根目录的批次仍然兼容：当根目录 manifest 中的
+起止日期与当前配置完全一致时，程序继续使用旧目录，不会搬迁或重跑已有结果。
+
+每个周期首次运行设置 `RESUME = False`；该周期中断后，保持相同日期并设置
+`RESUME = True` 即可续跑。批次产物包括：
 
 - `manifest.json`：批次状态、数据区间、数据表和提交数量；
 - `submissions.json`：本次入围提交快照；

@@ -25,6 +25,20 @@ COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 PRIVATE_FILES_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private")
 
 
+def _period_dir_name(date_start: str, date_end: str) -> str:
+    """把评测区间转换为稳定、可读的批次子目录名。"""
+    try:
+        start = datetime.fromisoformat(str(date_start)).strftime("%Y%m%d")
+        end = datetime.fromisoformat(str(date_end)).strftime("%Y%m%d")
+    except ValueError as exc:
+        raise RuntimeError(
+            f"DATE_START/DATE_END 格式错误: {date_start!r} -> {date_end!r}"
+        ) from exc
+    if start > end:
+        raise RuntimeError(f"DATE_START 不能晚于 DATE_END: {date_start} -> {date_end}")
+    return f"{start}_{end}"
+
+
 def _notebook_code(path: str) -> str:
     with open(path, encoding="utf-8") as reader:
         notebook = json.load(reader)
@@ -109,7 +123,23 @@ class PrivateJudge(JudgeBase):
         self.batch_id = str(batch_id).strip()
         if not self.batch_id:
             raise RuntimeError("batch_id 不能为空")
-        self.run_dir = os.path.join(self.RUNS_DIR, self.batch_id)
+        self.batch_dir = os.path.join(self.RUNS_DIR, self.batch_id)
+        self.period_id = _period_dir_name(self.DATE_START, self.DATE_END)
+        self.run_dir = os.path.join(self.batch_dir, self.period_id)
+        # 兼容已经完成的旧批次：历史版本直接把产物写在 BATCH_ID 根目录。
+        # 只有根 manifest 的日期与当前配置完全一致时才复用，其他日期始终进入子目录。
+        legacy_manifest_path = os.path.join(self.batch_dir, "manifest.json")
+        if os.path.isfile(legacy_manifest_path):
+            try:
+                with open(legacy_manifest_path, encoding="utf-8") as reader:
+                    legacy_manifest = json.load(reader)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(f"旧批次 manifest.json 无法读取: {legacy_manifest_path}") from exc
+            if (
+                legacy_manifest.get("date_start") == self.DATE_START
+                and legacy_manifest.get("date_end") == self.DATE_END
+            ):
+                self.run_dir = self.batch_dir
         self.resume = bool(resume)
         rerun_ids = [str(sid).strip() for sid in (rerun_submission_ids or [])]
         if any(not sid for sid in rerun_ids):

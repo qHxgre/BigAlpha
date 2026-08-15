@@ -29,8 +29,9 @@ from private_judge import PRIVATE_FILES_DIR, PrivateJudge
 # BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 BATCH_ID = "20260812_180129"
 
-# False：创建新批次；True：断点续跑或指定重跑 BATCH_ID 对应的已有批次。
-RESUME = True
+# False：为当前 DATE_START/DATE_END 创建新周期目录；True：续跑该周期目录。
+# 当前准备运行新周期，日期由运行前手动修改。
+RESUME = False
 
 # 仅在 RESUME = True 时生效。程序会删除这些 submission 的旧运行目录并强制重跑；
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
