@@ -20,6 +20,8 @@ COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 RUNS_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private", "runs")
 BATCH_ID = "20260812_180115"
 RUN_DIR = os.path.join(RUNS_DIR, BATCH_ID)
+# True：试运行，只校验并打印待发布分数，不调用 API、不修改 manifest。
+# False：正式发布；运行后仍需手工输入 PUBLISH，才会调用 API 更新私榜分数。
 DRY_RUN = True
 
 
