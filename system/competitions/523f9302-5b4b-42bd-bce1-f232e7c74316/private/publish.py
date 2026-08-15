@@ -18,7 +18,8 @@ from fileio import update_manifest, write_jsonl
 
 COMPETITION_ID = "523f9302-5b4b-42bd-bce1-f232e7c74316"
 RUNS_DIR = os.path.join(FILE_DIR, COMPETITION_ID, "private", "runs")
-RUN_DIR = "/Users/xiehao/Desktop/workspace/BigAlpha/system/files/private/523f9302-5b4b-42bd-bce1-f232e7c74316/private/runs/20260812_180115"
+BATCH_ID = "20260812_180115"
+RUN_DIR = os.path.join(RUNS_DIR, BATCH_ID)
 DRY_RUN = True
 
 
