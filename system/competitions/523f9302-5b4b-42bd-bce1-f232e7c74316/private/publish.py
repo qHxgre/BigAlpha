@@ -61,6 +61,27 @@ def main() -> int:
         raise RuntimeError("待发布列表为空")
     if len(pending) != int(manifest.get("submission_count") or 0):
         raise RuntimeError("待发布记录数量与批次 submission_count 不一致")
+
+    scores = [record.get("payload", {}).get("private_score") for record in pending]
+    failed_scores = [score for score in scores if score == -2]
+    successful_scores = [
+        score for score in scores
+        if isinstance(score, (int, float)) and not isinstance(score, bool) and score != -2
+    ]
+    invalid_scores = [score for score in scores if score != -2 and score not in successful_scores]
+
+    total = len(pending)
+    print("=== 待发布批次统计 ===")
+    print(f"批次 ID: {manifest.get('batch_id', BATCH_ID)}")
+    print(f"批次状态: {manifest.get('status')}")
+    print(f"Submission 总数: {total}")
+    print(f"评分成功: {len(successful_scores)} ({len(successful_scores) / total:.2%})")
+    print(f"评分失败（private_score=-2）: {len(failed_scores)} ({len(failed_scores) / total:.2%})")
+    print(f"无效分数: {len(invalid_scores)}")
+    if successful_scores:
+        print(f"正常分数范围: {min(successful_scores):.6f} ~ {max(successful_scores):.6f}")
+        print(f"正常分数平均值: {sum(successful_scores) / len(successful_scores):.6f}")
+    print("\n=== 待发布明细 ===")
     for record in pending:
         print(record["submission_id"], record["payload"].get("private_score"))
     if DRY_RUN:
