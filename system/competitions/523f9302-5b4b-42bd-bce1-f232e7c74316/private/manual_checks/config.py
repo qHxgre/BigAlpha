@@ -103,6 +103,22 @@ class CheckPaths:
     def similarity_path(self) -> Path:
         return self.artifacts_dir / SIMILARITY_SUMMARY_FILENAME
 
+    @property
+    def submission_source_path(self) -> Path:
+        return self.run_dir.parents[3] / "alphathon__submission.csv"
+
+    @property
+    def team_source_path(self) -> Path:
+        return self.run_dir.parents[3] / "alphathon__team.csv"
+
+    @property
+    def user_source_path(self) -> Path:
+        return self.run_dir.parents[4] / "scripts" / "private" / "alphathon__user.csv"
+
+    @property
+    def account_source_path(self) -> Path:
+        return self.run_dir.parents[3] / "bigauth__user.csv"
+
 
 @dataclass(frozen=True)
 class ManualCheckConfig:
@@ -133,7 +149,7 @@ def build_config() -> ManualCheckConfig:
         run_dir=competition_files / "private" / "runs" / RUN_ID,
         prepared_dir=competition_files / "private" / "prepared",
         private_code_dir=private_dir,
-        public_leaderboard_dir=files_dir / "public" / COMPETITION_ID / "leaderboard",
+        public_leaderboard_dir=files_dir / "public" / COMPETITION_ID,
     ))
 
 

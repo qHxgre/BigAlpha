@@ -12,6 +12,7 @@ from .team_private_leaderboard import (
     build_team_leaderboard_summary,
     build_team_private_leaderboard,
     build_team_private_report,
+    build_team_submission_detail,
     export_team_private_leaderboard,
 )
 
@@ -29,6 +30,7 @@ __all__ = [
     "analyze_metric_sensitivity", "compare_public_private_ranking",
     "analyze_prediction_similarity",
     "build_team_leaderboard_summary", "build_team_private_leaderboard", "build_team_private_report",
+    "build_team_submission_detail",
     "export_team_private_leaderboard",
     "generate_markdown_report",
 ]

@@ -17,7 +17,7 @@ from .ranking import (
     compare_public_private_ranking,
 )
 from .similarity import analyze_prediction_similarity
-from .team_private_leaderboard import build_team_private_leaderboard
+from .team_private_leaderboard import build_team_submission_detail
 
 
 def _format(value) -> str:
@@ -85,7 +85,7 @@ def generate_markdown_report(
     similarity = analyze_prediction_similarity(paths, save=True, display=False) if run_similarity else pd.DataFrame()
     summary, score, final = read_summary(paths), read_score(paths), read_final(paths)
     participant = _participants(paths)
-    participant_submission_detail = build_team_private_leaderboard(paths)
+    participant_submission_detail = build_team_submission_detail(paths)
 
     ranking = conflicts.merge(participant, on="submission_id", how="left")
     public_private = public_private.merge(participant, on="submission_id", how="left")

@@ -27,16 +27,17 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # 运行配置：每次只需修改这两个值。
 # ---------------------------------------------------------------------------
-competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-batch_id = "20260812_180129"
+# competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+# batch_id = "20260812_180129"
 
-# competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
-# batch_id = "20260812_180115"
+competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
+batch_id = "20260812_180115"
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"
 OUTPUT_ROOT = FILES_DIR / "scripts" / "private"
 USERS_CSV = OUTPUT_ROOT / "alphathon__user.csv"
+USER_INFO_CSV = FILES_DIR / "scripts" / "leaderboard_crawl" / "user_info.csv"
 
 # 报名信息中可能使用的电话字段名。
 PHONE_FIELDS = (
@@ -158,8 +159,27 @@ def _load_phones(cid: str) -> dict[str, str]:
     return phones
 
 
+def _load_display_names() -> dict[str, str]:
+    """读取个人参赛方的榜单展示名：优先昵称，其次用户名。"""
+    _required_file(USER_INFO_CSV, "用户账号信息文件")
+    users = pd.read_csv(
+        USER_INFO_CSV,
+        usecols=["id", "username", "nickname"],
+        dtype={"id": str, "username": str, "nickname": str},
+    )
+    display_names: dict[str, str] = {}
+    for row in users.itertuples(index=False):
+        nickname = "" if pd.isna(row.nickname) else str(row.nickname).strip()
+        username = "" if pd.isna(row.username) else str(row.username).strip()
+        display_name = nickname or username
+        if display_name:
+            display_names[str(row.id)] = display_name
+    return display_names
+
+
 def _contact_maps(
-    metadata: dict[str, Any], phones_by_user: dict[str, str]
+    metadata: dict[str, Any], phones_by_user: dict[str, str],
+    display_names_by_user: dict[str, str],
 ) -> tuple[dict[str, dict], dict[str, dict]]:
     by_submission: dict[str, dict] = {}
     by_user: dict[str, dict] = {}
@@ -171,7 +191,9 @@ def _contact_maps(
             contacts = participant.get("members", []) or []
         else:
             contact = participant.get("user", {}) or {}
-            participant_name = contact.get("name", "")
+            user_id = str(contact.get("user_id", ""))
+            # 个人参赛方展示账号名，真实姓名仅保留在内部联系人字段中。
+            participant_name = display_names_by_user.get(user_id) or user_id
             contacts = [contact]
 
         contact_info = {
@@ -201,6 +223,7 @@ def _build_failure_tables(
     metadata: dict[str, Any],
     run_dir: Path,
     phones_by_user: dict[str, str],
+    display_names_by_user: dict[str, str],
 ) -> pd.DataFrame:
     required_columns = {"submission_id", "user_id", "status"}
     missing = sorted(required_columns.difference(summary.columns))
@@ -208,7 +231,9 @@ def _build_failure_tables(
         raise ValueError(f"submissions_summary.csv 缺少列: {', '.join(missing)}")
 
     failed = summary.loc[summary["status"].fillna("").ne("success")].copy()
-    contacts_by_submission, contacts_by_user = _contact_maps(metadata, phones_by_user)
+    contacts_by_submission, contacts_by_user = _contact_maps(
+        metadata, phones_by_user, display_names_by_user
+    )
     contact_columns = [
         "participant_type",
         "participant_name",
@@ -399,7 +424,10 @@ def main() -> None:
     )
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     phones_by_user = _load_phones(cid)
-    by_submission = _build_failure_tables(summary, metadata, run_dir, phones_by_user)
+    display_names_by_user = _load_display_names()
+    by_submission = _build_failure_tables(
+        summary, metadata, run_dir, phones_by_user, display_names_by_user
+    )
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     log_path = OUTPUT_ROOT / f"{cid}__{bid}__failed_submissions.log"
