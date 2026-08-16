@@ -30,7 +30,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 batch_id = "20260812_180129"
-period_id = "20251201_20260810"
+period_id = "20250301_20260810_merged"
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"
@@ -120,6 +120,11 @@ def _classify_error(value: object) -> str:
     error = _display_value(value).strip()
     if error == "-":
         return "未记录错误"
+
+    if error.startswith("incomplete_period:"):
+        first_status = "失败" if "first_not_success" in error else "成功"
+        second_status = "失败" if "second_not_success" in error else "成功"
+        return f"first {first_status}, second {second_status}"
 
     exited = re.fullmatch(r"user code exited with code (-?\d+)", error)
     if exited:

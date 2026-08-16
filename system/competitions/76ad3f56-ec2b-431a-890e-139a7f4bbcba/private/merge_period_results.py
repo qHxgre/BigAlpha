@@ -1,13 +1,13 @@
 """合并两个连续私榜周期的原始因子，并按完整周期重新计算全部得分。
 
-默认采用严格口径：只有两个周期都成功、代码一致且 raw_factor.parquet 完整的
+默认采用严格口径：只有两个周期都成功且 raw_factor.parquet 完整的
 submission 才进入完整周期 SFA；其余 submission 在合并批次中记为失败。
+两个周期的 Notebook 允许不同，合并时不做内容一致性校验。
 
 脚本不会修改源周期，也不会生成 pending_publish.jsonl。
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -67,11 +67,8 @@ RESUME = True
 # submission 继续复用 merged 周期中已有的 result.json。全部完成后会基于最新结果
 # 重新生成 leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和汇总文件。
 RERUN_SUBMISSION_IDS: list[str] = [
-    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9",
-    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509",
-    "312186dc-7b00-457f-b7f3-6e885c1e5ffc",
-    "7f8311ec-f7af-4867-ac95-49876c88bdc8",
-    "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313",
+    "1ae4de95-e776-4733-ab28-fd3f48ad8db1", 
+    "993c4dbd-5035-4c6c-8543-2b20cbfd51e2"
 ]
 
 
@@ -94,16 +91,6 @@ def _default_run_root() -> Path:
 def _read_json(path: Path) -> Any:
     with path.open(encoding="utf-8") as reader:
         return json.load(reader)
-
-
-def _sha256(path: Path) -> str | None:
-    if not path.is_file():
-        return None
-    digest = hashlib.sha256()
-    with path.open("rb") as reader:
-        for chunk in iter(lambda: reader.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _submission_map(path: Path) -> dict[str, dict]:
@@ -174,8 +161,6 @@ def build_audit(first_dir: Path, second_dir: Path) -> tuple[pd.DataFrame, list[d
         second_result = second_results.get(sid)
         first_code = _code_path(first_dir, sid, first_result)
         second_code = _code_path(second_dir, sid, second_result)
-        first_hash = _sha256(first_code) if first_code else None
-        second_hash = _sha256(second_code) if second_code else None
         first_raw = first_dir / "submissions" / sid / "raw_factor.parquet"
         second_raw = second_dir / "submissions" / sid / "raw_factor.parquet"
         _, first_factor_error = _parquet_columns(first_raw)
@@ -197,12 +182,10 @@ def build_audit(first_dir: Path, second_dir: Path) -> tuple[pd.DataFrame, list[d
             reasons.append("missing_second_result")
         elif second_result.get("status") != "success":
             reasons.append("second_not_success")
-        if first_hash is None:
+        if first_code is None or not first_code.is_file():
             reasons.append("missing_first_code")
-        if second_hash is None:
+        if second_code is None or not second_code.is_file():
             reasons.append("missing_second_code")
-        if first_hash and second_hash and first_hash != second_hash:
-            reasons.append("code_mismatch")
         if first_factor_error:
             reasons.append(f"first_{first_factor_error}")
         if second_factor_error:
@@ -214,8 +197,6 @@ def build_audit(first_dir: Path, second_dir: Path) -> tuple[pd.DataFrame, list[d
                 "user_id_second": (second_result or {}).get("user_id"),
                 "code_file_first": first_code.name if first_code else None,
                 "code_file_second": second_code.name if second_code else None,
-                "code_sha256_first": first_hash,
-                "code_sha256_second": second_hash,
                 "status_first": (first_result or {}).get("status"),
                 "status_second": (second_result or {}).get("status"),
                 "error_first": (first_result or {}).get("error"),
@@ -381,6 +362,7 @@ def main() -> None:
             "submission_count": len(audit),
             "audit_summary": summary,
             "strict_both_success": True,
+            "code_consistency_required": False,
             "resume": RESUME,
             "rerun_submission_ids": sorted(rerun_submission_ids),
             "published": False,
