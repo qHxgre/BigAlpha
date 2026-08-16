@@ -7,7 +7,6 @@ submission 才进入完整周期 SFA；其余 submission 在合并批次中记�
 """
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
@@ -42,7 +41,38 @@ DATE_END = "2026-08-10 23:59:59"
 FACTOR_COLUMNS = ["date", "instrument", "factor"]
 COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 DEFAULT_BATCH_ID = "20260812_180129"
-DEFAULT_MAX_WORKERS = 5
+
+# ---------------------------------------------------------------------------
+# 合并运行配置：所有运行参数都在本文件中显式设置，不读取命令行参数。
+# ---------------------------------------------------------------------------
+
+# None：根据 DEFAULT_BATCH_ID 自动定位批次根目录；也可填写云端绝对路径。
+RUN_ROOT: Path | None = None
+FIRST_PERIOD = "20250301_20251130"
+SECOND_PERIOD = "20251201_20260810"
+OUTPUT_PERIOD = "20250301_20260810_merged"
+MAX_WORKERS = 1
+
+# DRY_RUN=True 只生成合并审计，不执行因子合并和评分。
+DRY_RUN = False
+
+# OVERWRITE=True 删除整个 OUTPUT_PERIOD 后全量重跑。
+# RESUME=True 复用其他 submission 的已有结果，并重跑 RERUN_SUBMISSION_IDS。
+# 两者不能同时为 True。本次定向重跑应保持 OVERWRITE=False、RESUME=True。
+OVERWRITE = False
+RESUME = True
+
+# 仅在 RESUME = True 时生效。源周期中的这些 submission 重新评测后，需在这里
+# 指定相同 ID，脚本会删除它们在 merged 周期中的旧结果并重新合并、评分；其他
+# submission 继续复用 merged 周期中已有的 result.json。全部完成后会基于最新结果
+# 重新生成 leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和汇总文件。
+RERUN_SUBMISSION_IDS: list[str] = [
+    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9",
+    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509",
+    "312186dc-7b00-457f-b7f3-6e885c1e5ffc",
+    "7f8311ec-f7af-4867-ac95-49876c88bdc8",
+    "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313",
+]
 
 
 def _default_run_root() -> Path:
@@ -318,57 +348,50 @@ def _save_scores(rows: list[dict], submission_dir: Path, artifact_dir: Path, log
     ).to_csv(artifact_dir / "submissions_summary.csv", index=False)
 
 
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--run-root",
-        type=Path,
-        default=_default_run_root(),
-        help="批次根目录；默认自动定位 20260812_180129",
-    )
-    parser.add_argument("--first-period", default="20250301_20251130")
-    parser.add_argument("--second-period", default="20251201_20260810")
-    parser.add_argument("--output-period", default="20250301_20260810_merged")
-    parser.add_argument("--max-workers", type=int, default=DEFAULT_MAX_WORKERS)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--resume", action="store_true")
-    return parser.parse_args()
-
-
 def main() -> None:
-    args = _parse_args()
-    if args.max_workers < 1:
-        raise RuntimeError("--max-workers 必须是正整数")
-    run_root = args.run_root.resolve()
-    first_dir = run_root / args.first_period
-    second_dir = run_root / args.second_period
-    output_dir = run_root / args.output_period
+    if MAX_WORKERS < 1:
+        raise RuntimeError("MAX_WORKERS 必须是正整数")
+    rerun_submission_ids = {
+        str(value).strip() for value in RERUN_SUBMISSION_IDS if str(value).strip()
+    }
+    if rerun_submission_ids and not RESUME:
+        raise RuntimeError("RERUN_SUBMISSION_IDS 非空时必须设置 RESUME = True")
+    run_root = (RUN_ROOT or _default_run_root()).resolve()
+    first_dir = run_root / FIRST_PERIOD
+    second_dir = run_root / SECOND_PERIOD
+    output_dir = run_root / OUTPUT_PERIOD
     for path in (first_dir, second_dir):
         if not path.is_dir():
             raise RuntimeError(f"源周期目录不存在: {path}")
     if output_dir in (first_dir, second_dir):
         raise RuntimeError("输出目录不能与源周期目录相同")
-    if args.overwrite and args.resume:
-        raise RuntimeError("--overwrite 和 --resume 不能同时使用")
+    if OVERWRITE and RESUME:
+        raise RuntimeError("OVERWRITE 和 RESUME 不能同时为 True")
     if output_dir.exists():
-        if not args.overwrite and not args.resume:
+        if not OVERWRITE and not RESUME:
             raise RuntimeError(f"输出目录已存在，拒绝覆盖: {output_dir}")
-        if args.overwrite:
+        if OVERWRITE:
             shutil.rmtree(output_dir)
 
     artifact_dir = output_dir / "artifacts"
     submission_dir = output_dir / "submissions"
     log_dir = output_dir / "logs"
-    artifact_dir.mkdir(parents=True, exist_ok=args.resume)
+    artifact_dir.mkdir(parents=True, exist_ok=RESUME)
     audit, submissions = build_audit(first_dir, second_dir)
+    audit_submission_ids = set(audit["submission_id"].astype(str))
+    unknown_rerun_ids = sorted(rerun_submission_ids - audit_submission_ids)
+    if unknown_rerun_ids:
+        raise RuntimeError(
+            "RERUN_SUBMISSION_IDS 包含不在源周期中的 submission: "
+            f"{unknown_rerun_ids}"
+        )
     audit.to_csv(artifact_dir / "merge_audit.csv", index=False, encoding="utf-8-sig")
     summary = audit["merge_status"].value_counts().to_dict()
     write_json(str(output_dir / "submissions.json"), submissions)
     write_json(
         str(output_dir / "manifest.json"),
         {
-            "status": "audit_complete" if args.dry_run else "running",
+            "status": "audit_complete" if DRY_RUN else "running",
             "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             "date_start": DATE_START,
             "date_end": DATE_END,
@@ -376,28 +399,35 @@ def main() -> None:
             "submission_count": len(audit),
             "audit_summary": summary,
             "strict_both_success": True,
+            "resume": RESUME,
+            "rerun_submission_ids": sorted(rerun_submission_ids),
             "published": False,
         },
     )
     print(f"审计完成: total={len(audit)} ready={summary.get('ready', 0)} excluded={summary.get('excluded', 0)}")
     print(f"审计报告: {artifact_dir / 'merge_audit.csv'}")
-    if args.dry_run:
+    if DRY_RUN:
         return
 
-    submission_dir.mkdir(exist_ok=args.resume)
-    log_dir.mkdir(exist_ok=args.resume)
+    submission_dir.mkdir(exist_ok=RESUME)
+    log_dir.mkdir(exist_ok=RESUME)
     from judge.judgebase import setup_judge_logging
     import structlog
 
     setup_judge_logging(str(log_dir / "merge_period_results.log"))
     log = structlog.get_logger()
+    for sid in sorted(rerun_submission_ids):
+        target = submission_dir / sid
+        if target.exists():
+            shutil.rmtree(target)
+        log.info("merge.submission_reset", submission_id=sid)
     rows_by_id = {}
     records = audit.to_dict("records")
     pending_records = []
     for record in records:
         sid = str(record["submission_id"])
         result_path = submission_dir / sid / "result.json"
-        if args.resume and result_path.is_file():
+        if RESUME and result_path.is_file():
             try:
                 completed = _read_json(result_path)
             except (OSError, json.JSONDecodeError):
@@ -415,7 +445,7 @@ def main() -> None:
                 )
                 continue
         pending_records.append(record)
-    with ThreadPoolExecutor(max_workers=args.max_workers, thread_name_prefix="period-merge") as executor:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="period-merge") as executor:
         futures = {
             executor.submit(_run_one, record, submission_dir, DATE_START, DATE_END): str(
                 record["submission_id"]
