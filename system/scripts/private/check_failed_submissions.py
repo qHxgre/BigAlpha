@@ -30,7 +30,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 batch_id = "20260812_180129"
-period_id = "20250301_20260810_merged"
+period_id = "20251201_20260810"
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"

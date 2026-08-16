@@ -236,34 +236,16 @@ def build_audit(first_dir: Path, second_dir: Path) -> tuple[pd.DataFrame, list[d
 
 
 def _load_and_merge_factors(first_path: Path, second_path: Path) -> pd.DataFrame:
-    frames = []
-    ranges = [
-        (first_path, pd.Timestamp("2025-03-01"), pd.Timestamp("2025-11-30 23:59:59")),
-        (second_path, pd.Timestamp("2025-12-01"), pd.Timestamp("2026-08-10 23:59:59")),
-    ]
-    for path, start, end in ranges:
-        frame = pd.read_parquet(path, columns=FACTOR_COLUMNS)
-        frame["date"] = pd.to_datetime(frame["date"], errors="raise")
-        outside = (frame["date"] < start) | (frame["date"] > end)
-        if outside.any():
-            sample = frame.loc[outside, "date"].astype(str).head(5).tolist()
-            raise RuntimeError(f"因子日期超出源周期 {path}: {sample}")
-        frames.append(frame)
-    merged = pd.concat(frames, ignore_index=True)
-    if merged.duplicated(["date", "instrument"]).any():
-        sample = merged.loc[
-            merged.duplicated(["date", "instrument"], keep=False),
-            ["date", "instrument"],
-        ].head(5).to_dict("records")
-        raise RuntimeError(f"合并后存在重复 date/instrument: {sample}")
-    numeric = pd.to_numeric(merged["factor"], errors="coerce")
-    if numeric.isna().any():
-        raise RuntimeError(f"合并因子包含空值或非数值，数量={int(numeric.isna().sum())}")
-    import numpy as np
-
-    if not np.isfinite(numeric.to_numpy()).all():
-        raise RuntimeError("合并因子包含 inf/-inf")
-    merged["factor"] = numeric
+    # merge 层只负责拼接两个周期的原始因子。缺失值、重复值、
+    # 日期范围及数值合法性等内容校验统一交给 bigalpha_eval 处理，
+    # 避免合并评测与分段评测使用不同口径。
+    merged = pd.concat(
+        [
+            pd.read_parquet(first_path, columns=FACTOR_COLUMNS),
+            pd.read_parquet(second_path, columns=FACTOR_COLUMNS),
+        ],
+        ignore_index=True,
+    )
     return merged.sort_values(["date", "instrument"]).reset_index(drop=True)
 
 
