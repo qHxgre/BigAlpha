@@ -38,6 +38,25 @@ def judge_runner_main():
     )
 '''
 
+_SFA_FROM_FACTOR_TEMPLATE = '''
+def judge_runner_main():
+    import json
+    import pandas as pd
+    from bigmodule import M
+
+    factor = pd.read_parquet("__FACTOR_INPUT__")
+    result = M.bigalpha_eval._latest(
+        factor_data=factor,
+        start_date="__DATE_START__",
+        end_date="__DATE_END__",
+        show=True,
+    )
+    result["raw_factor"].to_parquet("raw_factor.parquet")
+    result["process_factor"].to_parquet("process_factor.parquet")
+    with open("factor_analyze.json", "w", encoding="utf-8") as f:
+        json.dump(result["factor_analyze"], f, ensure_ascii=False, default=str)
+'''
+
 
 def build_sfa_runner(user_code: str, datasets: dict[str, str], date_start: str, date_end: str) -> str:
     """渲染单个提交的评测 runner。"""
@@ -61,6 +80,20 @@ def build_regression_runner(
         _REGRESSION_TEMPLATE
         .replace("__FACTOR_POOL__", factor_pool)
         .replace("__REGRESSION_CSV__", regression_csv)
+        .replace("__DATE_START__", date_start)
+        .replace("__DATE_END__", date_end)
+    )
+
+
+def build_sfa_from_factor_runner(
+    factor_input: str,
+    date_start: str,
+    date_end: str,
+) -> str:
+    """为已经固化的因子文件渲染 SFA runner，用于跨周期重新统一评测。"""
+    return (
+        _SFA_FROM_FACTOR_TEMPLATE
+        .replace("__FACTOR_INPUT__", factor_input)
         .replace("__DATE_START__", date_start)
         .replace("__DATE_END__", date_end)
     )
