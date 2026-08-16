@@ -31,13 +31,19 @@ BATCH_ID = "20260812_180129"
 
 # False：为当前 DATE_START/DATE_END 创建新周期目录；True：续跑该周期目录。
 # 当前准备运行新周期，日期由运行前手动修改。
-RESUME = False
+RESUME = True
 
 # 仅在 RESUME = True 时生效。程序会删除这些 submission 的旧运行目录并强制重跑；
 # 其他 submission 复用原 result.json。重跑完成后会基于全批次最新结果重新计算
 # leaderboard_sfa.csv、回归 B 分、leaderboard_final.csv 和 pending_publish.jsonl。
 # RERUN_SUBMISSION_IDS: list[str] = []
-RERUN_SUBMISSION_IDS: list[str] = []
+RERUN_SUBMISSION_IDS: list[str] = [
+    "65fcb0d6-42aa-4dd4-8593-8ab1437e69c9", 
+    "f6e44b3b-42c7-4e0c-8242-b91c89cfc509", 
+    "312186dc-7b00-457f-b7f3-6e885c1e5ffc", 
+    "7f8311ec-f7af-4867-ac95-49876c88bdc8", 
+    "b8f6af17-daf0-4c44-ad48-9bd6ef3d7313"
+]
 
 # 同时运行的 submission 数量，根据机器 CPU、内存和数据查询承载能力调整。
 MAX_WORKERS = 1
@@ -49,8 +55,8 @@ class Judge(PrivateJudge):
     INPUT_DIR = os.path.join(PRIVATE_FILES_DIR, "prepared")
 
     def __init__(self) -> None:
-        self.DATE_START = "2025-12-01 00:00:00"
-        self.DATE_END = "2026-08-10 23:59:59"
+        self.DATE_START = "2025-03-01 00:00:00"
+        self.DATE_END = "2025-11-30 23:59:59"
         super().__init__(
             input_dir=self.INPUT_DIR,
             batch_id=BATCH_ID,

@@ -1,12 +1,13 @@
 """检查私榜批次中的失败 submission，并输出内部日志和公开通知。
 
-日常使用时只需修改下方 ``competition_id`` 和 ``batch_id``，然后运行：
+日常使用时只需修改下方 ``competition_id``、``batch_id`` 和
+``period_id``，然后运行：
 
     python3 system/scripts/private/check_failed_submissions.py
 
 输出文件：
-    system/files/scripts/private/<competition_id>__<batch_id>__failed_submissions.log
-    system/files/scripts/private/<competition_id>__<batch_id>__failed_submissions.md
+    system/files/scripts/private/<competition_id>__<batch_id>__<period_id>__failed_submissions.log
+    system/files/scripts/private/<competition_id>__<batch_id>__<period_id>__failed_submissions.md
 
 ``.log`` 仅供主办方内部排查，包含联系方式和运行日志；``.md`` 可直接用于
 通知参赛者，仅列出 submission ID 和参赛方名称，不包含联系方式、用户 ID、
@@ -25,13 +26,11 @@ import pandas as pd
 
 
 # ---------------------------------------------------------------------------
-# 运行配置：每次只需修改这两个值。
+# 运行配置：每次只需修改这三个值。
 # ---------------------------------------------------------------------------
-# competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-# batch_id = "20260812_180129"
-
-competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
-batch_id = "20260812_180115"
+competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+batch_id = "20260812_180129"
+period_id = "20250301_20251130"
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"
@@ -52,7 +51,7 @@ PHONE_FIELDS = (
 )
 
 
-def _resolve_private_root(cid: str) -> Path:
+def _resolve_private_root(cid: str, bid: str, pid: str) -> Path:
     """兼容云端和本地下载数据的两种目录布局。"""
     candidates = (
         FILES_DIR / cid / "private",
@@ -62,7 +61,9 @@ def _resolve_private_root(cid: str) -> Path:
     if len(existing) == 1:
         return existing[0]
     if len(existing) > 1:
-        matches = [path for path in existing if (path / "runs" / batch_id).is_dir()]
+        matches = [
+            path for path in existing if (path / "runs" / bid / pid).is_dir()
+        ]
         if len(matches) == 1:
             return matches[0]
         raise RuntimeError(
@@ -290,6 +291,7 @@ def _write_full_log(
         "=" * 100,
         f"competition_id: {competition_id}",
         f"batch_id: {batch_id}",
+        f"period_id: {period_id}",
         f"总提交数: {total_count}",
         f"失败提交数: {len(by_submission)}",
         f"涉及参赛方: {by_submission['participant_name'].nunique(dropna=True)}",
@@ -404,11 +406,25 @@ def _write_public_markdown(
 def main() -> None:
     cid = competition_id.strip()
     bid = batch_id.strip()
-    if not cid or not bid:
-        raise ValueError("competition_id 和 batch_id 不能为空")
+    pid = period_id.strip()
+    identifiers = {
+        "competition_id": cid,
+        "batch_id": bid,
+        "period_id": pid,
+    }
+    empty = [name for name, value in identifiers.items() if not value]
+    if empty:
+        raise ValueError(f"{', '.join(empty)} 不能为空")
+    invalid = [
+        name
+        for name, value in identifiers.items()
+        if value in {".", ".."} or Path(value).name != value
+    ]
+    if invalid:
+        raise ValueError(f"{', '.join(invalid)} 必须是单个目录名")
 
-    private_root = _resolve_private_root(cid)
-    run_dir = private_root / "runs" / bid
+    private_root = _resolve_private_root(cid, bid, pid)
+    run_dir = private_root / "runs" / bid / pid
     summary_path = _required_file(
         run_dir / "artifacts" / "submissions_summary.csv",
         "提交汇总文件",
@@ -430,8 +446,9 @@ def main() -> None:
     )
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    log_path = OUTPUT_ROOT / f"{cid}__{bid}__failed_submissions.log"
-    markdown_path = OUTPUT_ROOT / f"{cid}__{bid}__failed_submissions.md"
+    output_prefix = f"{cid}__{bid}__{pid}__failed_submissions"
+    log_path = OUTPUT_ROOT / f"{output_prefix}.log"
+    markdown_path = OUTPUT_ROOT / f"{output_prefix}.md"
     _write_full_log(by_submission, log_path, len(summary))
     _write_public_markdown(by_submission, markdown_path)
 
