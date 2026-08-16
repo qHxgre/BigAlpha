@@ -40,6 +40,24 @@ from templates import build_sfa_from_factor_runner
 DATE_START = "2025-03-01 00:00:00"
 DATE_END = "2026-08-10 23:59:59"
 FACTOR_COLUMNS = ["date", "instrument", "factor"]
+COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+DEFAULT_BATCH_ID = "20260812_180129"
+
+
+def _default_run_root() -> Path:
+    project_root = HERE.parents[3]
+    candidates = [
+        project_root / "system" / "files" / COMPETITION_ID / "private" / "runs" / DEFAULT_BATCH_ID,
+        project_root
+        / "system"
+        / "files"
+        / "private"
+        / COMPETITION_ID
+        / "private"
+        / "runs"
+        / DEFAULT_BATCH_ID,
+    ]
+    return next((path for path in candidates if path.is_dir()), candidates[0])
 
 
 def _read_json(path: Path) -> Any:
@@ -301,7 +319,12 @@ def _save_scores(rows: list[dict], submission_dir: Path, artifact_dir: Path, log
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-root", required=True, type=Path)
+    parser.add_argument(
+        "--run-root",
+        type=Path,
+        default=_default_run_root(),
+        help="批次根目录；默认自动定位 20260812_180129",
+    )
     parser.add_argument("--first-period", default="20250301_20251130")
     parser.add_argument("--second-period", default="20251201_20260810")
     parser.add_argument("--output-period", default="20250301_20260810_merged")
