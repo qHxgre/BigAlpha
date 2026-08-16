@@ -42,6 +42,7 @@ DATE_END = "2026-08-10 23:59:59"
 FACTOR_COLUMNS = ["date", "instrument", "factor"]
 COMPETITION_ID = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
 DEFAULT_BATCH_ID = "20260812_180129"
+DEFAULT_MAX_WORKERS = 5
 
 
 def _default_run_root() -> Path:
@@ -328,7 +329,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--first-period", default="20250301_20251130")
     parser.add_argument("--second-period", default="20251201_20260810")
     parser.add_argument("--output-period", default="20250301_20260810_merged")
-    parser.add_argument("--max-workers", type=int, default=1)
+    parser.add_argument("--max-workers", type=int, default=DEFAULT_MAX_WORKERS)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--resume", action="store_true")
