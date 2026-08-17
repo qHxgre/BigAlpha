@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -288,12 +289,12 @@ def build_team_leaderboard_summary(paths: CheckPaths = PATHS) -> pd.DataFrame:
     return build_team_private_leaderboard(paths)
 
 
-def _fmt(value: Any) -> str:
+def _fmt(value: Any, *, decimal_places: int = 6) -> str:
     if value is None or pd.isna(value):
         return "—"
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
-    return f"{value:.6f}" if isinstance(value, float) else str(value)
+    return f"{value:.{decimal_places}f}" if isinstance(value, float) else str(value)
 
 
 def _json_report(report: dict[str, Any]) -> dict[str, Any]:
@@ -392,10 +393,77 @@ def _markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _competition_notice_markdown(
+    report: dict[str, Any], *, submission_id_length: int = 8, score_decimal_places: int = 4
+) -> str:
+    """生成赛事通知单表；用 Markdown 内嵌 HTML 实现二级表头及团队单元格合并。"""
+
+    def cell(value: Any) -> str:
+        return escape(
+            _fmt(value, decimal_places=score_decimal_places), quote=True
+        ).replace("\n", "<br>")
+
+    lines = [
+        "# 赛事排名通知", "",
+        "<table>",
+        "  <thead>",
+        "    <tr>",
+        '      <th colspan="2">团队排名</th>',
+        '      <th colspan="2">团队信息</th>',
+        '      <th colspan="2">团队最终得分</th>',
+        '      <th>Submission</th>',
+        '      <th colspan="2">Submission 最终得分</th>',
+        '      <th colspan="4">私榜细分项</th>',
+        '      <th colspan="4">公榜细分项</th>',
+        "    </tr>",
+        "    <tr>",
+        "      <th>私榜</th><th>公榜</th>",
+        "      <th>团队名</th><th>私榜提交数量</th>",
+        "      <th>私榜</th><th>公榜</th>",
+        "      <th>ID</th>",
+        "      <th>私榜</th><th>公榜</th>",
+        "      <th>IC均值</th><th>ICIR</th><th>夏普</th><th>压力ICIR</th>",
+        "      <th>IC均值</th><th>ICIR</th><th>夏普</th><th>压力ICIR</th>",
+        "    </tr>",
+        "  </thead>",
+        "  <tbody>",
+    ]
+    for participant in report["participants"]:
+        # 没有私榜 submission 的团队也保留一行团队汇总信息。
+        submissions = participant["submissions"] or [None]
+        for submission_index, submission in enumerate(submissions):
+            private_metrics = submission["private_metrics"] if submission else {}
+            public_metrics = submission["public_metrics"] if submission else {}
+            submission_id = submission["submission_id"] if submission else None
+            lines.append("    <tr>")
+            if submission_index == 0:
+                rowspan = len(submissions)
+                for value in (
+                    participant["private_rank"], participant["public_rank"],
+                    participant["participant_name"], participant["submission_count"],
+                    participant["best_private_score"], participant["team_public_score"],
+                ):
+                    lines.append(f'      <td rowspan="{rowspan}">{cell(value)}</td>')
+            values = [
+                str(submission_id)[:submission_id_length] if submission_id else None,
+                submission["private_score"] if submission else None,
+                submission["public_score"] if submission else None,
+                private_metrics.get("ic_mean"), private_metrics.get("ic_ir"),
+                private_metrics.get("sharpe_ratio"), private_metrics.get("stress_ic_ir"),
+                public_metrics.get("ic_mean"), public_metrics.get("ic_ir"),
+                public_metrics.get("sharpe_ratio"), public_metrics.get("stress_ic_ir"),
+            ]
+            lines.extend(f"      <td>{cell(value)}</td>" for value in values)
+            lines.append("    </tr>")
+    lines.extend(["  </tbody>", "</table>"])
+    return "\n".join(lines)
+
+
 def export_team_private_leaderboard(
     paths: CheckPaths = PATHS, *, output: str | Path | None = None,
     json_output: str | Path | None = None, markdown_output: str | Path | None = None,
     team_summary_output: str | Path | None = None,
+    competition_notice_output: str | Path | None = None,
 ) -> dict[str, Path]:
     csv_path = Path(output).expanduser().resolve() if output else paths.team_private_leaderboard_path
     json_path = Path(json_output).expanduser().resolve() if json_output else csv_path.with_suffix(".json")
@@ -404,15 +472,23 @@ def export_team_private_leaderboard(
         Path(team_summary_output).expanduser().resolve()
         if team_summary_output else paths.team_leaderboard_summary_path
     )
+    competition_notice_path = (
+        Path(competition_notice_output).expanduser().resolve()
+        if competition_notice_output else csv_path.with_name("competition_notice.md")
+    )
     report = build_team_private_report(paths)
-    for path in (csv_path, json_path, md_path, team_summary_path):
+    for path in (csv_path, json_path, md_path, team_summary_path, competition_notice_path):
         path.parent.mkdir(parents=True, exist_ok=True)
     summary = build_team_private_leaderboard(paths)
     summary.to_csv(csv_path, index=False, encoding="utf-8-sig")
     summary.to_csv(team_summary_path, index=False, encoding="utf-8-sig")
     json_path.write_text(json.dumps(_json_report(report), ensure_ascii=False, indent=2), encoding="utf-8")
     md_path.write_text(_markdown(report), encoding="utf-8")
+    competition_notice_path.write_text(
+        _competition_notice_markdown(report), encoding="utf-8"
+    )
     return {
         "csv": csv_path, "json": json_path, "markdown": md_path,
         "team_summary_csv": team_summary_path,
+        "competition_notice_markdown": competition_notice_path,
     }

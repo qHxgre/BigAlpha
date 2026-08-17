@@ -29,13 +29,13 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # 运行配置：每次只需修改这三个值。
 # ---------------------------------------------------------------------------
-# competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
-# batch_id = "20260812_180129"
-# period_id = "20250301_20260810_merged"
+competition_id = "76ad3f56-ec2b-431a-890e-139a7f4bbcba"
+batch_id = "20260812_180129"
+period_id = "20250301_20260810_merged"
 
-competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
-batch_id = "20260812_180115"
-period_id: str | None = None
+# competition_id = "523f9302-5b4b-42bd-bce1-f232e7c74316"
+# batch_id = "20260812_180115"
+# period_id: str | None = None
 
 SYSTEM_DIR = Path(__file__).resolve().parents[2]
 FILES_DIR = SYSTEM_DIR / "files"
