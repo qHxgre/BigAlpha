@@ -1,0 +1,97 @@
+{
+  "package": "submit_d128bag_s7s99e18_55_w440_p205_0805_1730_1111111111111",
+  "generated_utc": "2026-08-05T12:04:04Z",
+  "source": "batch_20260805_d128_s99e18_next all first-tier candidates",
+  "files": [
+    {
+      "path": "README.md",
+      "size_bytes": 2729,
+      "sha256": "5e78ab532dbb0fd031263aca47b9d37136a1e99e11ba14c2a201ce1328cae4a7"
+    },
+    {
+      "path": "download_data.py",
+      "size_bytes": 9555,
+      "sha256": "8a8a7384cc0c3171fc39cc22f53178c1e065cb981aa4166ec5f2cae676ffdbd0"
+    },
+    {
+      "path": "features_raw.py",
+      "size_bytes": 4775,
+      "sha256": "26be5b9c40cb67fb0dc25a5c971c86cf6a6b857894bd9f867bb6c57dee7b3094"
+    },
+    {
+      "path": "logs/alg_daily_d128_s123.log",
+      "size_bytes": 3119,
+      "sha256": "d7399a725879070914fdb4bbf5b86daba0cdb0d073b8e0bad85d12d9d075ae06"
+    },
+    {
+      "path": "logs/alg_daily_d128_s7.log",
+      "size_bytes": 3113,
+      "sha256": "07758f06de9ecbfda0662f2e7ffee5453a847174f7860d7c511ca424424061a2"
+    },
+    {
+      "path": "logs/alg_daily_d128_s99_ep18.log",
+      "size_bytes": 4050,
+      "sha256": "ca4debcf439d3b90b6a9328663dfa390baf5e24e5ff8c55b3d51658c184f9881"
+    },
+    {
+      "path": "numpy_compat.py",
+      "size_bytes": 1484,
+      "sha256": "ba2ebb8cf47e87d688758ba94a78ff820192d12c5ef2e6d36eccd79e3813a93f"
+    },
+    {
+      "path": "parquet_compat.py",
+      "size_bytes": 514,
+      "sha256": "31f29c60f38abfd8ea7ac8f4b05a7a1c83e2f5fbb4fa75204aacff19ce9f314d"
+    },
+    {
+      "path": "predict.ipynb",
+      "size_bytes": 39621,
+      "sha256": "6b59627a35872a0cc9fab6e8517364fe7e77c2a426e5183afd55822bcf6b4268"
+    },
+    {
+      "path": "predict__submit_d128bag_s7s99e18_55_w440_p205_0805_1730_1111111111111.ipynb",
+      "size_bytes": 39621,
+      "sha256": "6b59627a35872a0cc9fab6e8517364fe7e77c2a426e5183afd55822bcf6b4268"
+    },
+    {
+      "path": "reproducibility.py",
+      "size_bytes": 4719,
+      "sha256": "30b6506dac905570f1ee208a144954f972f644eb3f3321d73896b275b9a6f91a"
+    },
+    {
+      "path": "requirements.txt",
+      "size_bytes": 61,
+      "sha256": "9cf5d3b89deea69582c477fe584dd6dc7e690b7f5d3b531732e51d3c27f506b4"
+    },
+    {
+      "path": "submission_config.json",
+      "size_bytes": 2289,
+      "sha256": "8e68048474dc04314c9aa5ab32065efd01e584e533c0185fb2b90e3b3f8e179e"
+    },
+    {
+      "path": "train_5m_transformer.py",
+      "size_bytes": 33534,
+      "sha256": "7b1533508d072dec0574c9877abeb3f7e52b7346f1d35670f264c736c635519a"
+    },
+    {
+      "path": "train_daily_ohlcv_cross_transformer.py",
+      "size_bytes": 23965,
+      "sha256": "b0ad5813a601a914e882c27e244193d893cc13ce3cc21cf38a79241f4c88e52b"
+    },
+    {
+      "path": "transformer_model_5m.json",
+      "size_bytes": 47838974,
+      "sha256": "11625fda3fadab64651d31ff211403c9042faf3d46970f81300e4b10f7705305"
+    },
+    {
+      "path": "transformer_model_daily_s7.json",
+      "size_bytes": 16340286,
+      "sha256": "8302373e762946760a6434b6d23fb5f2c537585a78443e98a1820900e0830d0c"
+    },
+    {
+      "path": "transformer_model_daily_s99e18.json",
+      "size_bytes": 16339623,
+      "sha256": "d66fd09f7d3ccf9df3c4ed02097aaf31712f918bd07c3233776fbe9b7141bf55"
+    }
+  ]
+}

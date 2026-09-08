@@ -1,0 +1,111 @@
+import numpy as np
+import pandas as pd
+import dai
+
+
+def _cs_zscore(s: pd.Series) -> pd.Series:
+    s = s.astype(float)
+    std = s.std(ddof=0)
+    if pd.isna(std) or std < 1e-12:
+        return pd.Series(0.0, index=s.index)
+    return (s - s.mean()) / std
+
+
+def main(
+    data_source_name: str = "bigalpha_2026_stock_bar1m",
+    start_datetime: str = "2023-01-01 00:00:00",
+    end_datetime: str = "2023-01-31 23:59:59",
+) -> pd.DataFrame:
+    """
+    BigAlpha 2026 - AI 因子挖掘 baseline
+
+    说明：
+    - 该版本面向分钟级数据源 bigalpha_2026_stock_bar1m
+    - 评测程序会 import main，并传入数据源名、开始时间、结束时间
+    - 返回值需要包含三列：date / instrument / factor
+    """
+    if data_source_name != "bigalpha_2026_stock_bar1m":
+        raise ValueError(
+            "这个 baseline 面向 bigalpha_2026_stock_bar1m。"
+            f" 当前传入的数据源是: {data_source_name}"
+        )
+
+    sql = f'''
+    SELECT
+        date::DATE::DATETIME AS date,
+        instrument,
+        FIRST(close) AS close_first,
+        LAST(close) AS close_last,
+        AVG(close) AS close_mean,
+        LAST(volume) AS day_volume,
+        AVG(total_bid_volume) AS avg_total_bid_volume,
+        AVG(total_ask_volume) AS avg_total_ask_volume
+    FROM {data_source_name}
+    GROUP BY date::DATE, instrument
+    ORDER BY date, instrument
+    '''
+
+    df = dai.query(
+        sql,
+        filters={"date": [start_datetime, end_datetime]},
+        compression=True,
+    ).df()
+
+    if df.empty:
+        return pd.DataFrame(columns=["date", "instrument", "factor"])
+
+    # 1) 日内均价相对收盘价偏离：偏高说明更像回落，偏低说明更像收强
+    df["intraday_reversal"] = df["close_mean"] / df["close_last"] - 1.0
+
+    # 2) 日内动量：收盘相对开盘强弱
+    df["intraday_momentum"] = df["close_last"] / df["close_first"] - 1.0
+
+    # 3) 委托不平衡：买盘相对卖盘强弱
+    denom = df["avg_total_bid_volume"] + df["avg_total_ask_volume"]
+    df["order_imbalance"] = np.where(
+        denom > 0,
+        (df["avg_total_bid_volume"] - df["avg_total_ask_volume"]) / denom,
+        0.0,
+    )
+
+    # 4) 成交量强度
+    df["log_volume"] = np.log1p(df["day_volume"].clip(lower=0))
+
+    # 做横截面标准化，避免量纲不同
+    df["z_rev"] = df.groupby("date")["intraday_reversal"].transform(_cs_zscore)
+    df["z_mom"] = df.groupby("date")["intraday_momentum"].transform(_cs_zscore)
+    df["z_imb"] = df.groupby("date")["order_imbalance"].transform(_cs_zscore)
+    df["z_vol"] = df.groupby("date")["log_volume"].transform(_cs_zscore)
+
+    # 一个简单的线性组合作为 baseline
+    # 直觉：
+    # - 收盘强于均价（-z_rev 更高）可能更强
+    # - 买盘更强（z_imb 更高）可能更强
+    # - 日内动量更强（z_mom 更高）可能更强
+    # - 成交活跃（z_vol 更高）给予较小权重
+    df["factor"] = (
+        0.40 * (-df["z_rev"]) +
+        0.30 * df["z_imb"] +
+        0.20 * df["z_mom"] +
+        0.10 * df["z_vol"]
+    )
+
+    out = (
+        df[["date", "instrument", "factor"]]
+        .replace([np.inf, -np.inf], np.nan)
+        .dropna(subset=["factor"])
+        .sort_values(["date", "instrument"])
+        .reset_index(drop=True)
+    )
+
+    return out
+
+
+if __name__ == "__main__":
+    result = main(
+        data_source_name="bigalpha_2026_stock_bar1m",
+        start_datetime="2023-01-01 00:00:00",
+        end_datetime="2023-01-10 23:59:59",
+    )
+    print(result.head())
+    print(result.shape)

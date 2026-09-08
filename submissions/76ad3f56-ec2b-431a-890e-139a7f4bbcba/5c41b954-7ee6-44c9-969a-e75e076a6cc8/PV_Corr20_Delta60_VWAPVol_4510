@@ -1,0 +1,167 @@
+def main(datasources, start_date, end_date):
+    """
+    组合因子：
+    45% × 20日价量相关
+    + 45% × 60日价格反转
+    + 10% × 平滑VWAP波动
+
+    经济逻辑：
+    1. 价量相关项刻画价格与成交活跃度的同步/背离；
+    2. 60日价格变化取负，刻画中期反转；
+    3. 平滑VWAP波动项用于补充交易状态信息，因稳定性较弱仅赋10%权重。
+    """
+    import numpy as np
+    import pandas as pd
+    import dai
+
+    # 评估系统会替换该表名，不能硬编码训练集分钟表。
+    bar1m = datasources["bar1m"]
+
+    start_ts = pd.Timestamp(start_date)
+    end_ts = pd.Timestamp(end_date)
+
+    # 最长计算约需要 79 个交易日，向前申请130个自然日作为缓冲。
+    # 验证集实际能取得多少历史数据由平台提供的数据表决定。
+    query_start = start_ts - pd.Timedelta(days=130)
+
+    # 分钟数据聚合为日频：
+    # close、volume、amount取当日最后一个累计值；
+    # VWAP = 当日累计成交额 / 当日累计成交量。
+    sql = f"""
+    SELECT
+        date::DATE::DATETIME AS date,
+        instrument,
+        LAST(close ORDER BY date) AS close,
+        LAST(volume ORDER BY date) AS volume,
+        LAST(amount ORDER BY date)
+            / NULLIF(LAST(volume ORDER BY date), 0) AS vwap
+    FROM {bar1m}
+    GROUP BY date::DATE, instrument
+    ORDER BY instrument, date
+    """
+
+    daily = dai.query(
+        sql,
+        filters={
+            "date": [
+                str(query_start),
+                str(end_ts),
+            ]
+        },
+        compression=True,
+    ).df()
+
+    daily["date"] = pd.to_datetime(daily["date"])
+    daily = daily.sort_values(
+        ["instrument", "date"],
+        kind="mergesort",
+    ).drop_duplicates(
+        ["date", "instrument"],
+        keep="last",
+    )
+
+    for column in ["close", "volume", "vwap"]:
+        daily[column] = pd.to_numeric(daily[column], errors="coerce")
+
+    def calculate_one_stock(frame):
+        frame = frame.sort_values("date").copy()
+
+        # 因子1：-rank(ts_corr(close, volume, 20))
+        frame["corr_20"] = (
+            frame["close"]
+            .rolling(20, min_periods=15)
+            .corr(frame["volume"])
+        )
+
+        # 因子2：-rank(ts_delta(close, 60))
+        frame["delta_60"] = (
+            frame["close"] - frame["close"].shift(60)
+        )
+
+        # 因子3：rank(ts_std(ts_mean(vwap, 60), 20))
+        # min_periods只用于评估区间开头的覆盖度保护；
+        # 历史数据充足后等价于完整60/20窗口。
+        frame["vwap_mean_60"] = (
+            frame["vwap"]
+            .rolling(60, min_periods=40)
+            .mean()
+        )
+        frame["vwap_mean_std_20"] = (
+            frame["vwap_mean_60"]
+            .rolling(20, min_periods=10)
+            .std()
+        )
+
+        return frame
+
+    daily = (
+        daily.groupby(
+            "instrument",
+            group_keys=False,
+            sort=False,
+        )
+        .apply(calculate_one_stock)
+        .reset_index(drop=True)
+    )
+
+    # 每日横截面排名，各分量统一到相同尺度。
+    daily["f1"] = -daily.groupby("date")["corr_20"].rank(
+        pct=True,
+        method="average",
+    )
+    daily["f2"] = -daily.groupby("date")["delta_60"].rank(
+        pct=True,
+        method="average",
+    )
+    daily["f3"] = daily.groupby("date")["vwap_mean_std_20"].rank(
+        pct=True,
+        method="average",
+    )
+
+    # 若评估区间开头某一长周期分量还没有数据，
+    # 仅使用当日已有分量并重新归一化权重，避免整行丢失。
+    numerator = (
+        0.45 * daily["f1"].fillna(0.0)
+        + 0.45 * daily["f2"].fillna(0.0)
+        + 0.10 * daily["f3"].fillna(0.0)
+    )
+
+    denominator = (
+        0.45 * daily["f1"].notna().astype(float)
+        + 0.45 * daily["f2"].notna().astype(float)
+        + 0.10 * daily["f3"].notna().astype(float)
+    )
+
+    daily["composite_raw"] = numerator / denominator.replace(0.0, np.nan)
+
+    # 最终再次进行横截面排名。
+    daily["factor"] = daily.groupby("date")["composite_raw"].rank(
+        pct=True,
+        method="average",
+    )
+
+    daily["factor"] = daily["factor"].replace(
+        [np.inf, -np.inf],
+        np.nan,
+    )
+
+    # 用当日截面中位数填补少量个股缺失。
+    daily["factor"] = daily.groupby("date")["factor"].transform(
+        lambda values: values.fillna(values.median())
+    )
+    daily["factor"] = daily["factor"].fillna(0.5)
+
+    # 计算完成后必须裁剪回平台指定的评估区间。
+    result = daily[
+        daily["date"].between(start_ts, end_ts)
+    ][
+        ["date", "instrument", "factor"]
+    ].copy()
+
+    result = result.sort_values(
+        ["date", "instrument"],
+        kind="mergesort",
+    ).reset_index(drop=True)
+
+    return result
+    

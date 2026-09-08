@@ -1,0 +1,5 @@
+# BigQuant Notebook 环境自带, 仅作依赖声明; dai 为平台内置数据 SDK
+numpy
+pandas
+scipy
+torch

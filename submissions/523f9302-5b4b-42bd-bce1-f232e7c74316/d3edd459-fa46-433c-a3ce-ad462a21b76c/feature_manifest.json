@@ -1,0 +1,32 @@
+{
+  "field_count": 11,
+  "frequencies": {
+    "bar5m": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "amount",
+      "deal_number",
+      "ask_price1",
+      "bid_price1",
+      "ask_volume1",
+      "bid_volume1"
+    ]
+  },
+  "derived_input_features": [],
+  "allowed_transforms": {
+    "volume": "log1p_then_standardize",
+    "amount": "log1p_then_standardize",
+    "deal_number": "log1p_then_standardize",
+    "ask_volume1": "log1p_then_standardize",
+    "bid_volume1": "log1p_then_standardize",
+    "other_fields": "standardize"
+  },
+  "local_unit_conversion": {
+    "open_high_low_close_amount_and_level1_prices": "divide_by_100_for_local_e2e_only"
+  },
+  "cloud_unit_conversion": "none",
+  "book_depth_used": 1
+}

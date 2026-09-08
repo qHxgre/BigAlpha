@@ -1,0 +1,97 @@
+{
+  "schema_version": "bigquant_v38_tail_locked_body_config_v1",
+  "version": "v38",
+  "seed": 20260731,
+  "data": {
+    "bar1m_table": "bigalpha_2026_stock_bar1m",
+    "bar5m_table": "bigalpha_2026_stock_bar5m",
+    "development_train": ["2019-01-01 00:00:00", "2023-12-31 23:59:59"],
+    "development_validation": ["2024-01-01 00:00:00", "2024-12-31 23:59:59"],
+    "final_train": ["2019-01-01 00:00:00", "2024-12-31 23:59:59"],
+    "cache_schema": "bigquant_v24_compact_daily_patch_mmap_v1",
+    "cache_reuse": "directly compatible with an existing V24/V37 cache",
+    "lookback": "two trading days: 96 five-minute bars and 480 aligned one-minute rows"
+  },
+  "features": {
+    "raw_field_count": 31,
+    "derived_features": false,
+    "bar1m_fields": [
+      "open", "high", "low", "close", "volume", "amount", "deal_number",
+      "bid_price1", "ask_price1", "bid_volume1", "ask_volume1", "bid_num_orders1", "ask_num_orders1",
+      "bid_price2", "ask_price2", "bid_volume2", "ask_volume2", "bid_num_orders2", "ask_num_orders2",
+      "bid_price3", "ask_price3", "bid_volume3", "ask_volume3", "bid_num_orders3", "ask_num_orders3"
+    ],
+    "bar5m_fields": ["open", "high", "low", "close", "pre_close", "adjust_factor"],
+    "preprocessing": {
+      "price": "nonfinite or nonpositive is missing, then natural log",
+      "activity": "negative or nonfinite is missing; real zero retained; log1p",
+      "normalization": "separate 1m and 5m per-field training-only StandardScaler",
+      "missing_fill": "zero in standardized space"
+    }
+  },
+  "target": {
+    "return": "next global trading-day raw close-to-close return",
+    "cache_value": "daily average rank percentile mapped to [-1, 1]",
+    "anchor_training_value": "finite Gaussianized daily rank",
+    "body_training_value": "linear daily rank on anchor-defined middle 80 percent",
+    "ties": "average rank"
+  },
+  "model": {
+    "type": "V38TailLockedBodyRanker",
+    "anchor": "V37 day-aware order-flow GRU and eight-factor prior",
+    "stock_dimension": 192,
+    "body_head": {
+      "input_dimension": 192,
+      "hidden_dimensions": [256, 128],
+      "activation": "GELU",
+      "dropout": 0.1,
+      "output": "zero-initialized residual added to anchor score"
+    },
+    "tail_lock": {
+      "bottom_fraction": 0.1,
+      "top_fraction": 0.1,
+      "membership_source": "anchor prediction only",
+      "output_mapping": "standardized anchor tail values plus body ranks inside the boundary interval"
+    },
+    "trainable_parameters": 604031,
+    "external_pretraining": false,
+    "ensemble": false,
+    "external_model_weights": false
+  },
+  "loss": {
+    "anchor_rank_huber": 0.65,
+    "anchor_daily_correlation": 0.35,
+    "posterior_teacher": 0.25,
+    "kl_max": 0.03,
+    "body_rank_huber": 0.6,
+    "body_daily_correlation": 0.4,
+    "body_huber_beta": 0.5
+  },
+  "training": {
+    "anchor_epochs": 6,
+    "anchor_lr_schedule_horizon_epochs": 14,
+    "body_epochs": 4,
+    "batch": "one complete historical CSI 1000 cross-section per day",
+    "anchor_optimizer": "fused AdamW when available",
+    "body_optimizer": "new fused AdamW on body head only",
+    "body_gradient_accumulation_days": 5,
+    "body_frozen_cache": "temporary float16 stock embeddings, automatically deleted",
+    "precision": "CUDA bfloat16 autocast; CPU float32",
+    "checkpoint_epochs": [6, 7, 8, 9, 10]
+  },
+  "inference": {
+    "posterior_disabled": true,
+    "monthly_chunks": true,
+    "unique_stock_day_encoding": true,
+    "complete_day_cross_section": true,
+    "extra_over_v37": "one small body MLP and one O(N log N) daily sort",
+    "score_sign": 1.0,
+    "output_columns": ["date", "instrument", "score"]
+  },
+  "checkpoint": {
+    "container": "json",
+    "state_dict_format": "exact float32 bytes compressed with zlib and base64",
+    "format_id": "torch_state_zlib_base64_v1",
+    "submission_file_limit_bytes": 50000000
+  }
+}

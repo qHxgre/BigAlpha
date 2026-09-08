@@ -15,9 +15,12 @@ __pycache__/
 # 忽略 MinerU 代码目录
 mineru/
 
-.claude/
-.vscode/
-
 # 忽略 ppt 目录
 ppt/
 system/files/
+
+
+# claude skill
+.claude/
+.codex/
+.agents/

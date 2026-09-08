@@ -1,0 +1,50 @@
+{
+  "lineage_transfer_from": "global_factor_lineage_audit.xlsx",
+  "data_contract": {
+    "main": "main(datasources, start_date, end_date)",
+    "bar1m": "datasources['bar1m']",
+    "financial": "datasources['financial']",
+    "pool": "bigalpha_2026_instruments",
+    "volume_semantics": "day_cumulative_use_lag_for_bar_vol"
+  },
+  "selected": [
+    {
+      "name": "book_depth_slope",
+      "family": "M1_book_pressure",
+      "expression": "AVG((bid1+2+5 - ask1+2+5)/(sum sizes))",
+      "rationale": "L1-L5 depth asymmetry",
+      "private_board_candidate": true
+    },
+    {
+      "name": "rel_spread_stress",
+      "family": "M2_liquidity",
+      "expression": "AVG((ask1-bid1)/mid)",
+      "rationale": "Relative spread",
+      "private_board_candidate": true
+    },
+    {
+      "name": "vwap_dev_close",
+      "family": "M3_intraday_path",
+      "expression": "LAST(close)/ (LAST(amount)/LAST(volume)) - 1",
+      "rationale": "Close vs cumulative day VWAP",
+      "private_board_candidate": false
+    },
+    {
+      "name": "volume_tail_share",
+      "family": "M4_volume",
+      "expression": "sum(bar_vol|p>=0.8)/sum(bar_vol)",
+      "rationale": "Bar volume from lag(day cumulative volume)",
+      "private_board_candidate": false
+    },
+    {
+      "name": "roe_ttm_pit",
+      "family": "M5_financial",
+      "expression": "NI_parent_ttm / equity_parent_lf",
+      "rationale": "Official ROE_TTM template with asof join",
+      "private_board_candidate": false
+    }
+  ],
+  "max_submissions": 50,
+  "freeze_for_private_board_max": 2,
+  "objective": "0.3*A + 0.7*B"
+}

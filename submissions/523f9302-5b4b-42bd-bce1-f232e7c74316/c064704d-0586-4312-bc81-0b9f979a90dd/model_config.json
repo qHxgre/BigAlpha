@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "arch": "ensemble",
+  "alpha_v1": 0.5,
+  "train_start": "2019-01-01",
+  "train_end": "2023-12-31",
+  "validation_start": "2024-01-01",
+  "validation_end": "2024-12-31",
+  "preload_workers": 32,
+  "input_fields": 26,
+  "frequencies": [
+    "1m",
+    "5m",
+    "15m",
+    "30m"
+  ],
+  "branches": {
+    "v1": {
+      "epochs": 8,
+      "batch_size": 2048,
+      "learning_rate": 0.0002,
+      "weight_decay": 0.0001,
+      "objective": "huber",
+      "scheduler": "constant",
+      "seed": 42
+    },
+    "v2": {
+      "epochs": 8,
+      "batch_size": 512,
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "objective": "ic",
+      "scheduler": "cosine",
+      "seed": 42
+    }
+  }
+}

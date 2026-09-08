@@ -1,0 +1,81 @@
+{
+  "submission": {
+    "name": "submit_d128bag_s7s99e18_55_w440_p205_0805_1730_1111111111111",
+    "track": "BigAlpha 2026 end-to-end",
+    "reported_public_score": null,
+    "inference_entrypoint": "predict.ipynb",
+    "named_inference_notebook": "predict__submit_d128bag_s7s99e18_55_w440_p205_0805_1730_1111111111111.ipynb",
+    "package_note": "seed99_ep18 第一梯队完整候选包；生成时尚未取得该候选平台公榜分数。"
+  },
+  "fusion": {
+    "variant": "softsignz_or_daily_seed_bag",
+    "weight_5m": 0.56,
+    "weight_daily": 0.44,
+    "post_fusion_normalization": "cross_sectional_zscore_by_date",
+    "softsign_param": 2.05
+  },
+  "models": {
+    "bar5m_transformer": {
+      "weight_file": "transformer_model_5m.json",
+      "train_script": "train_5m_transformer.py",
+      "random_seed": 42,
+      "train_cfg": {
+        "freq": "bar5m",
+        "train_start": "2019-01-01",
+        "train_end": "2023-12-31",
+        "seq_len": 240,
+        "patch_size": 12,
+        "batch_size": 2048,
+        "epochs": 20,
+        "lr": 0.0005,
+        "weight_decay": 0.0001,
+        "label_winsor": [
+          1,
+          99
+        ],
+        "label_mode": "raw",
+        "feature_set": "raw19"
+      }
+    },
+    "daily_ohlcv_cross_transformer": {
+      "weight_files": [
+        "transformer_model_daily_s7.json",
+        "transformer_model_daily_s99e18.json"
+      ],
+      "train_script": "train_daily_ohlcv_cross_transformer.py",
+      "random_seed": [
+        7,
+        99
+      ],
+      "train_cfg": {
+        "freq": "bar5m",
+        "train_start": "2019-01-01",
+        "train_end": "2023-12-31",
+        "validation_start": "2024-01-01",
+        "validation_end": "2024-12-31",
+        "seq_len": 120,
+        "d_model": 128,
+        "nhead": 4,
+        "ts_layers": 3,
+        "cs_layers": 1,
+        "dim_ff": 384,
+        "dropout": 0.12,
+        "batch_days": 8,
+        "epochs": 18,
+        "lr": 0.0007,
+        "weight_decay": 0.0001,
+        "label_mode": "rank",
+        "pairwise_weight": 0.15,
+        "revin": 1,
+        "save_best": 1,
+        "amp": 1
+      },
+      "seed99_ep18_validation": {
+        "best_epoch": 12,
+        "best_val_rank_ic": 0.061784,
+        "best_val_ir": 0.4064,
+        "validation_days": 236
+      }
+    }
+  }
+}

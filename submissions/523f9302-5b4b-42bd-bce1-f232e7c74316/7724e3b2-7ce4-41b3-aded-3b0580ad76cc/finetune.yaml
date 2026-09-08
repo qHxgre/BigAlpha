@@ -1,0 +1,186 @@
+data_root: data
+output_dir: outputs/finetune
+tables:
+  bar1m: bigalpha_2026_stock_bar1m
+  factorlib: bigalpha_2026_factorlib
+  exposure: bigalpha_2026_exposure
+  instruments: bigalpha_2026_instruments
+portfolio_evaluation:
+  table: exposure
+  return_column: ret
+  weight_column: float_market_cap
+  transaction_cost_bps:
+  - 5.0
+  - 10.0
+  - 20.0
+dates:
+  train_start: '2019-01-02'
+  train_end: '2023-06-30'
+  valid_start: '2023-07-03'
+  valid_end: '2023-12-29'
+  test_start: '2024-01-02'
+  test_end: '2024-12-31'
+universe:
+  max_instruments_per_day: 1024
+  candidate_buffer_multiplier: 4
+data:
+  padding: true
+  min_real_bars: 1
+features:
+  price_cols:
+  - open
+  - high
+  - low
+  - close
+  - bid_price1
+  - bid_price2
+  - bid_price3
+  - bid_price4
+  - bid_price5
+  - ask_price1
+  - ask_price2
+  - ask_price3
+  - ask_price4
+  - ask_price5
+  volume_cols:
+  - deal_number
+  - volume
+  - amount
+  - bid_volume1
+  - bid_volume2
+  - bid_volume3
+  - bid_volume4
+  - bid_volume5
+  - ask_volume1
+  - ask_volume2
+  - ask_volume3
+  - ask_volume4
+  - ask_volume5
+  num_order_cols:
+  - bid_num_orders1
+  - bid_num_orders2
+  - bid_num_orders3
+  - bid_num_orders4
+  - bid_num_orders5
+  - ask_num_orders1
+  - ask_num_orders2
+  - ask_num_orders3
+  - ask_num_orders4
+  - ask_num_orders5
+  use_num_orders: true
+frequency:
+  bar1m:
+    lookback_days: 5
+    bars_per_day: 240
+    seq_len: 1200
+    session_starts:
+    - 09:31
+    - '13:01'
+    session_lengths:
+    - 120
+    - 120
+routing:
+  router_atom_len: 5
+  routing_region_len: 60
+  attention_bucket_size: 64
+  patch_lens:
+  - 5
+  - 15
+  - 30
+  - 60
+  n_routed_experts: 4
+  expert_hidden: 256
+  top_k: 2
+  rope_base: 10000.0
+  routing_temperature: 1.0
+  balance_mode: fusion_mass_bias
+  bias_update_speed: 0.005
+  finetune_bias_update_speed: 0.0
+  load_ema_decay: 0.99
+  bias_clip: 0.5
+  dense_warmup_epochs: 0
+  expert_prior:
+  - 0.15
+  - 0.4
+  - 0.3
+  - 0.15
+  target_load:
+  - 0.15
+  - 0.35
+  - 0.35
+  - 0.15
+  mask_span_lens:
+  - 5
+  - 15
+  - 30
+  - 60
+label:
+  source: factorlib
+  column: daily_return
+  horizon_trading_days: 1
+  mode: exposure_residual_return
+residualization:
+  exposure_cols: auto
+  min_obs: 50
+  ridge: 1.0e-06
+normalization:
+  max_rows_per_frequency: 8000000
+  batch_size: 200000
+model:
+  name: model_dynamic1
+  d_model: 192
+  nhead: 6
+  nlayers: 4
+  dim_ff: 512
+  dropout: 0.1
+training:
+  seed: 42
+  distributed_timeout_minutes: 1440
+  epochs: 15
+  head_lr: 0.0001
+  router_lr: 5.0e-05
+  experts_lr: 2.0e-05
+  backbone_lr: 2.0e-05
+  loss_lr: 0.0001
+  weight_decay: 0.0001
+  scheduler: cosine_warm_restart
+  scheduler_t0: 3
+  scheduler_t_mult: 2
+  scheduler_eta_min: 5.0e-06
+  grad_clip: 1.0
+  loss: spearman_aligned
+  pretrained_checkpoint: outputs/pretrain/pretrain_best.pt
+  amp_dtype: fp32
+  allow_tf32: false
+  max_valid_days: 0
+  max_test_days: 0
+  device: cuda:0
+  save_per_epoch_checkpoints: false
+  initialize_from_pretrained: true
+loss:
+  learnable_loss_weights: true
+  initial_weights:
+  - 0.07
+  - 0.8
+  - 0.13
+  min_weight: 0.05
+  pairwise_max_pairs: 16384
+  pairwise_temperature: 0.05
+  pairwise_extreme_fraction: 0.25
+  pairwise_local_fraction: 0.5
+  pairwise_local_window_fraction: 0.1
+cache:
+  enabled: true
+  mode: daily_features
+  dir: outputs/cache/daily_features_v2
+  prebuild: false
+  write: false
+  month_workers: 2
+  open_day_limit: 16
+logging:
+  progress_every_days: 1
+  routing_every_days: 25
+  use_tqdm: false
+  tqdm_mininterval: 0.5
+  tqdm_ascii: true
+  json_events: false

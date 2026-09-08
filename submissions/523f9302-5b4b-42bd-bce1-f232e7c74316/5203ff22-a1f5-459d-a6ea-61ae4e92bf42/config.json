@@ -1,0 +1,132 @@
+{
+  "competition": "BigAlpha 2026 · 端到端大模型（端到端量价时序预测）",
+  "submitted_on": "2026-08-03",
+  "data": {
+    "source_table_cloud": "bigalpha_2026_stock_bar5m",
+    "source_table_local": "bigalpha_2026_e2e_bar5m",
+    "universe_table": "bigalpha_2026_instruments",
+    "label_table": "bigalpha_2026_exposure",
+    "freq": "5m",
+    "bars_per_day": 48,
+    "train_range": [
+      "2019-01-01",
+      "2023-12-31"
+    ],
+    "val_range": [
+      "2024-01-01",
+      "2024-12-31"
+    ],
+    "label_public_weights": "r(t) = adj_close(t+1)/adj_close(t) − 1，adj_close = 当日末根 bar 的 close × 当日 adjust_factor（本地下载包通道；随包提交的 model.json 用的就是它）",
+    "label_private_retrain": "m_lead(ret, 1) —— exposure.ret 累乘成伪复权价后取 t→t+1 收益（云端 dai 通道；私榜隔离环境 train_and_save 走这条）",
+    "label_equivalence": "两者都是 T+1 后复权收盘价收益：exposure.ret 与 bar1d 当日收益 corr=1.0，而 bar1d.close = 分钟 close × adjust_factor，故口径一致，只是数据来源不同",
+    "label_horizon_days": 1
+  },
+  "model_spec": {
+    "n_input_fields": 25,
+    "max_input_fields": 100,
+    "input_fields": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "amount",
+      "deal_number",
+      "ask_price1",
+      "ask_price2",
+      "ask_price3",
+      "bid_price1",
+      "bid_price2",
+      "bid_price3",
+      "ask_volume1",
+      "ask_volume2",
+      "ask_volume3",
+      "bid_volume1",
+      "bid_volume2",
+      "bid_volume3",
+      "ask_num_orders1",
+      "ask_num_orders2",
+      "ask_num_orders3",
+      "bid_num_orders1",
+      "bid_num_orders2",
+      "bid_num_orders3"
+    ],
+    "lookback_trading_days": 5,
+    "max_lookback_trading_days": 240,
+    "sequence_length_bars": 240,
+    "trainable_params": 244633,
+    "param_range": [
+      100000,
+      100000000
+    ],
+    "architecture": "SelfRefStem（三条**全部可训练、全部逐通道**的路径：nn.Parameter 因果差分核 diff_k、nn.Linear(F,F) 可学跨通道投影 contrast、nn.ParameterList 多尺度平滑核 ma_k（感受野 3/12/48，初始化为均匀 1/w 但逐抽头可学，groups=n_fields 不跨字段；h−ma 在代数上等价于核为 δ_last−ma_k 的 depthwise 因果卷积））→ 4 层多尺度选择性 SSM（h_t = a_t·h_{t-1} + b_t，衰减率 a_t 由输入决定，dt_bias 按层从 +1.0 到 −1.5 初始化成快/慢时间尺度；并行结合扫描 O(log T)）→ 四路读出（全局均值 / 末位 / 快衰减加权 / 慢衰减加权，衰减率可学）→ 逐样本 RMS 归一（抹除幅度=波动/市值代理，提升风格残差化后的存活率）→ MLP 头。famou 演化冻结产物，见 evolved_ssm_v2.py",
+    "pretrained_weights": null,
+    "provenance_stamp": "bigalpha_e2e_scaffold_v1"
+  },
+  "hyperparameters": {
+    "seed": 42,
+    "arch": "evolved_ssm_v2",
+    "evolved_ssm_d_model": 96,
+    "evolved_ssm_n_blocks": 4,
+    "evolved_ssm_dropout": 0.12,
+    "evolved_ssm_note": "容量超参固化在 evolved_ssm*.Net 的默认参数里，不从 config 读 —— 改它会得到演化从未评估过的模型",
+    "optimizer": "AdamW",
+    "lr": 0.0003,
+    "weight_decay": 0.0012,
+    "batch_size": 2048,
+    "epochs_max": 50,
+    "patience": 5,
+    "grad_clip": 0.8,
+    "objective": "evolved_ssm_loss",
+    "objective_detail": "与架构一同演化出的复合损失（evolved_ssm_v2.ssm_loss_fn）：0.5·Huber − (0.5+wc)·soft_rank_IC − wc·Pearson − 0.12·多空十分组价差 + 单边峰度惩罚。soft-rank 是官方 Spearman IC 的可导代理；价差项对齐多空夏普；峰度惩罚只压过度集中、保留尾部。wc 沿用余弦爬升（0.03→0.30）。私榜重训由 train_and_save 经 hooks 挂载。",
+    "rank_robust_params": null,
+    "loss": "smooth_l1",
+    "loss_beta": 0.003,
+    "corr_loss_start": 0.03,
+    "corr_loss_end": 0.3,
+    "corr_ramp_epochs": 12,
+    "ema_decay": 0.9985,
+    "mixup_alpha": 0.1,
+    "mixup_prob": 0.3,
+    "label_clip_pct": 0.75,
+    "target_scale": 100.0,
+    "embargo_days": 2,
+    "budget_hours": 2.0
+  },
+  "preprocessing": {
+    "allowed_only": [
+      "缺失值填充（FieldNormalizer.transform 末端 nan_to_num）",
+      "按字段统一的对数变换（价格与量类字段 log1p）",
+      "按字段统一的归一化（z-score）"
+    ],
+    "stats_source": "仅训练集样本引用到的日块（流式累加，非抽样）",
+    "unit_alignment": "本地『分』→『元』在读取层由 to_canonical 完成；normalizer.scale 全为 1",
+    "no_feature_engineering": true
+  },
+  "training_result": {
+    "selected_epoch": 12,
+    "select_metric": "score_final",
+    "epochs_run": 18,
+    "early_stopped": true,
+    "elapsed_min": 91.56,
+    "val_rank_ic_mean": 0.0766565097381224,
+    "val_ic_ir": 1.1486750632353184,
+    "val_long_short_sharpe_ann": 12.349624764568066,
+    "val_stress_icir": 0.7972258903706266,
+    "val_stress_source": "official",
+    "val_stress_used_n_days": 25,
+    "val_stress_official_icir": 0.7972258903706266,
+    "val_stress_official_n_days": 25,
+    "val_stress_proxy_icir": 0.9495515595768056,
+    "val_stress_proxy_n_days": 55,
+    "val_neutralized": true,
+    "note": "本地指标口径（2026-07-30 起）：评估器已复刻官方 DataProcess 全链 —— 均值±3σ winsorize → 截面 z-score → BARRA 十风格 + 中信一级行业哑变量逐日 OLS 残差化。⚠️ 但**随包这组数值是否残差化以 val_neutralized 为准**：官方本地化训练通道的下载包只有 bar 数据、不含 bigalpha_2026_exposure（平台表），故本地训练时该步跳过，四分项为「残差化前」代理、系统性乐观。私榜在平台隔离环境重训时 dai 可用，submission_config() 的 neutralize=True 生效，走完整口径。Rank_Stress 采分口径见 val_stress_source：official = 官方 STRESS_PERIODS 四段并集（默认）；proxy = 按剧烈行情性质检出的连续段。两套始终并行计算并一并留档，命中天数不足时记 NaN 并在合成分里按最差计 0，不回退另一口径。评估区间与官方权威窗口不同，数值不可直接比对。"
+  },
+  "reproducibility": {
+    "entry_point": "python bigalpha_e2e_train.py",
+    "local_channel": "BIGALPHA_LOCAL_DATA=/path/to/e2e_data python bigalpha_e2e_train.py",
+    "cloud_channel": "train_and_save(datasources) —— 私榜隔离环境重训走这条",
+    "deterministic": "set_determinism(seed) 固定 python/numpy/torch 随机源；use_deterministic_algorithms；cudnn.benchmark=False",
+    "verified": "同种子两跑的验证集指标逐位一致（smoke_official.py 第 2 步断言）"
+  }
+}

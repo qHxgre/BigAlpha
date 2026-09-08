@@ -1,0 +1,4 @@
+# training environment pins (MIXED across members -- host=dl-rabbit torch=1.12.1+cu113 cuda=11.3 gpu=NVIDIA GeForce RTX 3090 ;; host=dl-snake torch=2.6.0+cu124 cuda=12.4 gpu=NVIDIA RTX A6000 ;; host=dl-rooster torch=2.5.1+cu121 cuda=12.1 gpu=NVIDIA RTX A6000)
+torch==1.12.1+cu113
+numpy==1.26.4
+pandas==2.3.3

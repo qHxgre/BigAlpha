@@ -1,0 +1,35 @@
+{
+  "run_name": "server_5m_attn_small_adamw",
+  "output_root": "training_results/server_5m_small",
+  "optimizer": "adamw",
+  "lr": 0.001,
+  "weight_decay": 0.0001,
+  "batch_size": 1024,
+  "epochs": 50,
+  "feature_dim": 32,
+  "head_dim": 16,
+  "dropout": 0.15,
+  "regression_weights": [
+    0.25,
+    0.15,
+    0.1
+  ],
+  "classification_weights": [
+    1.0,
+    0.5,
+    0.25
+  ],
+  "ordinal_sigma": 0.7,
+  "selection_score": "cls_blend_532",
+  "early_stop_metric": "loss",
+  "early_stop_patience": 10,
+  "grad_clip": 1.0,
+  "num_workers": 0,
+  "amp": true,
+  "seed": 42,
+  "data": {
+    "cache_dir": "cache/server_5m_small_cache"
+  },
+  "model_type": "attention_small",
+  "rank_loss_weight": 0.0
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "B-RTS1 External Artifact Manifest",
+  "type": "object",
+  "required": [
+    "manifest_schema_version",
+    "generator_spec_version",
+    "execution_authorization_id",
+    "artifact_mode",
+    "disabled_artifact_sha256",
+    "generator_sha256",
+    "enabled_artifact_raw_sha256",
+    "enabled_artifact_canonical_text_sha256",
+    "stage",
+    "start_date",
+    "end_date",
+    "request_ids",
+    "encoding",
+    "line_ending_policy",
+    "trailing_newline_policy"
+  ],
+  "properties": {
+    "manifest_schema_version": {"const": 2},
+    "artifact_mode": {"enum": ["REVIEW_ONLY", "REAL_PLATFORM"]},
+    "execution_authorization_id": {
+      "type": "string",
+      "oneOf": [
+        {"pattern": "^AUTH-B-RTS1-[0-9]{8}-[0-9]{3}$"},
+        {"pattern": "^REVIEW_ONLY-[A-Z0-9-]{8,80}$"}
+      ]
+    },
+    "disabled_artifact_sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+    "generator_sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+    "enabled_artifact_raw_sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+    "enabled_artifact_canonical_text_sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+    "stage": {"const": "B-RTS1"},
+    "start_date": {"const": "2024-01-02 00:00:00"},
+    "end_date": {"const": "2024-01-03 23:59:59"},
+    "request_ids": {"const": ["B-RTS1-DQ-01-BAR1M", "B-RTS1-DQ-02-POOL"]},
+    "encoding": {"const": "utf-8"},
+    "line_ending_policy": {"const": "LF"},
+    "trailing_newline_policy": {"enum": ["required", "present"]}
+  },
+  "additionalProperties": true
+}

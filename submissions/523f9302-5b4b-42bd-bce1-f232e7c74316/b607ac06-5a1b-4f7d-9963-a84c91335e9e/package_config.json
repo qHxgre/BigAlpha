@@ -1,0 +1,27 @@
+{
+  "config_tag": "c2c_champion_5level_full_2024_ep26",
+  "experiment": "current_champion_5level_full_train_fixed_ep26",
+  "variant": "shrink05_aux",
+  "seeds": [
+    42
+  ],
+  "top_k": 1,
+  "fixed_epochs": [
+    26
+  ],
+  "run_full_schedule": true,
+  "full_train_no_test": true,
+  "test_only_history": false,
+  "reference_epoch": 26,
+  "aux_weight": 0.2,
+  "shrink_alpha": 0.5,
+  "feature_levels": 5,
+  "feature_count": 37,
+  "platform_table": "bigalpha_2026_stock_bar1m",
+  "train_window": [
+    "2019-07-01",
+    "2024-12-31 23:59:59"
+  ],
+  "test_window": null,
+  "checkpoint_selection": "fixed_reference_ep26_full_train_no_test"
+}

@@ -1,0 +1,600 @@
+# baseline.py
+# BigAlpha 2026 - 端到端量化时序预测赛道
+# Transformer Baseline
+# 训练集: 2019-01-01 ~ 2024-12-31，推理产出 date/instrument/score
+
+import dai
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import StandardScaler
+import warnings
+import os
+import pickle
+
+warnings.filterwarnings("ignore")
+
+# ===================== 超参数配置 =====================
+CONFIG = {
+    # 数据
+    "train_start": "2019-01-01",
+    "train_end":   "2023-12-31",   # 训练集
+    "val_start":   "2024-01-01",
+    "val_end":     "2024-12-31",   # 验证集（用于早停）
+    
+    # 特征：直接使用原始字段，不超过100个
+    # 使用 5分钟 K线 + 部分盘口字段，控制字段数
+    "bar_table": "bigalpha_2026_stock_bar5m",
+    
+    # 时序窗口
+    "lookback_days": 20,           # 回看20个交易日（≤240）
+    "bars_per_day":  48,           # 5min bar，每天约48根（9:31~15:00）
+    
+    # 模型
+    "d_model":    64,
+    "nhead":       4,
+    "num_layers":  3,
+    "d_ff":       256,
+    "dropout":    0.1,
+    
+    # 训练
+    "batch_size":  512,
+    "lr":          1e-4,
+    "epochs":      20,
+    "early_stop":  5,
+    "weight_decay": 1e-5,
+    
+    # 标签：未来1日收益率（残差方向，用原始收益近似）
+    "forward_days": 1,
+    
+    # 路径
+    "model_path": "/tmp/bigalpha_transformer.pt",
+    "scaler_path": "/tmp/bigalpha_scaler.pkl",
+}
+
+# ===================== 原始特征字段（≤100个字段）=====================
+# 直接使用原始 OHLCV + 部分盘口，禁止任何衍生特征
+RAW_FEATURE_COLS = [
+    "open", "high", "low", "price",          # OHLC（5m bar 中 price=close）
+    "volume", "amount",                       # 成交量/额
+    "ask_price1", "ask_price2", "ask_price3", "ask_price4", "ask_price5",
+    "bid_price1", "bid_price2", "bid_price3", "bid_price4", "bid_price5",
+    "ask_volume1", "ask_volume2", "ask_volume3", "ask_volume4", "ask_volume5",
+    "bid_volume1", "bid_volume2", "bid_volume3", "bid_volume4", "bid_volume5",
+    "total_bid_volume", "total_ask_volume",
+    "bid_avg_price", "ask_avg_price",
+    "num_trades",
+]
+# 共 30 个原始字段，符合 ≤100 约束
+N_FEATURES = len(RAW_FEATURE_COLS)
+
+
+# ===================== 1. 数据加载 =====================
+def load_bar_data(start_date: str, end_date: str) -> pd.DataFrame:
+    """加载指定时间范围的 5min K线数据，按交易日聚合"""
+    print(f"[Data] Loading {CONFIG['bar_table']} from {start_date} to {end_date} ...")
+    
+    # 只拉取需要的字段，节省内存
+    cols = ", ".join(["date", "instrument", "trading_day"] + RAW_FEATURE_COLS)
+    sql = f"""
+        SELECT {cols}
+        FROM {CONFIG['bar_table']}
+        ORDER BY date, instrument
+    """
+    df = dai.query(
+        sql,
+        filters={"date": [f"{start_date} 00:00:00", f"{end_date} 23:59:59"]},
+        compression=True
+    ).df()
+    
+    print(f"[Data] Loaded {len(df):,} rows, {df['instrument'].nunique()} instruments")
+    return df
+
+
+def compute_daily_labels(start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    用日收益率作为标签（次日开盘/当日收盘）。
+    规则：label_t = close_{t+1} / close_t - 1
+    用每天最后一根 5min bar 的 price 作为当日收盘。
+    """
+    print("[Label] Computing daily forward returns ...")
+    sql = """
+        SELECT
+            date::DATE::DATETIME AS trade_date,
+            instrument,
+            LAST(price ORDER BY date) AS daily_close
+        FROM bigalpha_2026_stock_bar5m
+        GROUP BY date::DATE, instrument
+        ORDER BY trade_date, instrument
+    """
+    df = dai.query(
+        sql,
+        filters={"date": [f"{start_date} 00:00:00", f"{end_date} 23:59:59"]},
+        compression=True
+    ).df()
+    
+    # 计算 forward return（下一日）
+    df = df.sort_values(["instrument", "trade_date"])
+    df["label"] = df.groupby("instrument")["daily_close"].pct_change(1).shift(-1)
+    
+    # 截面去极值（winsorize 1%/99%）
+    def winsorize(x):
+        lo, hi = x.quantile(0.01), x.quantile(0.99)
+        return x.clip(lo, hi)
+    df["label"] = df.groupby("trade_date")["label"].transform(winsorize)
+    
+    # 截面 z-score 标准化标签
+    def zscore(x):
+        return (x - x.mean()) / (x.std() + 1e-8)
+    df["label"] = df.groupby("trade_date")["label"].transform(zscore)
+    
+    df = df[["trade_date", "instrument", "label"]].dropna()
+    print(f"[Label] Done, {len(df):,} rows")
+    return df
+
+
+# ===================== 2. 特征预处理 =====================
+def build_daily_features(bar_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将分钟级别数据按 (交易日, 股票) 展平为序列特征。
+    每天取最多 bars_per_day 根 bar，不足则 pad 0。
+    返回每天每只股票的 (lookback_days * bars_per_day, n_features) 展平向量。
+    实际上我们只存每日的bar序列，在Dataset中组装窗口。
+    """
+    print("[Feature] Processing bar data ...")
+    
+    # 处理缺失值：用0填充
+    bar_df[RAW_FEATURE_COLS] = bar_df[RAW_FEATURE_COLS].fillna(0.0)
+    
+    # 取 trading_day 作为日期键
+    bar_df["trading_day_str"] = pd.to_datetime(bar_df["trading_day"].astype(str), format="%Y%m%d")
+    
+    return bar_df
+
+
+class BarScaler:
+    """按字段做 StandardScaler，fit 在训练集上"""
+    def __init__(self):
+        self.scaler = StandardScaler()
+        self.fitted = False
+    
+    def fit(self, bar_df: pd.DataFrame):
+        data = bar_df[RAW_FEATURE_COLS].values
+        # 采样 100万行 fit，避免内存爆炸
+        if len(data) > 1_000_000:
+            idx = np.random.choice(len(data), 1_000_000, replace=False)
+            data = data[idx]
+        self.scaler.fit(data)
+        self.fitted = True
+        print("[Scaler] Fitted on training data")
+    
+    def transform(self, bar_df: pd.DataFrame) -> pd.DataFrame:
+        bar_df = bar_df.copy()
+        bar_df[RAW_FEATURE_COLS] = self.scaler.transform(bar_df[RAW_FEATURE_COLS].values)
+        return bar_df
+    
+    def save(self, path: str):
+        with open(path, "wb") as f:
+            pickle.dump(self.scaler, f)
+    
+    def load(self, path: str):
+        with open(path, "rb") as f:
+            self.scaler = pickle.load(f)
+        self.fitted = True
+
+
+# ===================== 3. Dataset =====================
+class StockSequenceDataset(Dataset):
+    """
+    每个样本：
+        x: (seq_len, n_features)  seq_len = lookback_days * bars_per_day
+        y: float label
+    """
+    def __init__(self, bar_df: pd.DataFrame, label_df: pd.DataFrame,
+                 lookback_days: int = 20, bars_per_day: int = 48):
+        self.lookback_days = lookback_days
+        self.bars_per_day = bars_per_day
+        self.seq_len = lookback_days * bars_per_day
+        
+        # 按 instrument 分组，建立 day -> bars 的索引
+        print("[Dataset] Building index ...")
+        self._build_index(bar_df, label_df)
+    
+    def _build_index(self, bar_df: pd.DataFrame, label_df: pd.DataFrame):
+        # 对齐 trading_day
+        bar_df = bar_df.copy()
+        bar_df["tday"] = bar_df["trading_day_str"]
+        
+        # 获取所有交易日排序列表
+        all_days = sorted(bar_df["tday"].unique())
+        day2idx = {d: i for i, d in enumerate(all_days)}
+        
+        # 按 (instrument, tday) 存储 bars
+        # 结构: inst_day_bars[(inst, day)] = np.array (n_bars, n_features)
+        grouped = bar_df.groupby(["instrument", "tday"])
+        
+        self.inst_day_bars = {}
+        for (inst, day), grp in grouped:
+            feats = grp[RAW_FEATURE_COLS].values.astype(np.float32)
+            # 截断到 bars_per_day
+            if len(feats) > self.bars_per_day:
+                feats = feats[-self.bars_per_day:]  # 取最后N根
+            self.inst_day_bars[(inst, day)] = feats
+        
+        # 构建样本列表: (instrument, target_day)
+        label_df = label_df.copy()
+        label_df["tday"] = pd.to_datetime(label_df["trade_date"])
+        
+        self.samples = []
+        for _, row in label_df.iterrows():
+            inst = row["instrument"]
+            tday = row["tday"]
+            label = row["label"]
+            
+            if pd.isna(label):
+                continue
+            
+            # 检查 lookback window 是否有足够数据
+            tday_i = day2idx.get(tday, -1)
+            if tday_i < self.lookback_days:
+                continue
+            
+            # 检查至少有一半的历史 bars 存在
+            window_days = all_days[tday_i - self.lookback_days: tday_i]
+            available = sum(1 for d in window_days if (inst, d) in self.inst_day_bars)
+            if available < self.lookback_days // 2:
+                continue
+            
+            self.samples.append((inst, tday, window_days, float(label)))
+        
+        self.all_days = all_days
+        print(f"[Dataset] {len(self.samples):,} samples")
+    
+    def __len__(self):
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        inst, tday, window_days, label = self.samples[idx]
+        
+        # 拼接 lookback_days 天的 bars
+        day_arrays = []
+        for d in window_days:
+            bars = self.inst_day_bars.get((inst, d))
+            if bars is None:
+                # 该天无数据，用零 pad
+                bars = np.zeros((self.bars_per_day, N_FEATURES), dtype=np.float32)
+            else:
+                # pad 到 bars_per_day
+                if len(bars) < self.bars_per_day:
+                    pad = np.zeros((self.bars_per_day - len(bars), N_FEATURES), dtype=np.float32)
+                    bars = np.concatenate([pad, bars], axis=0)
+            day_arrays.append(bars)
+        
+        x = np.concatenate(day_arrays, axis=0)  # (seq_len, n_features)
+        return torch.FloatTensor(x), torch.FloatTensor([label])
+
+
+# ===================== 4. Transformer 模型 =====================
+class TransformerAlpha(nn.Module):
+    """
+    端到端 Transformer 模型。
+    输入: (batch, seq_len, n_features)
+    输出: (batch, 1) 预测分数
+    
+    参数量约 3~5M，满足 [10万, 1亿] 约束。
+    """
+    def __init__(self, n_features: int, d_model: int = 64, nhead: int = 4,
+                 num_layers: int = 3, d_ff: int = 256, dropout: float = 0.1,
+                 seq_len: int = 960):
+        super().__init__()
+        
+        # 输入投影：原始特征 -> d_model
+        self.input_proj = nn.Linear(n_features, d_model)
+        
+        # 位置编码（可学习）
+        self.pos_embed = nn.Parameter(torch.randn(1, seq_len, d_model) * 0.02)
+        
+        # Transformer Encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=d_ff,
+            dropout=dropout,
+            batch_first=True,
+            norm_first=True,   # Pre-LN，更稳定
+        )
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers,
+            enable_nested_tensor=False,
+        )
+        
+        # 输出头：取 CLS token（最后时间步）-> 预测分数
+        self.head = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_ff // 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_ff // 4, 1),
+        )
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
+    def forward(self, x):
+        # x: (batch, seq_len, n_features)
+        batch_size, seq_len, _ = x.shape
+        
+        # 投影到 d_model
+        x = self.input_proj(x)  # (batch, seq_len, d_model)
+        
+        # 加位置编码
+        x = x + self.pos_embed[:, :seq_len, :]
+        
+        # Transformer
+        x = self.transformer(x)  # (batch, seq_len, d_model)
+        
+        # 取最后时间步作为汇聚表示
+        x = x[:, -1, :]  # (batch, d_model)
+        
+        # 输出
+        out = self.head(x)  # (batch, 1)
+        return out
+
+
+def count_params(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+# ===================== 5. 训练 =====================
+def train(model, train_loader, val_loader, config, device):
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
+    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=config["epochs"], eta_min=1e-6
+    )
+    criterion = nn.MSELoss()
+    
+    best_val_loss = float("inf")
+    patience = 0
+    
+    for epoch in range(1, config["epochs"] + 1):
+        # --- Train ---
+        model.train()
+        train_loss = 0.0
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            optimizer.zero_grad()
+            pred = model(x)
+            loss = criterion(pred, y)
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            train_loss += loss.item()
+        train_loss /= len(train_loader)
+        
+        # --- Val ---
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x, y = x.to(device), y.to(device)
+                pred = model(x)
+                val_loss += criterion(pred, y).item()
+        val_loss /= len(val_loader)
+        
+        scheduler.step()
+        
+        print(f"[Epoch {epoch:03d}] train_loss={train_loss:.6f}  val_loss={val_loss:.6f}  lr={scheduler.get_last_lr()[0]:.2e}")
+        
+        # 早停 & 保存最优模型
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience = 0
+            torch.save(model.state_dict(), config["model_path"])
+            print(f"  -> Best model saved (val_loss={best_val_loss:.6f})")
+        else:
+            patience += 1
+            if patience >= config["early_stop"]:
+                print(f"[Early Stop] No improvement for {config['early_stop']} epochs.")
+                break
+    
+    print(f"[Train] Done. Best val_loss={best_val_loss:.6f}")
+
+
+# ===================== 6. 推理 =====================
+def predict(model, bar_df: pd.DataFrame, label_df: pd.DataFrame,
+            config: dict, device: torch.device) -> pd.DataFrame:
+    """对推理数据集做预测，返回 date/instrument/score"""
+    dataset = StockSequenceDataset(
+        bar_df, label_df,
+        lookback_days=config["lookback_days"],
+        bars_per_day=config["bars_per_day"],
+    )
+    loader = DataLoader(dataset, batch_size=config["batch_size"] * 2,
+                        shuffle=False, num_workers=0)
+    
+    model.eval()
+    preds = []
+    with torch.no_grad():
+        for x, _ in loader:
+            x = x.to(device)
+            out = model(x).cpu().numpy().flatten()
+            preds.append(out)
+    
+    preds = np.concatenate(preds)
+    
+    # 提取 meta 信息（与 dataset.samples 对应）
+    meta = [(inst, tday) for inst, tday, _, _ in dataset.samples]
+    result = pd.DataFrame(meta, columns=["instrument", "date"])
+    result["score"] = preds
+    result = result[["date", "instrument", "score"]]
+    result["date"] = pd.to_datetime(result["date"]).dt.date
+    
+    return result
+
+
+# ===================== 7. main 函数（评判程序入口）=====================
+def main(data_source: str, start_datetime: str, end_datetime: str) -> pd.DataFrame:
+    """
+    评判程序调用入口。
+    
+    Args:
+        data_source: 数据源名称（本赛道传入 bigalpha_2026_stock_bar5m 等）
+        start_datetime: 开始日期时间，格式 "YYYY-MM-DD HH:MM:SS"
+        end_datetime:   结束日期时间，格式 "YYYY-MM-DD HH:MM:SS"
+    
+    Returns:
+        pd.DataFrame with columns [date, instrument, score]
+    """
+    print(f"[Main] data_source={data_source}, range=[{start_datetime}, {end_datetime}]")
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[Main] Device: {device}")
+    
+    # 解析推理日期范围
+    infer_start = start_datetime[:10]
+    infer_end   = end_datetime[:10]
+    
+    # ---- 判断是否需要训练 ----
+    need_train = not (os.path.exists(CONFIG["model_path"]) and
+                      os.path.exists(CONFIG["scaler_path"]))
+    
+    if need_train:
+        print("[Main] === TRAINING PHASE ===")
+        
+        # 1. 加载训练 + 验证数据
+        train_bar = load_bar_data(CONFIG["train_start"], CONFIG["val_end"])
+        train_bar = build_daily_features(train_bar)
+        
+        # 2. Fit scaler（仅用训练集）
+        train_only_bar = train_bar[train_bar["trading_day_str"] <= pd.Timestamp(CONFIG["train_end"])]
+        scaler = BarScaler()
+        scaler.fit(train_only_bar)
+        scaler.save(CONFIG["scaler_path"])
+        
+        # 3. 变换全部数据
+        train_bar = scaler.transform(train_bar)
+        
+        # 4. 计算标签
+        all_labels = compute_daily_labels(CONFIG["train_start"], CONFIG["val_end"])
+        
+        # 5. 划分 train/val
+        train_labels = all_labels[all_labels["trade_date"] <= pd.Timestamp(CONFIG["train_end"])]
+        val_labels   = all_labels[all_labels["trade_date"] >  pd.Timestamp(CONFIG["train_end"])]
+        
+        train_bar_tr = train_bar[train_bar["trading_day_str"] <= pd.Timestamp(CONFIG["train_end"])]
+        # val 需要 lookback 历史，所以 val bar 包含训练末尾
+        # 简单处理：val 使用全部 bar，Dataset 内部按窗口过滤
+        
+        # 6. 构建 Dataset
+        print("[Main] Building train dataset ...")
+        train_dataset = StockSequenceDataset(
+            train_bar, train_labels,
+            lookback_days=CONFIG["lookback_days"],
+            bars_per_day=CONFIG["bars_per_day"],
+        )
+        print("[Main] Building val dataset ...")
+        val_dataset = StockSequenceDataset(
+            train_bar, val_labels,
+            lookback_days=CONFIG["lookback_days"],
+            bars_per_day=CONFIG["bars_per_day"],
+        )
+        
+        train_loader = DataLoader(train_dataset, batch_size=CONFIG["batch_size"],
+                                  shuffle=True, num_workers=4, pin_memory=True)
+        val_loader   = DataLoader(val_dataset,   batch_size=CONFIG["batch_size"] * 2,
+                                  shuffle=False, num_workers=4, pin_memory=True)
+        
+        # 7. 构建模型
+        seq_len = CONFIG["lookback_days"] * CONFIG["bars_per_day"]
+        model = TransformerAlpha(
+            n_features=N_FEATURES,
+            d_model=CONFIG["d_model"],
+            nhead=CONFIG["nhead"],
+            num_layers=CONFIG["num_layers"],
+            d_ff=CONFIG["d_ff"],
+            dropout=CONFIG["dropout"],
+            seq_len=seq_len,
+        ).to(device)
+        
+        n_params = count_params(model)
+        print(f"[Model] Trainable params: {n_params:,}")
+        assert 100_000 <= n_params <= 100_000_000, f"参数量 {n_params} 不满足约束！"
+        
+        # 8. 训练
+        train(model, train_loader, val_loader, CONFIG, device)
+        
+        del train_dataset, val_dataset, train_loader, val_loader, train_bar
+        import gc; gc.collect()
+    
+    # ---- 推理阶段 ----
+    print("[Main] === INFERENCE PHASE ===")
+    
+    # 加载 scaler
+    scaler = BarScaler()
+    scaler.load(CONFIG["scaler_path"])
+    
+    # 推理需要 lookback 窗口历史数据
+    # 往前多取 lookback_days + buffer 个交易日的数据
+    infer_bar_start = (pd.Timestamp(infer_start) - pd.Timedelta(days=CONFIG["lookback_days"] * 2)).strftime("%Y-%m-%d")
+    
+    infer_bar = load_bar_data(infer_bar_start, infer_end)
+    infer_bar = build_daily_features(infer_bar)
+    infer_bar = scaler.transform(infer_bar)
+    
+    # 推理标签（用于构建 Dataset 的日期索引，label 值不参与推理）
+    # 我们需要知道推理区间内每天的 instrument 列表
+    infer_labels = compute_daily_labels(infer_start, infer_end)
+    # 推理时 label 只用于索引，不需要真实值
+    infer_labels = infer_labels[["trade_date", "instrument", "label"]]
+    
+    # 加载模型
+    seq_len = CONFIG["lookback_days"] * CONFIG["bars_per_day"]
+    model = TransformerAlpha(
+        n_features=N_FEATURES,
+        d_model=CONFIG["d_model"],
+        nhead=CONFIG["nhead"],
+        num_layers=CONFIG["num_layers"],
+        d_ff=CONFIG["d_ff"],
+        dropout=CONFIG["dropout"],
+        seq_len=seq_len,
+    ).to(device)
+    model.load_state_dict(torch.load(CONFIG["model_path"], map_location=device))
+    print("[Main] Model loaded.")
+    
+    # 推理
+    result = predict(model, infer_bar, infer_labels, CONFIG, device)
+    
+    # 数据校验
+    result = result.dropna(subset=["score"])
+    result = result[["date", "instrument", "score"]]
+    
+    print(f"[Main] Output: {len(result):,} rows, {result['date'].nunique()} days, {result['instrument'].nunique()} instruments")
+    print(result.head())
+    
+    return result
+
+
+# ===================== 8. 本地测试入口 =====================
+if __name__ == "__main__":
+    # 本地调试：模拟评判程序调用
+    result = main(
+        data_source="bigalpha_2026_stock_bar5m",
+        start_datetime="2024-01-01 00:00:00",
+        end_datetime="2024-12-31 23:59:59",
+    )
+    
+    # 保存结果
+    result.to_csv("/tmp/submission.csv", index=False)
+    print("[Done] Saved to /tmp/submission.csv")
+    print(result.describe())

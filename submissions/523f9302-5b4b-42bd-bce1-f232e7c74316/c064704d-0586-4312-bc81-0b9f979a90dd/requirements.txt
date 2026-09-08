@@ -1,0 +1,6 @@
+torch>=2.2,<3
+numpy>=1.26,<3
+pandas>=2.0,<4
+pyarrow>=13,<25
+duckdb>=1.0,<2
+structlog>=24,<27
