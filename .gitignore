@@ -5,22 +5,10 @@
 # Python 编译文件
 __pycache__/
 
-# 环境变量
-.env
-
-# 虚拟环境
-.venv/
-*.pyc
-
-# 忽略 MinerU 代码目录
-mineru/
-
-# 忽略 ppt 目录
-ppt/
-system/files/
-
-
 # claude skill
 .claude/
 .codex/
 .agents/
+
+
+system/files/
