@@ -12,3 +12,15 @@ __pycache__/
 
 
 system/files/
+
+# 提交代码和必要配置，不提交 submissions 下的模型权重及运行产物。
+/submissions/**/*.json
+!/submissions/**/*config.json
+!/submissions/**/MANIFEST.json
+!/submissions/**/*manifest*.json
+!/submissions/**/members.json
+!/submissions/**/selected_factors.json
+/submissions/**/*.pt
+/submissions/**/*.json.ep*
+/submissions/**/*.log
+/submissions/**/*.csv
