@@ -5,7 +5,7 @@ from pydantic import Field
 from base import BaseSchema
 
 
-class Bigalpha2026E2EBarKmSchema(BaseSchema):
+class CptJyc2026E2EBarKmSchema(BaseSchema):
     """K 分钟 K 线 + 盘口快照
 
     字段与 bigalpha_2026_stock_bar1m 保持一致, date 为 K 分钟 bar 的
@@ -31,8 +31,8 @@ class Bigalpha2026E2EBarKmSchema(BaseSchema):
     low: np.int32 = Field(description="最低价(单位:分=元×100, 缺失=-1)", default=-1)
     close: np.int32 = Field(description="收盘价(单位:分=元×100, 缺失=-1)", default=-1)
     deal_number: np.int32 = Field(description="成交笔数", default=0)
-    volume: np.int64 = Field(description="总成交量(单位:股)", default=0)
-    amount: np.int64 = Field(description="成交金额(单位:分=元×100)", default=0)
+    volume: np.int64 = Field(description="最新总成交量(单位:股)", default=0)
+    amount: np.int64 = Field(description="最新成交金额(单位:分=元×100)", default=0)
 
     # 委托价格(单位:分=元×100, 缺失=0)
     ask_price1: np.int32 = Field(description="1档委卖价(单位:分=元×100)", default=0)

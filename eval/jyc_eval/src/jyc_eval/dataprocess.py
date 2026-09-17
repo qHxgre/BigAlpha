@@ -1,0 +1,171 @@
+import dai
+import numpy as np
+import pandas as pd
+import structlog
+from datetime import datetime
+from joblib import Parallel, delayed
+from .data import get_exposure
+
+logger = structlog.get_logger()
+
+
+def _solve_normal_equation(X: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """OLS 残差。条件数差时用 SVD 伪逆。"""
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)
+
+    def _solve_with_svd(X_, y_):
+        U, s, Vt = np.linalg.svd(X_, full_matrices=False)
+        eps = np.finfo(float).eps
+        threshold = eps * max(X_.shape) * (np.max(s) if s.size else 1.0)
+        s_inv = np.zeros_like(s)
+        mask = s > threshold
+        s_inv[mask] = 1.0 / s[mask]
+        X_pinv = Vt.T @ np.diag(s_inv) @ U.T
+        beta = X_pinv @ y_
+        return y_ - X_ @ beta
+
+    try:
+        xtx = X.T @ X
+        cond_number = np.linalg.cond(xtx)
+        if not np.isfinite(cond_number) or cond_number > 1e12:
+            return _solve_with_svd(X, y)
+        try:
+            xtx_inv = np.linalg.inv(xtx)
+        except np.linalg.LinAlgError:
+            return _solve_with_svd(X, y)
+        beta = xtx_inv @ (X.T @ y)
+        return y - X @ beta
+    except np.linalg.LinAlgError:
+        return _solve_with_svd(X, y)
+
+
+def _neutralize_one_day(date_df: pd.DataFrame, factor_names: list, exposure_cols: list) -> pd.DataFrame:
+    """单日截面回归取残差。对每个因子列独立回归。"""
+    out = date_df[["date", "instrument"]].copy()
+
+    if exposure_cols:
+        X = date_df[exposure_cols].to_numpy(dtype=float)
+        X = np.column_stack([np.ones(len(date_df), dtype=float), X])
+    else:
+        X = np.ones((len(date_df), 1), dtype=float)
+
+    x_finite = np.isfinite(X).all(axis=1)
+
+    for factor_name in factor_names:
+        y = pd.to_numeric(date_df[factor_name], errors="coerce").to_numpy(dtype=float)
+        mask = np.isfinite(y) & x_finite
+        if mask.sum() < 5:
+            out[factor_name] = np.nan
+            continue
+        try:
+            resid = _solve_normal_equation(X[mask], y[mask])
+            result = np.full_like(y, np.nan, dtype=float)
+            result[mask] = resid
+            out[factor_name] = result
+        except Exception:
+            logger.exception("neutralize: 单日截面回归失败", factor_name=factor_name)
+            out[factor_name] = np.nan
+    return out
+
+
+class DataProcess:
+    """因子预处理：去极值 / 标准化 / 风格剔除（残差）。支持多因子列同步处理。"""
+    def __init__(self, start_date: str, end_date: str):
+        self.start_date = start_date
+        self.end_date = end_date
+
+    @staticmethod
+    def _factor_cols(factor_data: pd.DataFrame) -> list:
+        """date/instrument 之外的列均视为待处理的因子列。"""
+        return [c for c in factor_data.columns if c not in {"date", "instrument"}]
+
+    def drop_inf(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """把 inf/-inf 置为 NaN，不删行。对所有因子列生效。"""
+        df = factor_data.copy()
+        for col in self._factor_cols(df):
+            x = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float)
+            inf_mask = np.isinf(x)
+            if inf_mask.any():
+                logger.warning("发现 inf/-inf，已置为 NaN", factor=col, count=int(inf_mask.sum()))
+                x[inf_mask] = np.nan
+            df[col] = x
+        return df
+
+    def winsorize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """3 倍标准差去极值（按 date 截面）。对所有因子列逐列处理。"""
+        factor_cols = self._factor_cols(factor_data)
+        clip_exprs = ",\n            ".join(
+            f"clip({col}, c_avg({col}, pb:=date) - 3 * c_std({col}, pb:=date), "
+            f"c_avg({col}, pb:=date) + 3 * c_std({col}, pb:=date)) AS {col}"
+            for col in factor_cols
+        )
+        sql = f"""
+        SELECT
+            date,
+            instrument,
+            {clip_exprs}
+        FROM factor_data
+        ORDER BY date, instrument
+        """
+        return dai.query(sql, bind_relations={"factor_data": factor_data}).df()
+
+    def normalize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """截面 z-score 标准化（按 date 截面）。对所有因子列逐列处理。"""
+        factor_cols = self._factor_cols(factor_data)
+        norm_exprs = ",\n            ".join(
+            f"c_normalize({col}, pb:=date) AS {col}" for col in factor_cols
+        )
+        sql = f"""
+        SELECT
+            date,
+            instrument,
+            {norm_exprs}
+        FROM factor_data
+        ORDER BY date, instrument
+        """
+        return dai.query(sql, bind_relations={"factor_data": factor_data}).df()
+
+    def neutralize(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """风格剔除：对每个因子列做 ~ BARRA 风格暴露 + 行业哑变量回归，取残差。"""
+        df = factor_data.copy()
+        factor_cols = self._factor_cols(df)
+
+        neutralize_df = get_exposure(self.start_date, self.end_date)
+
+        merge_df = pd.merge(df, neutralize_df, how="left", on=["date", "instrument"])
+
+        exclude = {"date", "instrument", *factor_cols}
+        exposure_cols = [c for c in merge_df.columns if c not in exclude]
+
+        if exposure_cols:
+            merge_df[exposure_cols] = merge_df[exposure_cols].fillna(0)
+
+        parallel_result = Parallel(backend="threading", n_jobs=-1)(
+            delayed(_neutralize_one_day)(group_df, factor_cols, exposure_cols)
+            for _, group_df in merge_df.groupby("date")
+        )
+
+        return pd.concat(parallel_result, ignore_index=True)
+
+    def validate(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """完整预处理流程。对 date/instrument 之外的所有因子列同步处理。"""
+   
+        t0 = datetime.now()
+        factor_data = self.drop_inf(factor_data)
+        t1 = datetime.now()
+        logger.info(f"inf 处理, 耗时: {round((t1 - t0).total_seconds(), 4)} 秒")
+
+        factor_data = self.winsorize(factor_data)
+        t2 = datetime.now()
+        logger.info(f"去极值, 耗时: {round((t2 - t1).total_seconds(), 4)} 秒")
+
+        factor_data = self.normalize(factor_data)
+        t3 = datetime.now()
+        logger.info(f"标准化, 耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
+
+        factor_data = self.neutralize(factor_data)
+        t4 = datetime.now()
+        logger.info(f"风格剔除(取残差), 耗时: {round((t4 - t3).total_seconds(), 4)} 秒")
+
+        return factor_data
