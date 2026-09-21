@@ -24,8 +24,8 @@ class CptJyc2026StockBarKmSchema(BaseSchema):
     low: np.float32 = Field(description="最低价", default=np.nan)
     close: np.float32 = Field(description="收盘价", default=np.nan)
     deal_number: np.int32 = Field(description="成交笔数", default=0)
-    volume: np.int32 = Field(description="总成交量", default=0)
-    amount: np.float32 = Field(description="成交金额", default=np.nan)
+    volume: np.int32 = Field(description="成交量", default=0)
+    amount: np.float32 = Field(description="成交额", default=np.nan)
 
     # 委托价格
     ask_price1: np.float32 = Field(description="1档委卖价", default=0)
