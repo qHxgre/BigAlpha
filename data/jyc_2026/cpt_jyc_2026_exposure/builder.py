@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from cpt_jyc_2026_exposure.schema import CptJyc2026ExposureSchema
+from jyc_2026.cpt_jyc_2026_exposure.schema import CptJyc2026ExposureSchema
 
 
 class CptJyc2026ExposureBuilder(BaseBuilder):

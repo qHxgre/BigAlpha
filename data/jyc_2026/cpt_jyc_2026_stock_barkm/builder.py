@@ -4,8 +4,8 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from cpt_jyc_2026_stock_barkm.constant import TIME_SETS
-from cpt_jyc_2026_stock_barkm.schema import CptJyc2026StockBarKmSchema
+from jyc_2026.cpt_jyc_2026_stock_barkm.constant import TIME_SETS
+from jyc_2026.cpt_jyc_2026_stock_barkm.schema import CptJyc2026StockBarKmSchema
 
 
 class CptJyc2026StockBarKmBuilder(BaseBuilder):

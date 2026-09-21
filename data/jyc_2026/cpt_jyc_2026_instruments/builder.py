@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 from base import BaseBuilder
-from cpt_jyc_2026_instruments.schema import CptJyc2026InstrumentsSchema
+from jyc_2026.cpt_jyc_2026_instruments.schema import CptJyc2026InstrumentsSchema
 
 
 class CptJyc2026InstrumentsBuilder(BaseBuilder):
