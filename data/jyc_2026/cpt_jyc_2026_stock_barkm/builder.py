@@ -40,12 +40,12 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
         self.start_date = start_date
         self.end_date = end_date
         
-        # 股票池：2019年至今的中证1000指数成分
+        # 股票池：2020年至今的中证2000指数成分
         self.instruments = dai.query("""
         SELECT date, member_code
         FROM cn_stock_index_component
-        WHERE instrument='000852.SH'
-        AND date>'2019-01-01'
+        WHERE instrument='932000.CSI'
+        AND date>'2020-01-01'
         """).df()['member_code'].unique().tolist()
 
         self.K = int(K)

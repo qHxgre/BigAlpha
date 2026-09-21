@@ -30,7 +30,6 @@ class CptJyc2026E2EBarKmBuilder(BarKmBuilder):
     def __init__(self, start_date: str, end_date: str, K: int = 1, suffix: str=None) -> None:
         super().__init__(start_date, end_date, K, suffix)
         
-        # 股票池：2019年至今的中证1000指数成分
         self.instruments_df = dai.query("SELECT date, member_code FROM cn_stock_index_component", 
             filters={'date': [self.start_date, self.end_date], 'instrument': ['932000.CSI']}).df()
         self.instruments_df = self.instruments_df.rename(columns={'member_code': 'instrument', 'date': 'trading_day'})
