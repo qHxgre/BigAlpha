@@ -11,7 +11,7 @@ __pycache__/
 .agents/
 
 
-system/files/
+files/
 
 # 提交代码和必要配置，不提交 submissions 下的模型权重及运行产物。
 /submissions/**/*.json
