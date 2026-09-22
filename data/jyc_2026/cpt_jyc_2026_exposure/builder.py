@@ -41,7 +41,7 @@ class CptJyc2026ExposureBuilder(BaseBuilder):
         WITH cte_index AS (
             SELECT date, member_code AS instrument
             FROM cn_stock_index_component
-            WHERE instrument = '932000.CSI'
+            WHERE instrument = '000852.SH'
         )
         SELECT e.*
         FROM bq_exposure e

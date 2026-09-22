@@ -78,7 +78,7 @@ class CptJyc2026VwapBuilder(BaseBuilder):
                 CAST(strftime(date, '%Y%m%d') AS INT32) AS trading_day,
                 member_code AS instrument
             FROM cn_stock_index_component
-            WHERE instrument = '932000.CSI'
+            WHERE instrument = '000852.SH'
         )
         SELECT
             s.date,

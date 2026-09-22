@@ -44,7 +44,7 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
         self.instruments = dai.query("""
         SELECT date, member_code
         FROM cn_stock_index_component
-        WHERE instrument='932000.CSI'
+        WHERE instrument='000852.SH'
         AND date>'2020-01-01'
         """).df()['member_code'].unique().tolist()
 
