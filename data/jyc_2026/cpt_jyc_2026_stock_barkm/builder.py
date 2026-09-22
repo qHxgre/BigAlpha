@@ -3,6 +3,7 @@ from datetime import datetime
 import dai
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 
 from base import BaseBuilder
 from jyc_2026.cpt_jyc_2026_stock_barkm.constant import TIME_SETS
@@ -62,9 +63,13 @@ class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
         start_date: str,
         end_date: str,
         suffix: str = None,
+        n_jobs: int = 8,
     ) -> None:
         self.start_date = start_date
         self.end_date = end_date
+        self.n_jobs = int(n_jobs)
+        if self.n_jobs == 0:
+            raise ValueError("n_jobs 不能为 0")
         self.stock_pool = dai.query(
             """
             SELECT date, member_code AS instrument
@@ -145,20 +150,47 @@ class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
         return out.drop(columns="trading_day")
 
     def build(self) -> pd.DataFrame:
+        start_date = pd.Timestamp(self.start_date).normalize()
+        end_date = pd.Timestamp(self.end_date).normalize()
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+
         t0 = datetime.now()
-        snapshots = self.get_data(self.start_date, self.end_date)
+        snapshots = self.get_data(start_date_str, end_date_str)
         t1 = datetime.now()
         print(
             f"获取快照耗时: {round((t1 - t0).total_seconds(), 4)} 秒, "
             f"行数: {len(snapshots)}"
         )
 
-        df = self.build_one_minute(snapshots)
-        df = self.enrich_one_minute(df, self.start_date, self.end_date)
+        if snapshots.empty:
+            print("源数据为空，跳过构建和入库")
+            return pd.DataFrame(columns=self.schema.columns())
+
+        snapshots["date"] = pd.to_datetime(snapshots["date"])
+        snapshots["__trading_day"] = snapshots["date"].dt.normalize()
+        daily_snapshots = [
+            group.drop(columns="__trading_day")
+            for _, group in snapshots.groupby(
+                "__trading_day", sort=True, observed=True
+            )
+        ]
+        parallel_result = Parallel(backend="loky", n_jobs=self.n_jobs)(
+            delayed(OneMinuteBarBuilder.build)(daily_snapshot)
+            for daily_snapshot in daily_snapshots
+        )
+        parallel_result = [df for df in parallel_result if not df.empty]
+        if not parallel_result:
+            print("分钟行情构建结果为空，跳过入库")
+            return pd.DataFrame(columns=self.schema.columns())
+
+        df = pd.concat(parallel_result, ignore_index=True)
+        df = self.enrich_one_minute(df, start_date_str, end_date_str)
         t2 = datetime.now()
         print(
-            f"一分钟构建及信息合并耗时: "
-            f"{round((t2 - t1).total_seconds(), 4)} 秒, 行数: {len(df)}"
+            f"按日并行构建及信息合并耗时: "
+            f"{round((t2 - t1).total_seconds(), 4)} 秒, "
+            f"交易日数: {len(daily_snapshots)}, 行数: {len(df)}"
         )
 
         df = self.normalize(df)
