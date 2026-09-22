@@ -6,12 +6,12 @@ from base import BaseSchema
 
 
 class CptJyc2026VwapSchema(BaseSchema):
-    """未来 30 分钟 VWAP 收益标签。"""
+    """股票及指数的未来 30 分钟 VWAP 收益标签。"""
 
     date: np.datetime64 = Field(
         description="采样时点（未来30分钟窗口起点）", default=0
     )
-    instrument: pd.StringDtype = Field(description="股票代码", default=np.nan)
+    instrument: pd.StringDtype = Field(description="股票或指数代码", default=np.nan)
     vwap_return: np.float32 = Field(
         description="窗口终点价格相对未来30分钟VWAP的收益率",
         default=np.nan,

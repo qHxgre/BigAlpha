@@ -9,7 +9,7 @@ from jyc_2026.cpt_jyc_2026_vwap.schema import CptJyc2026VwapSchema
 
 
 class CptJyc2026VwapBuilder(BaseBuilder):
-    """构建未来 30 分钟 VWAP 收益标签。
+    """构建股票及指数的未来 30 分钟 VWAP 收益标签。
 
     标签时点为 09:30、10:00、10:30、11:00、11:30、13:30、14:00、
     14:30。收益定义为 ``window_end_price / future_vwap - 1``。其中
@@ -30,6 +30,7 @@ class CptJyc2026VwapBuilder(BaseBuilder):
     schema = CptJyc2026VwapSchema
 
     _CUMULATIVE_COLUMNS = ["volume", "amount", "num_trades"]
+    _INDEX_INSTRUMENTS = ("000852.SH",)
     _OUTPUT_COLUMNS = [
         "date",
         "instrument",
@@ -71,8 +72,8 @@ class CptJyc2026VwapBuilder(BaseBuilder):
         )
 
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        """读取中证 2000 历史成分股的标签计算所需快照字段。"""
-        sql = """
+        """读取中证 1000 历史成分股及指数本身的快照字段。"""
+        stock_sql = """
         WITH cte_index AS (
             SELECT
                 CAST(strftime(date, '%Y%m%d') AS INT32) AS trading_day,
@@ -93,16 +94,39 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             ON s.trading_day = i.trading_day
             AND s.instrument = i.instrument
         """
-        return dai.query(
-            sql,
+        date_filter = {
+            "date": [
+                f"{start_date} 00:00:00",
+                f"{end_date} 23:59:59",
+            ]
+        }
+        stock_df = dai.query(
+            stock_sql,
+            filters=date_filter,
+            compression=True,
+        ).df()
+
+        index_df = dai.query(
+            "SELECT * FROM cn_stock_index_snapshot ORDER BY date",
             filters={
-                "date": [
-                    f"{start_date} 00:00:00",
-                    f"{end_date} 23:59:59.999",
-                ]
+                **date_filter,
+                "instrument": list(self._INDEX_INSTRUMENTS),
             },
             compression=True,
         ).df()
+        snapshot_columns = [
+            "date",
+            "trading_day",
+            "instrument",
+            "price",
+            "volume",
+            "amount",
+            "num_trades",
+        ]
+        return pd.concat(
+            [stock_df[snapshot_columns], index_df[snapshot_columns]],
+            ignore_index=True,
+        )
 
     @staticmethod
     def _assign_window_start(date: pd.Series) -> pd.Series:

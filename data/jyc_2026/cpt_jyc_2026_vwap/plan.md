@@ -2,13 +2,15 @@
 
 ## 数据范围
 
-从 `cn_stock_level2_snapshot` 读取快照数据，并通过
-`cn_stock_index_component` 筛选当日中证 2000（`932000.CSI`）历史成分股。
-使用字段：`date`、`instrument`、`price`、`volume`、`amount`、`num_trades`。
+从 `cn_stock_level2_snapshot` 读取股票快照数据，并通过
+`cn_stock_index_component` 筛选当日中证 1000（`000852.SH`）历史成分股；
+同时从 `cn_stock_index_snapshot` 读取 `000852.SH` 指数快照。两类数据统一使用
+字段：`date`、`instrument`、`price`、`volume`、`amount`、`num_trades`。
+股票和指数分别查询，再通过 Pandas 纵向合并，不在 SQL 中跨数据表合并。
 
 ## 构建方法
 
-1. 按股票、交易日和快照时间排序。
+1. 按标的、交易日和快照时间排序，股票和指数采用相同的聚合逻辑。
 2. `volume`、`amount`、`num_trades` 为日内累计值，先按股票和交易日做相邻快照差分，得到单条快照的成交增量；若差分为负，视为累计值重置，使用当前累计值作为增量。
 3. 将成交增量映射至左开右闭的 30 分钟窗口，并分别汇总窗口成交量、成交额和成交笔数。
 4. 以窗口成交额除以窗口成交量得到 VWAP；取窗口内最后一个大于 0 的 `price` 作为终点价格。
