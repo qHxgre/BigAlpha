@@ -196,6 +196,17 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             # 盘中重置时，当前累计值就是重置后的有效增量。
             data[f"__{column}_delta"] = delta.where(delta >= 0, data[column])
 
+        # 股票的 amount / volume 与股票价格处于同一量纲，可以直接用于
+        # VWAP。指数快照的 amount、volume 是成分证券的汇总成交额和成交量，
+        # amount / volume 并不是指数点位，因此指数改用快照点位按成交量增量
+        # 加权：sum(price * volume_delta) / sum(volume_delta)。
+        data["__vwap_numerator_delta"] = data["__amount_delta"]
+        is_index = data["instrument"].isin(cls._INDEX_INSTRUMENTS)
+        data.loc[is_index, "__vwap_numerator_delta"] = (
+            data.loc[is_index, "__valid_price"]
+            * data.loc[is_index, "__volume_delta"]
+        )
+
         data["__window_start"] = cls._assign_window_start(data["date"])
         data = data.dropna(subset=["__window_start"])
         if data.empty:
@@ -209,6 +220,7 @@ class CptJyc2026VwapBuilder(BaseBuilder):
                     column: (f"__{column}_delta", "sum")
                     for column in cls._CUMULATIVE_COLUMNS
                 },
+                __vwap_numerator=("__vwap_numerator_delta", "sum"),
             )
             .reset_index()
             .rename(columns={"__window_start": "date"})
@@ -216,10 +228,10 @@ class CptJyc2026VwapBuilder(BaseBuilder):
 
         has_volume = labels["volume"] > 0
         labels["vwap"] = np.divide(
-            labels["amount"],
+            labels["__vwap_numerator"],
             labels["volume"],
             out=np.full(len(labels), np.nan, dtype="float64"),
-            where=has_volume & labels["amount"].notna(),
+            where=has_volume & labels["__vwap_numerator"].notna(),
         )
         valid_vwap = labels["vwap"] > 0
         labels["vwap_return"] = np.divide(
