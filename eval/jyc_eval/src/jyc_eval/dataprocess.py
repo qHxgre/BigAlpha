@@ -74,6 +74,7 @@ class DataProcess:
     def __init__(self, start_date: str, end_date: str):
         self.start_date = start_date
         self.end_date = end_date
+        self.raw_factor = pd.DataFrame()
 
     @staticmethod
     def _factor_cols(factor_data: pd.DataFrame) -> list:
@@ -132,8 +133,21 @@ class DataProcess:
         factor_cols = self._factor_cols(df)
 
         neutralize_df = get_exposure(self.start_date, self.end_date)
-
-        merge_df = pd.merge(df, neutralize_df, how="left", on=["date", "instrument"])
+        # 暴露为日频，同一交易日的 8 个分钟截面使用同一份暴露。
+        df["date"] = pd.to_datetime(df["date"])
+        df["__trading_day"] = df["date"].dt.normalize()
+        neutralize_df = neutralize_df.copy()
+        neutralize_df["__trading_day"] = pd.to_datetime(neutralize_df["date"]).dt.normalize()
+        neutralize_df = neutralize_df.drop(columns="date").drop_duplicates(
+            ["__trading_day", "instrument"], keep="last"
+        )
+        merge_df = pd.merge(
+            df,
+            neutralize_df,
+            how="left",
+            on=["__trading_day", "instrument"],
+            validate="many_to_one",
+        ).drop(columns="__trading_day")
 
         exclude = {"date", "instrument", *factor_cols}
         exposure_cols = [c for c in merge_df.columns if c not in exclude]
@@ -169,3 +183,8 @@ class DataProcess:
         logger.info(f"风格剔除(取残差), 耗时: {round((t4 - t3).total_seconds(), 4)} 秒")
 
         return factor_data
+
+    def run(self, factor_data: pd.DataFrame) -> pd.DataFrame:
+        """保存原始提交并执行完整预处理流程。"""
+        self.raw_factor = factor_data.copy().reset_index(drop=True)
+        return self.validate(factor_data.copy())

@@ -6,23 +6,31 @@ import structlog
 
 logger = structlog.get_logger()
 
-BM_DICT = {
-    "中证500": "000905.SH",
-    "中证1000": "000852.SH",
-    "沪深300": "000300.SH",
-}
-
+BM_DICT = {"中证1000": "000852.SH"}
 
 def load_pool_pairs(start_date: str, end_date: str) -> pd.DataFrame:
-    """加载中证 1000 历史成分股面板 (date, instrument)。"""
-    sql = "SELECT date, instrument FROM bigalpha_2026_instruments"
+    """加载官方分钟级股票池面板 (date, instrument)。"""
+    sql = "SELECT date, instrument FROM cpt_jyc_2026_instruments"
     df = dai.query(sql, filters={"date": [start_date, end_date]}).df()
     if df is None or df.empty:
         raise ValueError("无法获取中证 1000 股票池数据，无法进行评估，请联系官方解决")
 
-    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["instrument"] = df["instrument"].astype(str)
     return df[["date", "instrument"]].drop_duplicates()
+
+
+def load_evaluation_data(start_date: str, end_date: str) -> pd.DataFrame:
+    """加载官方未来 30 分钟 VWAP 收益标签。"""
+    sql = "SELECT date, instrument, vwap_return FROM cpt_jyc_2026_vwap"
+    df = dai.query(sql, filters={"date": [start_date, end_date]}).df()
+    if df is None or df.empty:
+        raise ValueError("无法获取未来 30 分钟 VWAP 收益标签")
+    df = df.rename(columns={"vwap_return": "forward_return"})
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["instrument"] = df["instrument"].astype(str)
+    df["forward_return"] = pd.to_numeric(df["forward_return"], errors="coerce")
+    return df
 
 
 def get_exposure(start_date: str, end_date: str) -> pd.DataFrame:
@@ -34,8 +42,8 @@ def get_exposure(start_date: str, end_date: str) -> pd.DataFrame:
         AGRIFOREST, MINING, CHEM, IRONSTEEL, NONFERMETAL, ELECTRONICS, AUTO, HOUSEAPP,
         FOODBEVER, TEXTILE, LIGHTINDUS, HEALTH, UTILITIES, TRANSPORTATION, REALESTATE,
         COMMETRADE, LEISERVICE, BANK, NONBANKFINAN, CONGLOMERATES, CONMAT, BUILDDECO,
-        ELECEQP, AERODEF, COMPUTER, MEDIA, TELECOM, COAL, PETRO, ENVP, BEAUTY
-    FROM bigalpha_2026_exposure
+        ELECEQP, MACHIEQUIP, AERODEF, COMPUTER, MEDIA, TELECOM, COAL, PETRO, ENVP, BEAUTY
+    FROM cpt_jyc_2026_exposure
     """
     return dai.query(sql, filters={"date": [start_date, end_date]}).df()
 
