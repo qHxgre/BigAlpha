@@ -1,7 +1,8 @@
+from datetime import datetime
+
 import dai
 import numpy as np
 import pandas as pd
-from datetime import datetime
 
 from base import BaseBuilder
 from jyc_2026.cpt_jyc_2026_stock_barkm.constant import TIME_SETS
@@ -9,215 +10,322 @@ from jyc_2026.cpt_jyc_2026_stock_barkm.schema import CptJyc2026StockBarKmSchema
 
 
 class CptJyc2026StockBarKmBuilder(BaseBuilder):
-    """K 分钟 K 线构建器
-
-    基于已构建的 1 分钟数据源 bigalpha_2026_stock_bar1m, 按交易时段
-    (上午 09:30-11:30, 下午 13:00-15:00) 自定义时间段聚合为 K 分钟 bar，
-    同时为所有频率单独保留 09:25 的开盘集合竞价截面。
-
-    为什么不用简单的 resample:
-        df.resample('5min') 以 0 点为锚点对齐分箱, 对于"右标注"的分钟
-        bar 会整体错位一格, 导致开盘/收盘 bar 被划入相邻分箱, 同时午休
-        时段会产生跨越 11:30~13:00 的空箱或错误聚合。这里改为按 constant.py
-        中写死的时间段端点(TIME_SETS)分箱, 并把 bar 标注在分段的"结束时刻"
-        (收盘段封顶到 11:30 / 15:00), 从而保证开盘、收盘数据都不丢失。
-
-    参数 K 控制频率: 1 / 5 / 15 / 30 等, 必须是 TIME_SETS 中已定义的频率。
-    K=1 时即原始 1 分钟, 不做聚合, 仅过滤连续竞价时段。
-    """
+    """由 Level-2 快照构建中证 1000 成分股 K 分钟行情。"""
 
     unique_together = ["date", "instrument"]
     sort_by = [("date", "ascending"), ("instrument", "ascending")]
     indexes = ["date"]
     schema = CptJyc2026StockBarKmSchema
 
-    # 取分段最后一笔(快照/累计类字段) / 首笔 / 极值
-    FIRST_FIELDS = ["open", "pre_close"]
-    MAX_FIELDS = ["high"]
-    MIN_FIELDS = ["low"]
-    # 其余字段(close、累计 volume/amount/deal_number、盘口快照)均取分段末值
+    _CUMULATIVE_FIELDS = ["volume", "amount", "num_trades"]
+    _PRICE_FIELDS = ["open", "high", "low", "close"]
+    _IDENTITY_FIELDS = ["instrument_id", "adjust_factor"]
+    _MIN_DATE = "2020-01-01"
 
-    def __init__(self, start_date: str, end_date: str, K: int = 1, suffix: str=None) -> None:
-        self.start_date = start_date
+    def __init__(
+        self,
+        start_date: str,
+        end_date: str,
+        K: int = 1,
+        suffix: str = None,
+    ) -> None:
+        self.start_date = max(start_date, self._MIN_DATE)
         self.end_date = end_date
-        
-        # 股票池：2020年至今的中证2000指数成分
-        self.instruments = dai.query("""
-        SELECT date, member_code
-        FROM cn_stock_index_component
-        WHERE instrument='000852.SH'
-        AND date>'2020-01-01'
-        """).df()['member_code'].unique().tolist()
-
         self.K = int(K)
         if self.K not in TIME_SETS:
-            raise ValueError(f"不支持的频率 K={self.K}, 可选: {sorted(TIME_SETS)} (在 constant.py 中定义)")
-        
-        if suffix is None:
-            self.datasource_id = f"cpt_jyc_2026_stock_bar{self.K}m"
-        else:
-            self.datasource_id = f"cpt_jyc_2026_stock_bar{self.K}m_{suffix}"
+            raise ValueError(
+                f"不支持的频率 K={self.K}, 可选: {sorted(TIME_SETS)} "
+                "(在 constant.py 中定义)"
+            )
 
-        print(f"初始化！{self.datasource_id}, 频率: {self.K}分钟, 时间周期: {self.start_date}, {self.end_date}")
+        name = f"cpt_jyc_2026_stock_bar{self.K}m"
+        self.datasource_id = f"{name}_{suffix}" if suffix else name
+        print(
+            f"初始化！{self.datasource_id}, 频率: {self.K}分钟, "
+            f"时间周期: {self.start_date}, {self.end_date}"
+        )
 
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.reindex(columns=self.schema.columns())
         df = df.astype(self.schema.field_type_mapping())
-        df = df.fillna(self.schema.field_default_mapping())
-        return df
+        return df.fillna(self.schema.field_default_mapping())
 
-    def dai_write(self, df: pd.DataFrame):
-        default_docs = self.schema.default_docs()
-        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.strftime("%Y%m").astype("int64")
+    def dai_write(self, df: pd.DataFrame) -> None:
+        df[dai.DEFAULT_PARTITION_FIELD] = (
+            df["date"].dt.strftime("%Y%m").astype("int64")
+        )
         dai.DataSource.write_bdb(
             df,
             id=self.datasource_id,
             unique_together=self.unique_together,
             sort_by=self.sort_by,
             indexes=self.indexes,
-            docs=default_docs,
+            docs=self.schema.default_docs(),
         )
 
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        # 复权因子
+        """按交易日成分关系读取 2020 年以来的中证 1000 快照。"""
         sql = """
-        SELECT date as trading_day, instrument, adjust_factor
-        FROM cn_stock_real_bar1d
+        WITH index_members AS (
+            SELECT
+                CAST(strftime(date, '%Y%m%d') AS INT32) AS trading_day,
+                member_code AS instrument
+            FROM cn_stock_index_component
+            WHERE instrument = '000852.SH'
+              AND date >= '2020-01-01'
+        )
+        SELECT s.*
+        FROM cn_stock_level2_snapshot s
+        INNER JOIN index_members m
+            ON s.trading_day = m.trading_day
+           AND s.instrument = m.instrument
         """
-        dff = dai.query(sql, filters={
-            "date": [start_date, end_date],
-            "instrument": self.instruments
-        }).df()
-        dff['trading_day'] = dff['trading_day'].dt.strftime('%Y-%m-%d')
-        dff['trading_day'] = dff['trading_day'].str.replace('-', '').astype(int)
+        return dai.query(
+            sql,
+            filters={
+                "date": [
+                    f"{max(start_date, self._MIN_DATE)} 00:00:00",
+                    f"{end_date} 23:59:59",
+                ]
+            },
+            compression=True,
+        ).df()
 
-        # 分钟数据 
-        sql = """
-        SELECT 
-            cn_stock_bar1m_derived_c.*,
-            all_instruments.instrument_id
-        FROM cn_stock_bar1m_derived_c
-        LEFT JOIN all_instruments USING (instrument)
-        """
-        df = dai.query(sql, filters={
-            "date": [f"{start_date} 00:00:00", f"{end_date} 23:59:59"],
-            "instrument": self.instruments
-        }).df()
+    @staticmethod
+    def _elapsed_ms(date: pd.Series) -> pd.Series:
+        return (
+            (date.dt.hour * 3600 + date.dt.minute * 60 + date.dt.second) * 1000
+            + date.dt.microsecond // 1000
+        )
 
-        # 合并数据
-        result = pd.merge(df, dff, how='left', on=['trading_day', 'instrument'])
+    @classmethod
+    def _assign_minute_end(cls, date: pd.Series) -> pd.Series:
+        """按交易所边界把快照映射到 09:25 或连续竞价分钟末端。"""
+        date = pd.to_datetime(date)
+        day = date.dt.normalize()
+        elapsed_ms = cls._elapsed_ms(date)
+        minute_ms = 60_000
 
-        # 去掉列
-        result = result.drop(['trading_day', 'time'], axis=1)
-        return result
+        auction_start = (9 * 3600 + 15 * 60) * 1000
+        auction_end = (9 * 3600 + 25 * 60) * 1000
+        morning_open = (9 * 3600 + 30 * 60) * 1000
+        morning_close = (11 * 3600 + 30 * 60) * 1000
+        afternoon_open = 13 * 3600 * 1000
+        afternoon_close = 15 * 3600 * 1000
+
+        end_minute = pd.Series(np.nan, index=date.index, dtype="float64")
+        auction = (elapsed_ms >= auction_start) & (elapsed_ms <= auction_end)
+        end_minute.loc[auction] = 9 * 60 + 25
+
+        # 减 1ms 让精确的分钟端点仍落在前一个左开右闭区间。
+        for session_open, session_close in (
+            (morning_open, morning_close),
+            (afternoon_open, afternoon_close),
+        ):
+            in_session = (elapsed_ms >= session_open) & (elapsed_ms <= session_close)
+            labels = ((elapsed_ms - 1) // minute_ms + 1).astype("int64")
+            # 开盘时刻本身属于开盘第一分钟，而不是单独生成 09:30/13:00 bar。
+            labels = labels.where(elapsed_ms != session_open, session_open // minute_ms + 1)
+            end_minute.loc[in_session] = labels.loc[in_session]
+
+        return day + pd.to_timedelta(end_minute, unit="m")
+
+    @classmethod
+    def build_one_minute(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """将原始快照转换为 09:25 截面及右闭口径的一分钟行情。"""
+        output_columns = [
+            c for c in cls.schema.columns() if c not in cls._IDENTITY_FIELDS
+        ]
+        if df.empty:
+            return pd.DataFrame(columns=output_columns)
+
+        required = {
+            "date",
+            "instrument",
+            "price",
+            "pre_close",
+            *cls._CUMULATIVE_FIELDS,
+        }
+        missing = required.difference(df.columns)
+        if missing:
+            raise ValueError(f"快照数据缺少字段: {sorted(missing)}")
+
+        data = df.copy()
+        data["date"] = pd.to_datetime(data["date"])
+        data = data.dropna(subset=["date", "instrument"])
+        data = data.sort_values(["instrument", "date"]).reset_index(drop=True)
+        data["__trading_day"] = data["date"].dt.normalize()
+        groups = data.groupby(
+            ["instrument", "__trading_day"], sort=False, observed=True
+        )
+
+        for field in cls._CUMULATIVE_FIELDS:
+            delta = groups[field].diff()
+            # 首条记录或盘中累计值重置时，当前累计值就是有效增量。
+            data[f"__{field}_delta"] = delta.where(
+                delta.notna() & (delta >= 0), data[field]
+            )
+
+        data["__valid_price"] = data["price"].where(data["price"] > 0)
+        data["__minute_end"] = cls._assign_minute_end(data["date"])
+        data = data.dropna(subset=["__minute_end"])
+        if data.empty:
+            return pd.DataFrame(columns=output_columns)
+
+        passthrough = [
+            c
+            for c in cls.schema.columns()
+            if c
+            not in {
+                "date",
+                "instrument",
+                *cls._IDENTITY_FIELDS,
+                *cls._PRICE_FIELDS,
+                "deal_number",
+                "volume",
+                "amount",
+            }
+            and c in data.columns
+        ]
+        agg_spec = {
+            "open": ("__valid_price", "first"),
+            "high": ("__valid_price", "max"),
+            "low": ("__valid_price", "min"),
+            "close": ("__valid_price", "last"),
+            "deal_number": ("__num_trades_delta", "sum"),
+            "volume": ("__volume_delta", "sum"),
+            "amount": ("__amount_delta", "sum"),
+            **{field: (field, "last") for field in passthrough},
+        }
+        out = (
+            data.groupby(["instrument", "__minute_end"], sort=True, observed=True)
+            .agg(**agg_spec)
+            .reset_index()
+            .rename(columns={"__minute_end": "date"})
+        )
+        return out.reindex(columns=output_columns)
+
+    def enrich_one_minute(
+        self, df: pd.DataFrame, start_date: str, end_date: str
+    ) -> pd.DataFrame:
+        """一分钟行情生成后，再补充 instrument_id 和复权因子。"""
+        if df.empty:
+            return df.assign(instrument_id=pd.Series(dtype="int64"), adjust_factor=np.nan)
+
+        instruments = df["instrument"].dropna().unique().tolist()
+        instrument_ids = dai.query(
+            "SELECT instrument, instrument_id FROM all_instruments",
+            filters={"instrument": instruments},
+        ).df()
+        factors = dai.query(
+            "SELECT date, instrument, adjust_factor FROM cn_stock_real_bar1d",
+            filters={
+                "date": [start_date, end_date],
+                "instrument": instruments,
+            },
+        ).df()
+        factors["trading_day"] = pd.to_datetime(factors.pop("date")).dt.normalize()
+
+        out = df.copy()
+        out["trading_day"] = pd.to_datetime(out["date"]).dt.normalize()
+        out = out.merge(
+            instrument_ids,
+            how="left",
+            on="instrument",
+            validate="many_to_one",
+        )
+        out = out.merge(
+            factors,
+            how="left",
+            on=["trading_day", "instrument"],
+            validate="many_to_one",
+        )
+        return out.drop(columns="trading_day")
 
     @staticmethod
     def _hms_to_minute(hms: int) -> int:
-        """HHMMSS 整数 -> 当日分钟数(从 0 点起), 如 93000 -> 570。"""
         return (hms // 10000) * 60 + (hms // 100 % 100)
 
     def _assign_bar_end(self, df: pd.DataFrame) -> pd.Series:
-        """按 constant.py 中写死的时间段端点, 把每条 1 分钟数据分配到所属 bar。
-
-        遍历 TIME_SETS[K] 各时段的相邻端点 (start, end), 每对构成一个 bar:
-          - 每个时段的第一段实行"左闭右闭", 含开盘集合竞价(09:30/13:00)那一笔
-          - 其余段实行"左开右闭", 不含分段起始那一笔
-        bar 标注在该段的结束端点(如 09:35 / 11:30 / 15:00)。
-        09:25 集合竞价/午休等不落在任何段内的数据保持 NaT。09:25 截面
-        由 aggregate 单独保留，其他非连续竞价数据由调用方丢弃。
-        """
-        # 当日 HHMMSS 整数, 直接与时间段端点比较
         hms = df["date"].dt.strftime("%H%M%S").astype(int)
         day = df["date"].dt.normalize()
-
-        # bar 结束端点的分钟数(从 0 点起), 默认 NaN(非连续竞价时段)
         end_minute = pd.Series(np.nan, index=df.index, dtype="float64")
 
         for series in TIME_SETS[self.K].values():
             for i in range(1, len(series)):
                 start_time, end_time = series[i - 1], series[i]
-                if i - 1 == 0:
-                    # 时段第一段: 左闭右闭, 包含开盘那一分钟
-                    mask = (hms >= start_time) & (hms <= end_time)
-                else:
-                    # 其余段: 左开右闭, 不含分段起始那一分钟
-                    mask = (hms > start_time) & (hms <= end_time)
-                end_minute[mask] = self._hms_to_minute(end_time)
-
-        bar_end = day + pd.to_timedelta(end_minute, unit="m")
-        return bar_end
+                mask = (hms > start_time) & (hms <= end_time)
+                end_minute.loc[mask] = self._hms_to_minute(end_time)
+        return day + pd.to_timedelta(end_minute, unit="m")
 
     def aggregate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """按 (instrument, bar结束时刻) 聚合 1 分钟数据为 K 分钟 bar。
-
-        09:25 的开盘集合竞价数据不参与常规 K 分钟窗口聚合，而是作为独立
-        截面原样保留。5/15/30 分钟窗口仍统一从 09:30 开始分段。
-
-        K=1 时目标频率即为 1 分钟，无需聚合，直接保留原始数据（包括
-        09:25 截面）。
-        """
-        if df.empty:
+        """将一分钟行情聚合为 K 分钟；09:25 集合竞价独立保留。"""
+        if df.empty or self.K == 1:
             return df
 
-        if self.K == 1:
-            return df
+        data = df.copy()
+        data["date"] = pd.to_datetime(data["date"])
+        auction = data.loc[data["date"].dt.strftime("%H%M%S") == "092500"].copy()
+        data["__bar_end"] = self._assign_bar_end(data)
+        data = data.dropna(subset=["__bar_end"]).sort_values(["instrument", "date"])
 
-        df = df.copy()
-        df["date"] = pd.to_datetime(df["date"])
-
-        # 开盘集合竞价是独立截面，不能并入 09:30 起算的常规 K 分钟窗口。
-        # 先摘出并原样保留，常规聚合完成后再拼回结果。
-        hms = df["date"].dt.strftime("%H%M%S").astype(int)
-        auction = df.loc[hms == 92500].copy()
-
-        # 用预定义时间段端点标注 bar 结束时刻; 非连续竞价时段为 NaT
-        df["__bar_end"] = self._assign_bar_end(df)
-        df = df.dropna(subset=["__bar_end"])
-        # 时间先排序, 保证 first/last 取到真正的段首/段末
-        df = df.sort_values(["instrument", "date"])
-
-        cols = [c for c in self.schema.columns() if c not in ("date", "instrument")]
-        agg_map = {}
-        for c in cols:
-            if c in self.FIRST_FIELDS:
-                agg_map[c] = "first"
-            elif c in self.MAX_FIELDS:
-                agg_map[c] = "max"
-            elif c in self.MIN_FIELDS:
-                agg_map[c] = "min"
-            else:
-                # close、累计量(volume/amount/deal_number)、盘口快照 -> 段末值
-                agg_map[c] = "last"
-
+        excluded = {
+            "date",
+            "instrument",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "amount",
+            "deal_number",
+        }
+        last_fields = [c for c in data.columns if c not in excluded and c != "__bar_end"]
+        agg_spec = {
+            "open": ("open", "first"),
+            "high": ("high", "max"),
+            "low": ("low", "min"),
+            "close": ("close", "last"),
+            "volume": ("volume", "sum"),
+            "amount": ("amount", "sum"),
+            "deal_number": ("deal_number", "sum"),
+            **{field: (field, "last") for field in last_fields},
+        }
         out = (
-            df.groupby(["instrument", "__bar_end"], sort=True)
-            .agg(agg_map)
+            data.groupby(["instrument", "__bar_end"], sort=True, observed=True)
+            .agg(**agg_spec)
             .reset_index()
             .rename(columns={"__bar_end": "date"})
         )
-
         if not auction.empty:
-            # 与聚合结果保持完全一致的列顺序，避免 concat 引入额外列。
-            auction = auction.reindex(columns=out.columns)
-            out = pd.concat([auction, out], ignore_index=True)
-
+            out = pd.concat(
+                [auction.reindex(columns=out.columns), out], ignore_index=True
+            )
         return out.sort_values(["date", "instrument"]).reset_index(drop=True)
 
     def build(self) -> pd.DataFrame:
-        # 读取 1 分钟数据
         t0 = datetime.now()
-        df = self.get_data(self.start_date, self.end_date)
+        snapshots = self.get_data(self.start_date, self.end_date)
         t1 = datetime.now()
-        print(f"获取数据耗时: {round((t1-t0).total_seconds(), 4)} 秒, 行数: {len(df)}")
+        print(
+            f"获取快照耗时: {round((t1 - t0).total_seconds(), 4)} 秒, "
+            f"行数: {len(snapshots)}"
+        )
 
-        # 聚合为 K 分钟
-        df = self.aggregate(df)
+        df = self.build_one_minute(snapshots)
+        df = self.enrich_one_minute(df, self.start_date, self.end_date)
         t2 = datetime.now()
-        print(f"K分钟聚合耗时: {round((t2-t1).total_seconds(), 4)} 秒, 行数: {len(df)}")
+        print(
+            f"一分钟构建及信息合并耗时: "
+            f"{round((t2 - t1).total_seconds(), 4)} 秒, 行数: {len(df)}"
+        )
 
-        # 存储数据
+        df = self.aggregate(df)
+        t3 = datetime.now()
+        print(f"K分钟聚合耗时: {round((t3 - t2).total_seconds(), 4)} 秒, 行数: {len(df)}")
+
         df = self.normalize(df)
         self.dai_write(df)
-        t3 = datetime.now()
-        print(f"数据存储耗时: {round((t3-t2).total_seconds(), 4)} 秒")
+        t4 = datetime.now()
+        print(f"数据存储耗时: {round((t4 - t3).total_seconds(), 4)} 秒")
         return df

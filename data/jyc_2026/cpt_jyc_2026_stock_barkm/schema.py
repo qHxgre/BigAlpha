@@ -6,13 +6,7 @@ from base import BaseSchema
 
 
 class CptJyc2026StockBarKmSchema(BaseSchema):
-    """K 分钟 K 线 + 盘口快照
-
-    字段与 bigalpha_2026_stock_bar1m 保持一致, date 为 K 分钟 bar 的
-    结束时刻(收盘时刻), 例如 5 分钟频率的早盘首个 bar 标注为 09:35,
-    早盘收盘 bar 标注为 11:30, 尾盘收盘 bar 标注为 15:00；另外所有
-    频率均原样保留 09:25 的开盘集合竞价截面。
-    """
+    """由 Level-2 快照构建的 K 分钟 K 线及五档盘口。"""
 
     date: np.datetime64 = Field(description="日期(bar结束时刻)", default=0)
     instrument: pd.StringDtype = Field(description="股票代码", default=np.nan)
@@ -24,9 +18,9 @@ class CptJyc2026StockBarKmSchema(BaseSchema):
     open: np.float32 = Field(description="开盘价", default=np.nan)
     low: np.float32 = Field(description="最低价", default=np.nan)
     close: np.float32 = Field(description="收盘价", default=np.nan)
-    deal_number: np.int32 = Field(description="成交笔数", default=0)
-    volume: np.int32 = Field(description="成交量", default=0)
-    amount: np.float32 = Field(description="成交额", default=np.nan)
+    deal_number: np.int64 = Field(description="区间成交笔数", default=0)
+    volume: np.int64 = Field(description="区间成交量", default=0)
+    amount: np.float64 = Field(description="区间成交额", default=np.nan)
 
     # 委托价格
     ask_price1: np.float32 = Field(description="1档委卖价", default=0)
