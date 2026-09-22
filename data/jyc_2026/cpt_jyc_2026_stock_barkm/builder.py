@@ -12,7 +12,8 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
     """K 分钟 K 线构建器
 
     基于已构建的 1 分钟数据源 bigalpha_2026_stock_bar1m, 按交易时段
-    (上午 09:30-11:30, 下午 13:00-15:00) 自定义时间段聚合为 K 分钟 bar。
+    (上午 09:30-11:30, 下午 13:00-15:00) 自定义时间段聚合为 K 分钟 bar，
+    同时为所有频率单独保留 09:25 的开盘集合竞价截面。
 
     为什么不用简单的 resample:
         df.resample('5min') 以 0 点为锚点对齐分箱, 对于"右标注"的分钟
@@ -122,7 +123,8 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
           - 每个时段的第一段实行"左闭右闭", 含开盘集合竞价(09:30/13:00)那一笔
           - 其余段实行"左开右闭", 不含分段起始那一笔
         bar 标注在该段的结束端点(如 09:35 / 11:30 / 15:00)。
-        集合竞价/午休等不落在任何段内的数据保持 NaT, 由调用方丢弃。
+        09:25 集合竞价/午休等不落在任何段内的数据保持 NaT。09:25 截面
+        由 aggregate 单独保留，其他非连续竞价数据由调用方丢弃。
         """
         # 当日 HHMMSS 整数, 直接与时间段端点比较
         hms = df["date"].dt.strftime("%H%M%S").astype(int)
@@ -148,7 +150,11 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
     def aggregate(self, df: pd.DataFrame) -> pd.DataFrame:
         """按 (instrument, bar结束时刻) 聚合 1 分钟数据为 K 分钟 bar。
 
-        K=1 时目标频率即为 1 分钟, 无需聚合, 仅过滤连续竞价时段后直接返回。
+        09:25 的开盘集合竞价数据不参与常规 K 分钟窗口聚合，而是作为独立
+        截面原样保留。5/15/30 分钟窗口仍统一从 09:30 开始分段。
+
+        K=1 时目标频率即为 1 分钟，无需聚合，直接保留原始数据（包括
+        09:25 截面）。
         """
         if df.empty:
             return df
@@ -158,6 +164,11 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
 
         df = df.copy()
         df["date"] = pd.to_datetime(df["date"])
+
+        # 开盘集合竞价是独立截面，不能并入 09:30 起算的常规 K 分钟窗口。
+        # 先摘出并原样保留，常规聚合完成后再拼回结果。
+        hms = df["date"].dt.strftime("%H%M%S").astype(int)
+        auction = df.loc[hms == 92500].copy()
 
         # 用预定义时间段端点标注 bar 结束时刻; 非连续竞价时段为 NaT
         df["__bar_end"] = self._assign_bar_end(df)
@@ -184,7 +195,13 @@ class CptJyc2026StockBarKmBuilder(BaseBuilder):
             .reset_index()
             .rename(columns={"__bar_end": "date"})
         )
-        return out
+
+        if not auction.empty:
+            # 与聚合结果保持完全一致的列顺序，避免 concat 引入额外列。
+            auction = auction.reindex(columns=out.columns)
+            out = pd.concat([auction, out], ignore_index=True)
+
+        return out.sort_values(["date", "instrument"]).reset_index(drop=True)
 
     def build(self) -> pd.DataFrame:
         # 读取 1 分钟数据
