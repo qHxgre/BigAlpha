@@ -19,12 +19,6 @@ class _CptJyc2026StockBarBaseBuilder(BaseBuilder):
     indexes = ["date"]
     schema = CptJyc2026StockBarKmSchema
 
-    _MIN_DATE = "2020-01-01"
-
-    def _set_date_range(self, start_date: str, end_date: str) -> None:
-        self.start_date = max(start_date, self._MIN_DATE)
-        self.end_date = end_date
-
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.reindex(columns=self.schema.columns())
         df = df.astype(self.schema.field_type_mapping())
@@ -47,13 +41,40 @@ class _CptJyc2026StockBarBaseBuilder(BaseBuilder):
 class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
     """从 Level-2 snapshot 构建并写入 1 分钟行情。"""
 
+    snapshot_fields = [
+        "date",
+        "instrument",
+        "pre_close",
+        "price",
+        "num_trades",
+        "volume",
+        "amount",
+        *[f"ask_price{i}" for i in range(1, 6)],
+        *[f"bid_price{i}" for i in range(1, 6)],
+        *[f"ask_volume{i}" for i in range(1, 6)],
+        *[f"bid_volume{i}" for i in range(1, 6)],
+        *[f"ask_num_orders{i}" for i in range(1, 6)],
+        *[f"bid_num_orders{i}" for i in range(1, 6)],
+    ]
+
     def __init__(
         self,
         start_date: str,
         end_date: str,
         suffix: str = None,
     ) -> None:
-        self._set_date_range(start_date, end_date)
+        self.start_date = start_date
+        self.end_date = end_date
+        self.stock_pool = dai.query(
+            """
+            SELECT date, member_code AS instrument
+            FROM cn_stock_index_component
+            WHERE instrument = '000852.SH'
+            """,
+            filters={"date": ["2020-01-01", "2024-12-31"]},
+        ).df()
+        self.instruments = self.stock_pool["instrument"].unique().tolist()
+
         name = "cpt_jyc_2026_stock_bar1m"
         self.datasource_id = f"{name}_{suffix}" if suffix else name
         print(
@@ -62,29 +83,19 @@ class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
         )
 
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        """按交易日成分关系读取 2020 年以来的中证 1000 快照。"""
-        sql = """
-        WITH index_members AS (
-            SELECT
-                CAST(strftime(date, '%Y%m%d') AS INT32) AS trading_day,
-                member_code AS instrument
-            FROM cn_stock_index_component
-            WHERE instrument = '000852.SH'
-              AND date >= '2020-01-01'
-        )
-        SELECT s.*
-        FROM cn_stock_level2_snapshot s
-        INNER JOIN index_members m
-            ON s.trading_day = m.trading_day
-           AND s.instrument = m.instrument
-        """
+        """读取快照，并按 2020 至 2024 年中证 1000 成分股并集过滤。"""
+        if not self.instruments:
+            return pd.DataFrame()
+
+        fields = ", ".join(self.snapshot_fields)
         return dai.query(
-            sql,
+            f"SELECT {fields} FROM cn_stock_level2_snapshot",
             filters={
                 "date": [
-                    f"{max(start_date, self._MIN_DATE)} 00:00:00",
+                    f"{start_date} 00:00:00",
                     f"{end_date} 23:59:59",
-                ]
+                ],
+                "instrument": self.instruments,
             },
             compression=True,
         ).df()
@@ -169,7 +180,8 @@ class CptJyc2026StockBarKmBuilder(_CptJyc2026StockBarBaseBuilder):
         K: int,
         suffix: str = None,
     ) -> None:
-        self._set_date_range(start_date, end_date)
+        self.start_date = start_date
+        self.end_date = end_date
         self.K = int(K)
         supported = sorted(k for k in TIME_SETS if k != 1)
         if self.K not in supported:
@@ -192,7 +204,7 @@ class CptJyc2026StockBarKmBuilder(_CptJyc2026StockBarBaseBuilder):
             sql,
             filters={
                 "date": [
-                    f"{max(start_date, self._MIN_DATE)} 00:00:00",
+                    f"{start_date} 00:00:00",
                     f"{end_date} 23:59:59",
                 ]
             },
