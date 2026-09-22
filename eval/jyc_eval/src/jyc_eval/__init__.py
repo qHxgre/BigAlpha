@@ -1,29 +1,36 @@
-"""进益资本 2026 分钟级单因子评估入口。"""
+"""jyc_eval package.
+
+进益资本评估函数
+"""
 
 import pandas as pd
+from bigmodule import I
 
-try:
-    from bigmodule import I
-except ImportError:  # 本地测试环境不依赖 BigQuant UI 类型系统
-    class _I:
-        @staticmethod
-        def port(*args, **kwargs):
-            return object
-        str = bool = port
-    I = _I()
+# Third-party packages the module needs (installed at run time):
+# from bigmodule import R
+# R.require("requests>=2.0", "isort==5.13.2")
 
+# metadata
+# module author
 author = "BigQuant"
+# category shown in the module tree (placeholder)
 category = "BigAlpha"
-friendly_name = "进益资本评估函数"
+# display name
+friendly_name = "jyc_eval"
+# documentation URL, optional
 doc_url = "https://bigquant.com/wiki/"
+# cache the outputs automatically
 cacheable = True
+
 
 def run(
     factor_data: I.port("因子数据: date, instrument, factor") = None,
     start_date: I.str("评估窗口起始日") = None,
     end_date: I.str("评估窗口结束日") = None,
     show: I.bool("画出绩效图") = False,
-):
+)->[
+    I.port("一个DataFrame", "data")
+]:
     """评估单个分钟级 submission，返回原始因子、处理后因子和五项指标。"""
     if factor_data is None:
         raise ValueError("factor_data 不能为空")
