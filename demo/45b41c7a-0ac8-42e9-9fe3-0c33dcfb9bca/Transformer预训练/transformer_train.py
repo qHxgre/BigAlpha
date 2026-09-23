@@ -40,7 +40,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(_HERE, "transformer_model.json")
 
 # ---------- 配置 (写死, 不随平台入参变化) ----------
-TRAIN_START, TRAIN_END = "2022-01-01", "2023-12-31 23:59:59"  # 训练区间写死, 切勿用平台注入的测试区间训练
+TRAIN_START, TRAIN_END = "2020-01-01", "2020-12-31 23:59:59"  # 训练区间写死, 切勿用平台注入的测试区间训练
 SEQ_LEN = 64                  # 每条样本回看多少个 bar
 EPOCHS, BATCH, LR, SEED = 5, 512, 1e-3, 42
 MAX_TRAIN_INSTRUMENTS = 200   # demo 限制训练标的数控制时长, 正式可放开
