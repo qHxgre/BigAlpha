@@ -57,7 +57,7 @@ class FactorAnalyze:
         end_date: str,
         factor_name: str = "factor",
         benchmark: str = "中证1000",
-        group_number: int = 5,
+        group_number: int = 10,
     ) -> None:
         self.start_date = start_date
         self.end_date = end_date
