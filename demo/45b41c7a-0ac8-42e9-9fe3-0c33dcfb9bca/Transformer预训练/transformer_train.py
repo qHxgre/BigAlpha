@@ -41,17 +41,22 @@ MODEL_PATH = os.path.join(_HERE, "transformer_model.json")
 
 # ---------- 配置 (写死, 不随平台入参变化) ----------
 TRAIN_START, TRAIN_END = "2020-01-01", "2020-12-31 23:59:59"  # 训练区间写死, 切勿用平台注入的测试区间训练
-SEQ_LEN = 64                  # 每条样本回看多少个 bar
+SEQ_LEN = 64                  # 每个 30 分钟截面回看的原始 1m bar 数
 EPOCHS, BATCH, LR, SEED = 5, 512, 1e-3, 42
 MAX_TRAIN_INSTRUMENTS = 200   # demo 限制训练标的数控制时长, 正式可放开
 
-PRICE_COLS = ["open", "high", "low", "close", "bid_price1", "ask_price1"]
-VOL_COLS   = ["volume", "amount", "bid_volume1", "ask_volume1"]  # 量纲大, 先 log1p
-FEATURE_COLS = PRICE_COLS + VOL_COLS
+# 直接使用 bar1m 原始字段，不构造派生特征，只做按字段标准化。
+FEATURE_COLS = [
+    "open", "high", "low", "close", "volume", "amount",
+    "bid_price1", "ask_price1", "bid_volume1", "ask_volume1",
+]
 N_FEAT = len(FEATURE_COLS)
+LABEL_TABLE = "cpt_jyc_2026_vwap"
+SECTION_TABLE = "cpt_jyc_2026_instruments"
 
 # 模型结构超参 (训练与推理必须一致, 会一并存入权重文件供推理端重建模型)
 MODEL_CFG = dict(n_feat=N_FEAT, d_model=64, nhead=4, nlayers=2, dim_ff=128, seq_len=SEQ_LEN)
+DATA_ALIGNMENT = "30m_section_uses_bar_end_le_section_and_vwap_return"
 
 
 # ---------- 模型: 单条 Transformer 编码 -> 池化 -> 回归头 ----------
@@ -72,60 +77,83 @@ class StockTransformer(nn.Module):
 
 def pool(sd, ed):
     """区间内中证 1000 成分股代码。"""
-    df = dai.query("SELECT DISTINCT instrument FROM cpt_jyc_2026_instruments",
+    df = dai.query(f"SELECT DISTINCT instrument FROM {SECTION_TABLE}",
                    filters={"date": [sd, ed]}).df()
-    return df["instrument"].tolist()
+    return sorted(df["instrument"].dropna().unique().tolist())
 
 
-# ---------- 数据: 直接用原始字段切窗口, 只做 量log + 标准化 ----------
+# ---------- 数据: 原始 1m bar -> 30 分钟截面，只做标准化 ----------
 def build_dataset(table, sd, ed, mode, instruments, stats=None):
-    """切窗口并标准化 (训练与推理共用)。
-    mode='train' 返回 (X, y, None, stats); 'infer' 返回 (X, None, idx_df, stats)。
-    X 为 (N, SEQ_LEN, N_FEAT); stats 为 (mean, std), 训练集上算好, 推理复用。"""
+    """构建比赛的 30 分钟截面样本。
+
+    截面时间来自 cpt_jyc_2026_instruments；训练标签直接使用
+    cpt_jyc_2026_vwap.vwap_return。每个截面只使用 date <= 截面时间的原始
+    1 分钟 bar，避免未来数据泄漏。
+    """
     t0 = time.time()
-    buf = (pd.to_datetime(sd) - pd.Timedelta(days=20)).strftime("%Y-%m-%d")  # 缓冲凑回看窗口
+    sd_ts = pd.to_datetime(sd)
+    buf = (sd_ts - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
     sql = f"SELECT date, instrument, {', '.join(FEATURE_COLS)} FROM {table} ORDER BY instrument, date"
     df = dai.query(sql, filters={"date": [buf, ed], "instrument": instruments}).df()
-    for c in VOL_COLS:
-        df[c] = np.log1p(df[c].clip(lower=0))                   # 量纲大的字段先 log1p
+    df["date"] = pd.to_datetime(df["date"])
 
-    sd_ts, ed_ts = pd.to_datetime(sd), pd.to_datetime(ed)
-    wins, ys, keys = [], [], []
-    for ins, sub in df.groupby("instrument", sort=False):
-        if len(sub) <= SEQ_LEN:
+    # 以比赛股票池中的 8 个日内时点作为样本主键。
+    section_df = dai.query(
+        f"SELECT date, instrument FROM {SECTION_TABLE} ORDER BY instrument, date",
+        filters={"date": [sd, ed], "instrument": instruments},
+    ).df()
+    section_df["date"] = pd.to_datetime(section_df["date"])
+    section_df = section_df.drop_duplicates(["date", "instrument"])
+
+    if mode == "train":
+        labels = dai.query(
+            f"SELECT date, instrument, vwap_return FROM {LABEL_TABLE}",
+            filters={"date": [sd, ed], "instrument": instruments},
+        ).df()
+        labels["date"] = pd.to_datetime(labels["date"])
+        labels = labels.replace([np.inf, -np.inf], np.nan).dropna(subset=["vwap_return"])
+        section_df = section_df.merge(
+            labels, on=["date", "instrument"], how="inner", validate="one_to_one"
+        )
+
+    wins, ys, sample_keys = [], [], []
+    section_groups = {
+        ins: sub.sort_values("date")
+        for ins, sub in section_df.groupby("instrument", sort=False)
+    }
+    for ins, bars in df.groupby("instrument", sort=False):
+        sections = section_groups.get(ins)
+        if sections is None or len(bars) < SEQ_LEN:
             continue
-        feats = sub[FEATURE_COLS].to_numpy(np.float32)
-        day = sub["date"].dt.normalize().to_numpy()            # 1m bar 时间戳取自然日
-        close_pos = np.flatnonzero(np.append(day[1:] != day[:-1], True))  # 每日最后一根 bar
-        close_px = sub["close"].to_numpy(np.float64)[close_pos]
-        dates = day[close_pos]
-        for k, p in enumerate(close_pos):
-            d = pd.Timestamp(dates[k])
-            if p + 1 < SEQ_LEN or d < sd_ts or d > ed_ts:
-                continue                                        # 历史不足 或 落在缓冲区
-            label = None
-            if k + 1 < len(close_pos) and close_px[k] > 0:
-                r = close_px[k + 1] / close_px[k] - 1.0         # 未来 1 日收益
-                if np.isfinite(r):
-                    label = np.float32(r)
-            if mode == "train" and label is None:
-                continue                                        # 训练集需要标签
-            wins.append(feats[p - SEQ_LEN + 1: p + 1])
-            ys.append(label if label is not None else np.float32(0.0))
-            keys.append((d, ins))
-    if not keys:
+        bars = bars.sort_values("date")
+        bar_time = bars["date"].to_numpy(dtype="datetime64[ns]")
+        feats = bars[FEATURE_COLS].to_numpy(np.float32)
+        for row in sections.itertuples(index=False):
+            section_time = pd.Timestamp(row.date)
+            end = np.searchsorted(bar_time, section_time.to_datetime64(), side="right")
+            if end < SEQ_LEN:
+                continue
+            window = feats[end - SEQ_LEN:end]
+            if pd.Timestamp(bar_time[end - 1]) > section_time:
+                raise RuntimeError(f"特征时点泄漏: {ins}, {section_time}")
+            wins.append(window)
+            ys.append(np.float32(row.vwap_return) if mode == "train" else np.float32(0.0))
+            sample_keys.append((section_time, ins))
+    if not sample_keys:
         raise RuntimeError(f"build_dataset 无样本 (mode={mode}, {sd}~{ed})")
 
     X = np.stack(wins).astype(np.float32)                       # (N, SEQ_LEN, N_FEAT)
-    if stats is None:                                           # 训练集上算, 推理复用
+    X[~np.isfinite(X)] = np.nan
+    if stats is None:                                           # 只在训练集上计算
         flat = X.reshape(-1, N_FEAT)
-        stats = (flat.mean(0).astype(np.float32), flat.std(0).astype(np.float32) + 1e-6)
+        stats = (np.nanmean(flat, 0).astype(np.float32),
+                 (np.nanstd(flat, 0) + 1e-6).astype(np.float32))
     m, s = stats
-    X = ((X - m) / s).astype(np.float32)                        # 按字段标准化
-    logger.info(f"{mode} 集构建完成", samples=len(keys), elapsed=round(time.time() - t0, 2))
+    X = np.nan_to_num((X - m) / s, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+    logger.info(f"{mode} 集构建完成", samples=len(sample_keys), elapsed=round(time.time() - t0, 2))
     if mode == "train":
         return X, np.array(ys, np.float32), None, stats
-    return X, None, pd.DataFrame(keys, columns=["date", "instrument"]), stats
+    return X, None, pd.DataFrame(sample_keys, columns=["date", "instrument"]), stats
 
 
 # ==== 模型存/读: 一律用文本类文件 (JSON), 不使用 .pt 等二进制 ====
@@ -182,8 +210,6 @@ def train_and_save(datasources, model_path=MODEL_PATH):
     Xtr, ytr, _, stats = build_dataset(
         table, TRAIN_START, TRAIN_END, "train",
         pool(TRAIN_START, TRAIN_END)[:MAX_TRAIN_INSTRUMENTS])
-    lo, hi = np.percentile(ytr, [1, 99])
-    ytr = np.clip(ytr, lo, hi)                                  # winsorize 标签
 
     # ---------- 从零训练 ----------
     model = StockTransformer(**MODEL_CFG).to(device)
@@ -216,6 +242,7 @@ def train_and_save(datasources, model_path=MODEL_PATH):
         "model_cfg": MODEL_CFG,
         "feature_cols": FEATURE_COLS,
         "seq_len": SEQ_LEN,
+        "data_alignment": DATA_ALIGNMENT,
         "mean": np.asarray(mean, np.float32).tolist(),         # 存为 list, 加载更稳健
         "std": np.asarray(std, np.float32).tolist(),
     }, model_path)
