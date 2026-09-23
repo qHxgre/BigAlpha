@@ -57,6 +57,22 @@ class JycEvalTest(unittest.TestCase):
         ):
             return run(factor_data, "2026-01-05", "2026-01-06", False)
 
+    def test_show_true_renders_factor_report(self):
+        pool_pairs = self.evaluation_data[["date", "instrument"]]
+        with patch("jyc_eval.datachecker.load_pool_pairs", return_value=pool_pairs), patch(
+            "jyc_eval.factoranalyze.analyzer.load_evaluation_data",
+            return_value=self.evaluation_data,
+        ), patch(
+            "jyc_eval.dataprocess.get_exposure", return_value=self.exposure_data
+        ), patch("jyc_eval.render.render_report") as render_report:
+            result = run(self.factor_data, "2026-01-05", "2026-01-06", True)
+
+        render_report.assert_called_once()
+        call = render_report.call_args.kwargs
+        self.assertFalse(call["group_cumret"].empty)
+        self.assertFalse(call["section_ic"].empty)
+        self.assertEqual(call["score"], result["factor_analyze"])
+
     def test_run_returns_single_factor_analysis(self):
         result = self.evaluate(self.factor_data)
         self.assertEqual(

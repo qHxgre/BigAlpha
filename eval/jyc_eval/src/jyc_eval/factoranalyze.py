@@ -208,6 +208,20 @@ class FactorAnalyze:
             turnovers.append((low_turnover + high_turnover) / 2.0)
         return float(np.mean(turnovers)) if turnovers else 0.0
 
+    def plot(self, score: Optional[FactorScore] = None) -> None:
+        """在 notebook 中展示 30 分钟单因子绩效报告。"""
+        if self.group_cumret.empty or self.section_ic.empty:
+            raise RuntimeError("请先调用 score(factor_data) 计算中间结果，再调用 plot()。")
+        from . import render
+
+        score_dict = score.to_dict() if score is not None else getattr(self, "_score_dict", {})
+        render.render_report(
+            group_cumret=self.group_cumret,
+            section_ic=self.section_ic,
+            factor_name=self.factor_name,
+            score=score_dict,
+        )
+
     def score(self, factor_data: pd.DataFrame, plot: bool = False) -> FactorScore:
         """返回 IC_mean、IC_IR、SR、stress 和 turnover 五项原始值。"""
         self.merge_data = self.merge_related_data(factor_data)
@@ -223,7 +237,8 @@ class FactorAnalyze:
             stress_stability=self.get_stress_stability(self.merge_data, self.section_ic),
             turnover=self.get_turnover(self.group_data),
         )
+        self._score_dict = result.to_dict()
         if plot:
-            logger.warning("分钟级评估暂不提供图形报告，已返回五项指标")
+            self.plot(result)
         logger.info("30 分钟单因子分析完成", **result.to_dict())
         return result
