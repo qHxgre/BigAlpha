@@ -70,6 +70,10 @@ class FactorAnalyze:
         self.group_ret = pd.DataFrame()
         self.group_cumret = pd.DataFrame()
         self.section_ic = pd.Series(dtype="float64")
+        self.section_volatility = pd.Series(dtype="float64")
+        self.turnover_series = pd.DataFrame(
+            columns=["low_turnover", "high_turnover", "turnover"]
+        )
 
     def merge_related_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
         """合并股票标签和同截面指数标签，并生成 30 分钟超额收益。"""
@@ -183,21 +187,24 @@ class FactorAnalyze:
         high_ir = _safe_ir(aligned_ic[section_vol > median])
         return float(min(low_ir, high_ir))
 
-    def get_turnover(self, group_data: pd.DataFrame) -> float:
-        """计算相邻截面多空组合的平均单边换手率。
+    def get_turnover_series(self, group_data: pd.DataFrame) -> pd.DataFrame:
+        """计算相邻截面多空组合的单边换手率时序。
 
         每侧等权，单侧换手为 ``1 - 前后持仓交集权重``，最终取多头与空头
         换手的平均。隔夜边界不计入，以免把日间持仓变化混入日内指标。
         """
         if group_data.empty:
-            return 0.0
+            return pd.DataFrame(
+                columns=["low_turnover", "high_turnover", "turnover"],
+                dtype="float64",
+            )
         portfolios = []
         for date, section in group_data.groupby("date", sort=True):
             low = frozenset(section.loc[section["group"].eq(0), "instrument"])
             high = frozenset(section.loc[section["group"].eq(section["max_group"]), "instrument"])
             portfolios.append((pd.Timestamp(date), low, high))
 
-        turnovers = []
+        rows = []
         for previous, current in zip(portfolios, portfolios[1:]):
             prev_date, prev_low, prev_high = previous
             date, low, high = current
@@ -205,8 +212,25 @@ class FactorAnalyze:
                 continue
             low_turnover = 1.0 - len(prev_low & low) / len(prev_low) if prev_low else 0.0
             high_turnover = 1.0 - len(prev_high & high) / len(prev_high) if prev_high else 0.0
-            turnovers.append((low_turnover + high_turnover) / 2.0)
-        return float(np.mean(turnovers)) if turnovers else 0.0
+            rows.append(
+                {
+                    "date": date,
+                    "low_turnover": low_turnover,
+                    "high_turnover": high_turnover,
+                    "turnover": (low_turnover + high_turnover) / 2.0,
+                }
+            )
+        if not rows:
+            return pd.DataFrame(
+                columns=["low_turnover", "high_turnover", "turnover"],
+                dtype="float64",
+            )
+        return pd.DataFrame(rows).set_index("date").sort_index()
+
+    def get_turnover(self, group_data: pd.DataFrame) -> float:
+        """计算相邻日内截面的平均单边换手率。"""
+        turnover = self.get_turnover_series(group_data)
+        return float(turnover["turnover"].mean()) if not turnover.empty else 0.0
 
     def plot(self, score: Optional[FactorScore] = None) -> None:
         """在 notebook 中展示 30 分钟单因子绩效报告。"""
@@ -217,7 +241,10 @@ class FactorAnalyze:
         score_dict = score.to_dict() if score is not None else getattr(self, "_score_dict", {})
         render.render_report(
             group_cumret=self.group_cumret,
+            group_ret=self.group_ret,
             section_ic=self.section_ic,
+            section_volatility=self.section_volatility,
+            turnover_series=self.turnover_series,
             factor_name=self.factor_name,
             score=score_dict,
         )
@@ -229,13 +256,22 @@ class FactorAnalyze:
         self.group_ret = self.get_group_returns(self.group_data)
         self.group_cumret = self.group_ret.fillna(0.0).cumsum()
         self.section_ic = self.get_section_ic(self.merge_data)
+        self.section_volatility = (
+            self.merge_data.groupby("date")["excess_return"].std().dropna()
+        )
+        self.section_volatility.index = pd.to_datetime(self.section_volatility.index)
+        self.turnover_series = self.get_turnover_series(self.group_data)
 
         result = FactorScore(
             ic_mean=float(self.section_ic.mean()) if not self.section_ic.empty else 0.0,
             ic_ir=_safe_ir(self.section_ic),
             sharpe_ratio=self._sharpe(self.group_ret.get("ls", pd.Series(dtype=float))),
             stress_stability=self.get_stress_stability(self.merge_data, self.section_ic),
-            turnover=self.get_turnover(self.group_data),
+            turnover=(
+                float(self.turnover_series["turnover"].mean())
+                if not self.turnover_series.empty
+                else 0.0
+            ),
         )
         self._score_dict = result.to_dict()
         if plot:

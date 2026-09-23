@@ -70,7 +70,10 @@ class JycEvalTest(unittest.TestCase):
         render_report.assert_called_once()
         call = render_report.call_args.kwargs
         self.assertFalse(call["group_cumret"].empty)
+        self.assertFalse(call["group_ret"].empty)
         self.assertFalse(call["section_ic"].empty)
+        self.assertFalse(call["section_volatility"].empty)
+        self.assertFalse(call["turnover_series"].empty)
         self.assertEqual(call["score"], result["factor_analyze"])
 
     def test_run_returns_single_factor_analysis(self):
