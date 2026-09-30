@@ -22,7 +22,7 @@ def load_pool_pairs(start_date: str, end_date: str) -> pd.DataFrame:
 
 def load_evaluation_data(start_date: str, end_date: str) -> pd.DataFrame:
     """加载官方未来 30 分钟 VWAP 收益标签。"""
-    sql = "SELECT date, instrument, vwap_return FROM cpt_jyc_2026_vwap"
+    sql = "SELECT date, instrument, vwap_return FROM cpt_jyc_2026_vwap_test"
     df = dai.query(sql, filters={"date": [start_date, end_date]}).df()
     if df is None or df.empty:
         raise ValueError("无法获取未来 30 分钟 VWAP 收益标签")
