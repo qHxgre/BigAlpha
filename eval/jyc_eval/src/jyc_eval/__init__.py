@@ -38,8 +38,16 @@ def run(
     if "date" not in factor_data.columns:
         raise ValueError("factor_data 必须包含 date 列")
 
-    window_start = start_date or pd.to_datetime(factor_data["date"]).min().strftime("%Y-%m-%d %H:%M:%S")
-    window_end = end_date or pd.to_datetime(factor_data["date"]).max().strftime("%Y-%m-%d %H:%M:%S")
+    window_start = pd.to_datetime(
+        start_date or pd.to_datetime(factor_data["date"]).min()
+    )
+    window_end = pd.to_datetime(
+        end_date or pd.to_datetime(factor_data["date"]).max()
+    )
+    if window_end == window_end.normalize():
+        window_end = window_end + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    window_start = window_start.strftime("%Y-%m-%d %H:%M:%S")
+    window_end = window_end.strftime("%Y-%m-%d %H:%M:%S")
     from .datachecker import DataCheck
     DataCheck(window_start, window_end).validate(factor_data)
 
