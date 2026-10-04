@@ -42,6 +42,10 @@ class JycEvalTest(unittest.TestCase):
             evaluation_rows,
             columns=["date", "instrument", "forward_return", "scenario"],
         )
+        self.stock_returns = self.evaluation_data.copy()
+        self.stock_returns["benchmark_return"] = self.stock_returns.groupby("date")[
+            "forward_return"
+        ].transform("mean")
         # JYC 修改：测试日频 BARRA 暴露可映射到同一天的所有分钟截面。
         self.exposure_data = pd.DataFrame(
             exposure_rows, columns=["date", "instrument", "SIZE", "BETA"]
@@ -50,8 +54,8 @@ class JycEvalTest(unittest.TestCase):
     def evaluate(self, factor_data):
         pool_pairs = self.evaluation_data[["date", "instrument"]]
         with patch("jyc_eval.datachecker.load_pool_pairs", return_value=pool_pairs), patch(
-            "jyc_eval.factoranalyze.analyzer.load_evaluation_data",
-            return_value=self.evaluation_data,
+            "jyc_eval.factoranalyze.analyzer.load_stock_returns",
+            return_value=self.stock_returns,
         ), patch(
             "jyc_eval.dataprocess.get_exposure", return_value=self.exposure_data
         ):
@@ -60,8 +64,8 @@ class JycEvalTest(unittest.TestCase):
     def test_show_true_renders_factor_report(self):
         pool_pairs = self.evaluation_data[["date", "instrument"]]
         with patch("jyc_eval.datachecker.load_pool_pairs", return_value=pool_pairs), patch(
-            "jyc_eval.factoranalyze.analyzer.load_evaluation_data",
-            return_value=self.evaluation_data,
+            "jyc_eval.factoranalyze.analyzer.load_stock_returns",
+            return_value=self.stock_returns,
         ), patch(
             "jyc_eval.dataprocess.get_exposure", return_value=self.exposure_data
         ), patch("jyc_eval.render.render_report") as render_report:
@@ -93,8 +97,8 @@ class JycEvalTest(unittest.TestCase):
         from jyc_eval.factoranalyze import FactorAnalyze
 
         with patch(
-            "jyc_eval.factoranalyze.analyzer.load_evaluation_data",
-            return_value=self.evaluation_data,
+            "jyc_eval.factoranalyze.analyzer.load_stock_returns",
+            return_value=self.stock_returns,
         ):
             merged = FactorAnalyze(
                 "2026-01-05", "2026-01-06"

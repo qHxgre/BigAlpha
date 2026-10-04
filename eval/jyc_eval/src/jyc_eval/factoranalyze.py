@@ -14,13 +14,13 @@ import numpy as np
 import pandas as pd
 import structlog
 
-from .data import BM_DICT, load_evaluation_data
+from .data import load_stock_returns
 
 logger = structlog.get_logger()
 
 PERIODS_PER_YEAR = 8 * 242
 # 兼容历史测试和调用方对 ``factoranalyze.analyzer`` 的 patch 路径。
-analyzer = SimpleNamespace(load_evaluation_data=load_evaluation_data)
+analyzer = SimpleNamespace(load_stock_returns=load_stock_returns)
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class FactorAnalyze:
         self.start_date = start_date
         self.end_date = end_date
         self.factor_name = factor_name
-        self.benchmark_instrument = BM_DICT.get(benchmark, benchmark)
+        self.benchmark = benchmark
         self.group_num = group_number
 
         self.merge_data = pd.DataFrame()
@@ -84,16 +84,11 @@ class FactorAnalyze:
 
         factor = factor_data[["date", "instrument", self.factor_name]].copy()
         factor["date"] = pd.to_datetime(factor["date"], errors="coerce")
-        labels = analyzer.load_evaluation_data(self.start_date, self.end_date).copy()
-        labels["date"] = pd.to_datetime(labels["date"], errors="coerce")
-
-        stock_labels = labels.loc[
-            ~labels["instrument"].eq(self.benchmark_instrument)
-        ].drop_duplicates(["date", "instrument"], keep="last")
-        benchmark = (
-            stock_labels.groupby("date", as_index=False)["forward_return"]
-            .mean()
-            .rename(columns={"forward_return": "benchmark_return"})
+        stock_labels = analyzer.load_stock_returns(
+            self.start_date, self.end_date
+        ).copy()
+        stock_labels["date"] = pd.to_datetime(
+            stock_labels["date"], errors="coerce"
         )
 
         merged = factor.merge(
@@ -101,7 +96,7 @@ class FactorAnalyze:
             on=["date", "instrument"],
             how="left",
             validate="one_to_one",
-        ).merge(benchmark, on="date", how="left", validate="many_to_one")
+        )
         # 基准收益来自完整股票标签池的截面均值。若某个时点缺失，应剔除
         # 完整截面，避免把股票绝对收益误当成超额收益。
         missing_benchmark_mask = merged["benchmark_return"].isna()

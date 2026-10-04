@@ -8,6 +8,7 @@ logger = structlog.get_logger()
 
 BM_DICT = {"中证1000": "000852.SH"}
 
+
 def load_pool_pairs(start_date: str, end_date: str) -> pd.DataFrame:
     """加载官方分钟级股票池面板 (date, instrument)。"""
     sql = "SELECT date, instrument FROM cpt_jyc_2026_instruments"
@@ -31,6 +32,20 @@ def load_evaluation_data(start_date: str, end_date: str) -> pd.DataFrame:
     df["instrument"] = df["instrument"].astype(str)
     df["forward_return"] = pd.to_numeric(df["forward_return"], errors="coerce")
     return df
+
+
+def load_stock_returns(start_date: str, end_date: str) -> pd.DataFrame:
+    """加载股票收益标签，并计算同截面股票池平均基准收益。"""
+    labels = load_evaluation_data(start_date, end_date)
+    stock_labels = labels.loc[
+        ~labels["instrument"].eq(BM_DICT["中证1000"])
+    ].drop_duplicates(["date", "instrument"], keep="last").copy()
+    stock_labels["benchmark_return"] = stock_labels.groupby("date")[
+        "forward_return"
+    ].transform("mean")
+    return stock_labels[
+        ["date", "instrument", "forward_return", "benchmark_return"]
+    ]
 
 
 def get_exposure(start_date: str, end_date: str) -> pd.DataFrame:

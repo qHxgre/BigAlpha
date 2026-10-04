@@ -20,7 +20,8 @@ Rank_Turnover：因子换手率的全场百分位排名，按换手率从小到�
 ### 1. 总体口径
 
 `FactorAnalyze` 以 `(date, instrument)` 为唯一键，将处理后的因子数据与
-`data.py` 中 `load_evaluation_data()` 返回的未来 30 分钟 VWAP 收益标签对齐。
+`data.py` 中 `load_stock_returns()` 返回未来 30 分钟 VWAP 收益标签及同截面
+股票池平均基准收益。
 
 - `date` 表示一个 30 分钟预测窗口的起点。
 - 每个 `date` 是一个独立的股票横截面。
