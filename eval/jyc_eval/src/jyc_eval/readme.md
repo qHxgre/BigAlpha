@@ -12,7 +12,7 @@ Rank_Turnover：因子换手率的全场百分位排名，按换手率从小到�
 你先不考虑百分位排名，根据上述内容修改 /Users/xiehao/Desktop/workspace/BigAlpha/eval/jyc_eval/src/jyc_eval/factoranalyze.py 这个单因子分析体系，返回 IC_mean, IC_IR，SR，stress, turnonver 这几个指标的值，根据下面的数据：
 
 * 数据获取均来自于：/Users/xiehao/Desktop/workspace/BigAlpha/eval/jyc_eval/src/jyc_eval/data.py
-* cpt_jyc_2026_vwap 除了包含股票的数据，也包含指数的数据，因此也能计算超额收益率，详细查看：/Users/xiehao/Desktop/workspace/BigAlpha/data/jyc_2026/cpt_jyc_2026_vwap
+* cpt_jyc_2026_vwap 包含股票的未来 30 分钟 VWAP 收益；单因子分析使用同截面股票池平均收益作为基准，详细查看：/Users/xiehao/Desktop/workspace/BigAlpha/data/jyc_2026/cpt_jyc_2026_vwap
 * 要注意现有的代码是日频单因子分析，相当于要改成30分钟频率的单因子分析，且不考虑隔夜收益
 
 ## `factoranalyze.py` 指标设计
@@ -43,8 +43,8 @@ Rank_Turnover：因子换手率的全场百分位排名，按换手率从小到�
 
 ### 2. 超额收益
 
-`cpt_jyc_2026_vwap` 同时包含股票和中证 1000 指数 `000852.SH` 的未来
-30 分钟 VWAP 收益。对于截面 `t` 中的股票 `i`，先计算：
+`cpt_jyc_2026_vwap` 提供股票的未来 30 分钟 VWAP 收益。对于截面 `t`
+中的股票 `i`，先计算：
 
 ```text
 excess_return(i,t) = forward_return(i,t) - benchmark_return(t)
@@ -53,11 +53,11 @@ excess_return(i,t) = forward_return(i,t) - benchmark_return(t)
 其中：
 
 - `forward_return(i,t)` 为股票未来 30 分钟 VWAP 收益。
-- `benchmark_return(t)` 为同一截面中证 1000 指数未来 30 分钟 VWAP 收益。
+- `benchmark_return(t)` 为同一截面股票池内全部股票未来 30 分钟 VWAP 收益的等权平均值。
 
-截面内减去相同的指数收益不会改变股票收益的横截面排序，因此不会改变
-RankIC，但会使分组收益和多空组合收益明确表示相对基准的超额收益。如果
-某个截面缺少指数标签，当前实现将该截面的指数收益按 `0` 处理并记录警告。
+截面内减去相同的股票池平均收益不会改变股票收益的横截面排序，因此不会
+改变 RankIC，但会使分组收益明确表示相对股票池的超额收益。如果某个截面
+无法计算股票池平均收益，当前实现会剔除该完整截面。
 
 ### 3. IC Mean
 

@@ -1,9 +1,9 @@
 """30 分钟频率的单因子分析。
 
-评估标签来自 ``cpt_jyc_2026_vwap``。同一张表中的中证 1000 指数
-（000852.SH）被用作基准，股票标签先减去同截面的指数标签，再用于
-IC、分组收益和压力测试。减去截面常数不改变 RankIC，但可以让组合
-收益和夏普反映超额收益。
+评估标签来自 ``cpt_jyc_2026_vwap``。每个截面以股票池内全部股票标签的
+等权平均收益作为基准，个股标签先减去该截面均值，再用于 IC、分组收益
+和压力测试。减去截面常数不改变 RankIC，并能避免指数代理 VWAP 与股票
+真实 VWAP 口径不同所产生的系统偏差。
 """
 
 from dataclasses import asdict, dataclass
@@ -76,7 +76,7 @@ class FactorAnalyze:
         )
 
     def merge_related_data(self, factor_data: pd.DataFrame) -> pd.DataFrame:
-        """合并股票标签和同截面指数标签，并生成 30 分钟超额收益。"""
+        """合并股票标签，并以股票池截面平均收益生成 30 分钟超额收益。"""
         required = {"date", "instrument", self.factor_name}
         missing = required.difference(factor_data.columns)
         if missing:
@@ -87,17 +87,14 @@ class FactorAnalyze:
         labels = analyzer.load_evaluation_data(self.start_date, self.end_date).copy()
         labels["date"] = pd.to_datetime(labels["date"], errors="coerce")
 
-        benchmark = (
-            labels.loc[
-                labels["instrument"].eq(self.benchmark_instrument),
-                ["date", "forward_return"],
-            ]
-            .drop_duplicates("date", keep="last")
-            .rename(columns={"forward_return": "benchmark_return"})
-        )
         stock_labels = labels.loc[
             ~labels["instrument"].eq(self.benchmark_instrument)
         ].drop_duplicates(["date", "instrument"], keep="last")
+        benchmark = (
+            stock_labels.groupby("date", as_index=False)["forward_return"]
+            .mean()
+            .rename(columns={"forward_return": "benchmark_return"})
+        )
 
         merged = factor.merge(
             stock_labels,
@@ -105,11 +102,25 @@ class FactorAnalyze:
             how="left",
             validate="one_to_one",
         ).merge(benchmark, on="date", how="left", validate="many_to_one")
-        # 在本地或旧数据缺少指数标签时，仍可计算股票绝对收益指标。
-        missing_benchmark = int(merged["benchmark_return"].isna().sum())
-        if missing_benchmark:
-            logger.warning("部分截面缺少指数 VWAP 收益，按 0 处理", rows=missing_benchmark)
-        merged["benchmark_return"] = merged["benchmark_return"].fillna(0.0)
+        # 基准收益来自完整股票标签池的截面均值。若某个时点缺失，应剔除
+        # 完整截面，避免把股票绝对收益误当成超额收益。
+        missing_benchmark_mask = merged["benchmark_return"].isna()
+        missing_benchmark_dates = (
+            merged.loc[missing_benchmark_mask, "date"]
+            .dropna()
+            .drop_duplicates()
+            .sort_values()
+        )
+        if not missing_benchmark_dates.empty:
+            logger.warning(
+                "部分截面无法计算股票池平均收益，已剔除完整截面",
+                sections=len(missing_benchmark_dates),
+                rows=int(missing_benchmark_mask.sum()),
+                dates=[timestamp.isoformat() for timestamp in missing_benchmark_dates],
+            )
+            merged = merged.loc[
+                ~merged["date"].isin(missing_benchmark_dates)
+            ].copy()
         merged["excess_return"] = merged["forward_return"] - merged["benchmark_return"]
         return merged.sort_values(["date", "instrument"]).reset_index(drop=True)
 
@@ -145,6 +156,13 @@ class FactorAnalyze:
         high = group_data[group_data["group"].eq(group_data["max_group"])].groupby("date")["excess_return"].mean()
         grouped["ls"] = high - low
         return grouped
+
+    @staticmethod
+    def get_group_cumulative_returns(group_returns: pd.DataFrame) -> pd.DataFrame:
+        """所有分组及多空组合均按 ``(1 + r).cumprod() - 1`` 复利累计。"""
+        if group_returns.empty:
+            return group_returns.copy()
+        return (1.0 + group_returns.fillna(0.0)).cumprod() - 1.0
 
     def get_section_ic(self, merged: pd.DataFrame) -> pd.Series:
         """每个 30 分钟截面的 Spearman RankIC。"""
@@ -254,7 +272,7 @@ class FactorAnalyze:
         self.merge_data = self.merge_related_data(factor_data)
         self.group_data = self.get_group_data(self.merge_data)
         self.group_ret = self.get_group_returns(self.group_data)
-        self.group_cumret = self.group_ret.fillna(0.0).cumsum()
+        self.group_cumret = self.get_group_cumulative_returns(self.group_ret)
         self.section_ic = self.get_section_ic(self.merge_data)
         self.section_volatility = (
             self.merge_data.groupby("date")["excess_return"].std().dropna()
