@@ -89,6 +89,24 @@ class JycEvalTest(unittest.TestCase):
             all(np.isfinite(value) for value in result["factor_analyze"].values())
         )
 
+    def test_factor_analysis_uses_cross_section_mean_as_benchmark(self):
+        from jyc_eval.factoranalyze import FactorAnalyze
+
+        with patch(
+            "jyc_eval.factoranalyze.analyzer.load_evaluation_data",
+            return_value=self.evaluation_data,
+        ):
+            merged = FactorAnalyze(
+                "2026-01-05", "2026-01-06"
+            ).merge_related_data(self.factor_data)
+
+        section = merged[merged["date"].eq(self.times[0])]
+        expected = self.evaluation_data.loc[
+            self.evaluation_data["date"].eq(self.times[0]), "forward_return"
+        ].mean()
+        self.assertTrue(np.allclose(section["benchmark_return"], expected))
+        self.assertAlmostEqual(section["excess_return"].mean(), 0.0, places=12)
+
     def test_score_column_is_rejected(self):
         score_data = self.factor_data.rename(columns={"factor": "score"})
         with self.assertRaisesRegex(DataValidationError, "必须且只能包含"):
