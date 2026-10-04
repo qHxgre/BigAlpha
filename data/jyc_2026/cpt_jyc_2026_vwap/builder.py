@@ -12,11 +12,9 @@ class CptJyc2026VwapBuilder(BaseBuilder):
     """构建股票及指数的未来 30 分钟 VWAP 收益标签。
 
     标签时点为 09:30、10:00、10:30、11:00、11:30、13:30、14:00、
-    14:30。收益定义为 ``window_end_price / future_vwap - 1``。其中
-    ``future_vwap`` 是信号后的下一可交易半小时 VWAP，``window_end_price``
-    是该窗口结束时的最新有效成交价。11:30 信号跳过午休，对应下午
-    ``(13:00, 13:30]``；14:30 信号使用 ``15:00 收盘价 / (14:30,
-    15:00] VWAP - 1``。
+    14:30。每个截面同时输出三种收益口径：窗口终点相对未来 VWAP、
+    未来 VWAP 相对信号价格、窗口终点相对信号价格。11:30 信号跳过午休，
+    对应下午 ``(13:00, 13:30]``；14:30 信号使用 ``(14:30, 15:00]``。
 
     Level-2 的 volume、amount、num_trades 是日内累计字段。这里先在逐笔
     快照层面做差，再汇总区间增量，避免用区间首末快照直接相减时
@@ -35,6 +33,9 @@ class CptJyc2026VwapBuilder(BaseBuilder):
         "date",
         "instrument",
         "vwap_return",
+        "signal_to_vwap_return",
+        "signal_to_end_return",
+        "signal_price",
         "vwap",
         "end_price",
         "volume",
@@ -191,6 +192,20 @@ class CptJyc2026VwapBuilder(BaseBuilder):
         # price <= 0 不作为窗口终点价格；组内最后一个有效成交价即终点价。
         data["__valid_price"] = data["price"].where(data["price"] > 0)
 
+        # 09:30 是每日第一个标签，无法从上一窗口的 end_price 推导信号价；
+        # 使用 09:30 当时已可获得的最后一个有效价格（通常为集合竞价价格）。
+        signal_cutoff = data["__trading_day"] + pd.Timedelta(hours=9, minutes=30)
+        opening_signal_prices = (
+            data.loc[data["date"] <= signal_cutoff]
+            .dropna(subset=["__valid_price"])
+            .groupby(["instrument", "__trading_day"], sort=False, observed=True)[
+                "__valid_price"
+            ]
+            .last()
+            .rename("__opening_signal_price")
+            .reset_index()
+        )
+
         for column in cls._CUMULATIVE_COLUMNS:
             delta = groups[column].diff()
             # 盘中重置时，当前累计值就是重置后的有效增量。
@@ -239,6 +254,40 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             labels["vwap"],
             out=np.full(len(labels), np.nan, dtype="float64"),
             where=valid_vwap & labels["end_price"].notna(),
+        ) - 1.0
+
+        labels["__trading_day"] = labels["date"].dt.normalize()
+        labels = labels.sort_values(["instrument", "date"]).reset_index(drop=True)
+        # 除每日首个截面外，当前信号时刻价格等于上一个非重叠窗口的终点价。
+        # 该方式也正确处理 11:30 -> 13:30 的午休映射。
+        labels["signal_price"] = labels.groupby(
+            ["instrument", "__trading_day"], sort=False, observed=True
+        )["end_price"].shift(1)
+        labels = labels.merge(
+            opening_signal_prices,
+            how="left",
+            on=["instrument", "__trading_day"],
+            validate="many_to_one",
+        )
+        first_section = labels.groupby(
+            ["instrument", "__trading_day"], sort=False, observed=True
+        ).cumcount().eq(0)
+        labels.loc[first_section, "signal_price"] = labels.loc[
+            first_section, "__opening_signal_price"
+        ]
+
+        valid_signal = labels["signal_price"] > 0
+        labels["signal_to_vwap_return"] = np.divide(
+            labels["vwap"],
+            labels["signal_price"],
+            out=np.full(len(labels), np.nan, dtype="float64"),
+            where=valid_signal & valid_vwap,
+        ) - 1.0
+        labels["signal_to_end_return"] = np.divide(
+            labels["end_price"],
+            labels["signal_price"],
+            out=np.full(len(labels), np.nan, dtype="float64"),
+            where=valid_signal & labels["end_price"].notna(),
         ) - 1.0
 
         return (

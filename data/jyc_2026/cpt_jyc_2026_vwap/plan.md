@@ -23,6 +23,8 @@
 stock_vwap = window_amount / window_volume
 index_vwap = sum(index_price * volume_delta) / sum(volume_delta)
 vwap_return = end_price / vwap - 1
+signal_to_vwap_return = vwap / signal_price - 1
+signal_to_end_return = end_price / signal_price - 1
 ```
 
 ## 股票与指数 VWAP 口径差异
@@ -86,6 +88,7 @@ VWAP。这里的指数 VWAP 是用于生成指数收益标签的代理指标。�
 
 ## 输出
 
-输出 `date`、`instrument`、`vwap_return`、`vwap`、`end_price`、`volume`、
+输出 `date`、`instrument`、`vwap_return`、`signal_to_vwap_return`、
+`signal_to_end_return`、`signal_price`、`vwap`、`end_price`、`volume`、
 `amount`、`num_trades`，以 `date + instrument` 为唯一键。窗口成交量为 0 或
 缺少有效终点价格时，不计算有效收益率。
