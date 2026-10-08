@@ -13,6 +13,9 @@ __pycache__/
 
 files/
 
+# jyc_eval 本地数据
+/eval/jyc_eval/data/
+
 # 提交代码和必要配置，不提交 submissions 下的模型权重及运行产物。
 /submissions/**/*.json
 !/submissions/**/*config.json
