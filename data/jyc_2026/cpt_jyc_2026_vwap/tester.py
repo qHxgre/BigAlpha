@@ -19,7 +19,9 @@ class CptJyc2026VwapTester(unittest.TestCase):
     test_data: pd.DataFrame = pd.DataFrame()
     index_instruments = {"000852.SH"}
     formula_rtol = 1e-6
-    formula_atol = 1e-7
+    # float32 执行 ``end_price / vwap - 1`` 时会产生约 1.2e-7 的
+    # 消减误差，绝对误差阈值略高于 float32 epsilon。
+    formula_atol = 2e-7
 
     @classmethod
     def run_tests(cls, data: pd.DataFrame) -> bool:
