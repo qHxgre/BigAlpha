@@ -14,7 +14,8 @@ class CptJyc2026VwapBuilder(BaseBuilder):
     标签时点为 09:30、10:00、10:30、11:00、11:30、13:30、14:00、
     14:30。每个截面同时输出三种收益口径：窗口终点相对未来 VWAP、
     未来 VWAP 相对信号价格、窗口终点相对信号价格。11:30 信号跳过午休，
-    对应下午 ``(13:00, 13:30]``；14:30 信号使用 ``(14:30, 15:00]``。
+    对应下午 ``(13:00, 13:30]``；14:30 信号通常使用
+    ``(14:30, 15:00]``，并额外接纳 15:00 后一分钟内到达的收盘快照。
 
     Level-2 的 volume、amount、num_trades 是日内累计字段。这里先在逐笔
     快照层面做差，再汇总区间增量，避免用区间首末快照直接相减时
@@ -29,6 +30,7 @@ class CptJyc2026VwapBuilder(BaseBuilder):
 
     _CUMULATIVE_COLUMNS = ["volume", "amount", "num_trades"]
     _INDEX_INSTRUMENTS = ("000852.SH",)
+    _CLOSE_GRACE_MS = 60_000
     _OUTPUT_COLUMNS = [
         "date",
         "instrument",
@@ -129,12 +131,14 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             ignore_index=True,
         )
 
-    @staticmethod
-    def _assign_window_start(date: pd.Series) -> pd.Series:
+    @classmethod
+    def _assign_window_start(cls, date: pd.Series) -> pd.Series:
         """把快照映射到未来 30 分钟窗口的采样起点。
 
         窗口均为左开右闭。于是 10:00:00 属于 09:30 标签，而
         10:00:00.001 属于 10:00 标签；午休与集合竞价返回 NaT。
+        参考分钟线构建逻辑，收盘后一分钟内到达的快照仍归入收盘窗口，
+        即下午 ``(14:30:00, 15:01:00)`` 均归入 14:30 标签。
         """
         date = pd.to_datetime(date)
         day = date.dt.normalize()
@@ -161,6 +165,15 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             slot = ((elapsed_ms - session_open - 1) // window_ms).astype("int64")
             labels = slot.map(dict(enumerate(label_minutes)))
             start_minute.loc[in_session] = labels.loc[in_session]
+
+            # 部分标的的收盘快照会在收盘后数秒才落库。与 stock_barkm 的
+            # 收盘口径保持一致，将收盘后一分钟内的快照归入最后一个窗口；
+            # 右端保持开放，避免把下一分钟边界也算入交易时段。
+            close_grace = (
+                (elapsed_ms > session_close)
+                & (elapsed_ms < session_close + cls._CLOSE_GRACE_MS)
+            )
+            start_minute.loc[close_grace] = label_minutes[-1]
 
         return day + pd.to_timedelta(start_minute, unit="m")
 
