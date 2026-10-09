@@ -6,6 +6,7 @@ import pandas as pd
 
 from base import BaseBuilder
 from jyc_2026.cpt_jyc_2026_vwap.schema import CptJyc2026VwapSchema
+from jyc_2026.cpt_jyc_2026_vwap.tester import CptJyc2026VwapTester
 
 
 class CptJyc2026VwapBuilder(BaseBuilder):
@@ -31,6 +32,11 @@ class CptJyc2026VwapBuilder(BaseBuilder):
     _CUMULATIVE_COLUMNS = ["volume", "amount", "num_trades"]
     _INDEX_INSTRUMENTS = ("000852.SH",)
     _CLOSE_GRACE_MS = 60_000
+    # 至少两个累计字段同时下降超过该比例，才认为行情源发生累计重置。
+    # 单字段回退通常是交易所/供应商对累计值的盘中修订，不能把当前
+    # 全天累计值当成当笔增量，否则会制造数量级异常的 VWAP。
+    _RESET_DROP_RATIO = 0.01
+    _RESET_MIN_FIELDS = 2
     _OUTPUT_COLUMNS = [
         "date",
         "instrument",
@@ -219,10 +225,64 @@ class CptJyc2026VwapBuilder(BaseBuilder):
             .reset_index()
         )
 
+        raw_deltas = {
+            column: groups[column].diff()
+            for column in cls._CUMULATIVE_COLUMNS
+        }
+        previous_values = {
+            column: groups[column].shift(1)
+            for column in cls._CUMULATIVE_COLUMNS
+        }
+
+        # 真正的累计重置通常会让 amount、volume、num_trades 中至少两个
+        # 字段同步大幅下降。单字段回退（例如成交额因精度修订回退几角钱）
+        # 不视为重置，以免把当前全天累计值重复计入窗口。
+        significant_drop_count = pd.Series(0, index=data.index, dtype="int8")
         for column in cls._CUMULATIVE_COLUMNS:
-            delta = groups[column].diff()
-            # 盘中重置时，当前累计值就是重置后的有效增量。
-            data[f"__{column}_delta"] = delta.where(delta >= 0, data[column])
+            previous = previous_values[column]
+            drop_ratio = np.divide(
+                -raw_deltas[column],
+                previous.abs(),
+                out=np.full(len(data), np.nan, dtype="float64"),
+                where=previous.abs().gt(0),
+            )
+            significant_drop_count += (
+                raw_deltas[column].lt(0)
+                & pd.Series(drop_ratio, index=data.index).gt(
+                    cls._RESET_DROP_RATIO
+                )
+            ).astype("int8")
+
+        real_reset = significant_drop_count.ge(cls._RESET_MIN_FIELDS)
+        data["__reset_segment"] = real_reset.groupby(
+            [data["instrument"], data["__trading_day"]],
+            sort=False,
+        ).cumsum()
+        segment_keys = [
+            data["instrument"],
+            data["__trading_day"],
+            data["__reset_segment"],
+        ]
+
+        for column in cls._CUMULATIVE_COLUMNS:
+            # 非重置区段内用单调包络吸收累计值的小幅回退。相比简单地把
+            # 负差裁为 0，cummax 还能避免下一条快照再次多计被修订的差额。
+            repaired_column = f"__{column}_repaired"
+            data[repaired_column] = data.groupby(
+                segment_keys,
+                sort=False,
+                observed=True,
+            )[column].cummax()
+            data[f"__{column}_delta"] = data.groupby(
+                segment_keys,
+                sort=False,
+                observed=True,
+            )[repaired_column].diff()
+
+            # 重置后第一条记录没有区段内前值；当前累计值就是新区段增量。
+            data.loc[real_reset, f"__{column}_delta"] = data.loc[
+                real_reset, column
+            ]
 
         # 股票的 amount / volume 与股票价格处于同一量纲，可以直接用于
         # VWAP。指数快照的 amount、volume 是成分证券的汇总成交额和成交量，
@@ -327,6 +387,7 @@ class CptJyc2026VwapBuilder(BaseBuilder):
         )
 
         df = self.normalize(df)
+        CptJyc2026VwapTester.run_tests(df)
         self.dai_write(df)
         t3 = datetime.now()
         print(f"数据存储耗时: {round((t3 - t2).total_seconds(), 4)} 秒")
