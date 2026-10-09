@@ -16,17 +16,6 @@ class CptJyc2026VwapSchema(BaseSchema):
         description="窗口终点价格相对未来30分钟VWAP的收益率",
         default=np.nan,
     )
-    signal_to_vwap_return: np.float32 = Field(
-        description="未来30分钟VWAP相对信号时刻价格的收益率",
-        default=np.nan,
-    )
-    signal_to_end_return: np.float32 = Field(
-        description="未来窗口终点价格相对信号时刻价格的收益率",
-        default=np.nan,
-    )
-    signal_price: np.float32 = Field(
-        description="信号时刻可获得的最新有效成交价", default=np.nan
-    )
     vwap: np.float32 = Field(
         description="未来30分钟成交量加权平均价", default=np.nan
     )
