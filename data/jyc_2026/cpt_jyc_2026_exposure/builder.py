@@ -13,9 +13,11 @@ class CptJyc2026ExposureBuilder(BaseBuilder):
     indexes = ["date"]
     schema = CptJyc2026ExposureSchema
 
-    def __init__(self, start_date: str, end_date: str) -> None:
+    def __init__(self, start_date: str, end_date: str, suffix: str = None) -> None:
         self.start_date = start_date
         self.end_date = end_date
+        if suffix:
+            self.datasource_id = f"cpt_jyc_2026_exposure_{suffix}"
         print(f"初始化！{self.datasource_id}, 时间周期: {self.start_date}, {self.end_date}")
 
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
