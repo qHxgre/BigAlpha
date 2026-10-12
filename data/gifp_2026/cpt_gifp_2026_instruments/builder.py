@@ -10,11 +10,7 @@ from gifp_2026.cpt_gifp_2026_instruments.schema import (
 
 
 class CptGifp2026InstrumentsBuilder(BaseBuilder):
-    """构建沪深 300 每日历史成分股列表。
-
-    收益标签口径尚未确定，因此这里只保留日频股票池，不提前展开为日内
-    采样截面。标签时点确定后，可在下游按交易日与本表连接。
-    """
+    """构建与 15 分钟收益标签一致的沪深 300 历史成分股截面。"""
 
     datasource_id = "cpt_gifp_2026_instruments"
     unique_together = ["date", "instrument"]
@@ -22,6 +18,25 @@ class CptGifp2026InstrumentsBuilder(BaseBuilder):
     indexes = ["date"]
     schema = CptGifp2026InstrumentsSchema
     index_instrument = "000300.SH"
+    # 必须与 cpt_gifp_2026_return 的标签时点完全一致。
+    section_times = (
+        "09:45:00",
+        "10:00:00",
+        "10:15:00",
+        "10:30:00",
+        "10:45:00",
+        "11:00:00",
+        "11:15:00",
+        "11:30:00",
+        "13:15:00",
+        "13:30:00",
+        "13:45:00",
+        "14:00:00",
+        "14:15:00",
+        "14:30:00",
+        "14:45:00",
+        "15:00:00",
+    )
 
     def __init__(self, start_date: str, end_date: str) -> None:
         self.start_date = start_date
@@ -37,8 +52,8 @@ class CptGifp2026InstrumentsBuilder(BaseBuilder):
         return df.fillna(self.schema.field_default_mapping())
 
     def dai_write(self, df: pd.DataFrame) -> None:
-        df[dai.DEFAULT_PARTITION_FIELD] = df["date"].dt.strftime("%Y").astype(
-            "int64"
+        df[dai.DEFAULT_PARTITION_FIELD] = (
+            df["date"].dt.strftime("%Y%m").astype("int64")
         )
         dai.DataSource.write_bdb(
             df,
@@ -65,6 +80,23 @@ class CptGifp2026InstrumentsBuilder(BaseBuilder):
         """
         return dai.query(sql, filters={"date": [start_date, end_date]}).df()
 
+    @classmethod
+    def expand_sections(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """将每日成分股展开到 16 个合法的 15 分钟因子截面。"""
+        if df.empty:
+            return df.copy()
+
+        data = df.copy()
+        data["date"] = pd.to_datetime(data["date"], errors="coerce").dt.normalize()
+        data = data.dropna(subset=["date", "instrument"])
+        data = data.drop_duplicates(["date", "instrument"], keep="last")
+        sections = pd.DataFrame(
+            {"__section_offset": pd.to_timedelta(cls.section_times)}
+        )
+        data = data.merge(sections, how="cross")
+        data["date"] = data["date"] + data.pop("__section_offset")
+        return data.sort_values(["date", "instrument"]).reset_index(drop=True)
+
     def build(self) -> pd.DataFrame:
         t0 = datetime.now()
         df = self.get_data(self.start_date, self.end_date)
@@ -74,6 +106,11 @@ class CptGifp2026InstrumentsBuilder(BaseBuilder):
             f"行数: {len(df)}"
         )
 
+        if df.empty:
+            print("股票池为空，跳过入库")
+            return pd.DataFrame(columns=self.schema.columns())
+
+        df = self.expand_sections(df)
         if df.empty:
             print("股票池为空，跳过入库")
             return pd.DataFrame(columns=self.schema.columns())

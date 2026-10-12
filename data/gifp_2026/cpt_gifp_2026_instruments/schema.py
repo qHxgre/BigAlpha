@@ -6,9 +6,11 @@ from base import BaseSchema
 
 
 class CptGifp2026InstrumentsSchema(BaseSchema):
-    """沪深 300 每日历史成分股。"""
+    """沪深 300 历史成分股的 15 分钟因子截面。"""
 
-    date: np.datetime64 = Field(description="交易日", default=np.nan, primary=True)
+    date: np.datetime64 = Field(
+        description="15分钟因子计算时点", default=np.nan, primary=True
+    )
     instrument: pd.StringDtype = Field(
         description="证券代码", default=np.nan, primary=True
     )
