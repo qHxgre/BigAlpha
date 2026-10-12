@@ -55,6 +55,6 @@ def get_exposure(start_date: str, end_date: str) -> pd.DataFrame:
         FOODBEVER, TEXTILE, LIGHTINDUS, HEALTH, UTILITIES, TRANSPORTATION, REALESTATE,
         COMMETRADE, LEISERVICE, BANK, NONBANKFINAN, CONGLOMERATES, CONMAT, BUILDDECO,
         ELECEQP, MACHIEQUIP, AERODEF, COMPUTER, MEDIA, TELECOM, COAL, PETRO, ENVP, BEAUTY
-    FROM cpt_jyc_2026_exposure
+    FROM cpt_jyc_2026_exposure_test
     """
     return dai.query(sql, filters={"date": [start_date, end_date]}).df()
