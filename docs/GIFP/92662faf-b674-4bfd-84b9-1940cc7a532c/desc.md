@@ -119,7 +119,7 @@
 
 $$
 Score = 0.4 \times Rank_{IC\ Mean}
-+ 0.2 \times Rank_{IR\ Mean}
++ 0.2 \times Rank_{ICIR}
 + 0.2 \times Rank_{SR}
 + 0.1 \times Rank_{Turnover}
 + 0.1 \times Rank_{Maximum\ Drawdown}
