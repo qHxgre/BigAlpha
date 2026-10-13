@@ -30,7 +30,7 @@ class CptGifp2026ReturnBuilder(BaseBuilder):
     indexes = ["date"]
     schema = CptGifp2026ReturnSchema
     source_datasource_id = "cpt_gifp_2026_stock_bar1m"
-    lookahead_calendar_days = 31
+    calendar_datasource_id = "cpt_gifp_2026_instruments"
     output_columns = [
         "date",
         "instrument",
@@ -59,17 +59,50 @@ class CptGifp2026ReturnBuilder(BaseBuilder):
         afternoon = minute.between(13 * 60 + 15, 15 * 60)
         return (morning | afternoon) & minute.mod(15).eq(0) & date.dt.second.eq(0)
 
+    def _get_next_trading_day(self, end_date: str) -> pd.Timestamp | None:
+        """从股票池截面表获取 ``end_date`` 之后的首个交易日。
+
+        instruments 表每天有 16 个截面时点。让数据库计算最小时间戳，
+        只返回一行，避免为探测交易日而读取未来多日的分钟行情。
+        """
+        end = pd.Timestamp(end_date).normalize()
+        result = dai.query(
+            f"""
+            SELECT MIN(date) AS next_date
+            FROM {self.calendar_datasource_id}
+            WHERE date > '{end:%Y-%m-%d} 23:59:59'
+            """,
+            compression=True,
+        ).df()
+        if result.empty or pd.isna(result.iloc[0]["next_date"]):
+            return None
+        return pd.Timestamp(result.iloc[0]["next_date"]).normalize()
+
     def get_data(self, start_date: str, end_date: str) -> pd.DataFrame:
+        next_trading_day = self._get_next_trading_day(end_date)
         query_end = (
-            pd.Timestamp(end_date) + pd.Timedelta(days=self.lookahead_calendar_days)
-        ).strftime("%Y-%m-%d")
+            next_trading_day
+            if next_trading_day is not None
+            else pd.Timestamp(end_date).normalize()
+        )
+        if next_trading_day is None:
+            print(
+                f"警告: {self.calendar_datasource_id} 中不存在 {end_date} "
+                "之后的交易日，区间最后一个交易日将无法生成前向收益"
+            )
+        else:
+            print(f"补读下一交易日分钟行情: {next_trading_day:%Y-%m-%d}")
+
         return dai.query(
             f"""
             SELECT date, instrument, close, adjust_factor
             FROM {self.source_datasource_id}
             """,
             filters={
-                "date": [f"{start_date} 00:00:00", f"{query_end} 23:59:59"]
+                "date": [
+                    f"{pd.Timestamp(start_date):%Y-%m-%d} 00:00:00",
+                    f"{query_end:%Y-%m-%d} 23:59:59",
+                ]
             },
             compression=True,
         ).df()
