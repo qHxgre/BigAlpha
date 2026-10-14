@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import logging
 import unittest
-from typing import Optional
 
 import dai
 import numpy as np
@@ -18,8 +17,8 @@ class StockBar1mDataTestError(AssertionError):
     """分钟行情未通过数据质量检查。"""
 
 
-class CptJyc2026StockBar1mTester(unittest.TestCase):
-    """检查中证 1000 股票池的一分钟行情。"""
+class _StockBar1mDataTests(unittest.TestCase):
+    """一分钟行情的数据质量测试用例。"""
 
     datasource_id = "cpt_jyc_2026_stock_bar1m"
     test_data: pd.DataFrame = pd.DataFrame()
@@ -41,7 +40,7 @@ class CptJyc2026StockBar1mTester(unittest.TestCase):
         return morning.append(afternoon)
 
     @classmethod
-    def run_tests(cls, data: pd.DataFrame, require_complete_day: bool = False) -> bool:
+    def check(cls, data: pd.DataFrame, require_complete_day: bool = False) -> None:
         """运行全部检查；失败时汇总异常并抛错。"""
         if data.empty:
             raise StockBar1mDataTestError("待测试分钟行情为空")
@@ -63,49 +62,6 @@ class CptJyc2026StockBar1mTester(unittest.TestCase):
                 method_name = getattr(test_case, "_testMethodName", str(test_case))
                 issues.append(f"{method_name}: {traceback.strip().splitlines()[-1]}")
             raise StockBar1mDataTestError("cpt_jyc_2026_stock_bar1m 数据测试失败:\n" + "\n".join(issues))
-        return True
-
-    @classmethod
-    def run_date_range_tests(cls, start_date: str, end_date: str, datasource_id: Optional[str] = None) -> pd.DataFrame:
-        """按照中证1000交易日逐日读取分钟行情并测试。"""
-        start = pd.Timestamp(start_date).normalize()
-        end = pd.Timestamp(end_date).normalize()
-        if start > end:
-            raise ValueError("start_date 不能晚于 end_date")
-
-        source = datasource_id or cls.datasource_id
-        calendar = dai.query(
-            """
-            SELECT DISTINCT CAST(date AS DATE) AS trading_day
-            FROM cn_stock_index_component
-            WHERE instrument = '000852.SH'
-            ORDER BY trading_day
-            """,
-            filters={"date": [start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")]},
-        ).df()
-        if calendar.empty:
-            raise StockBar1mDataTestError(f"{start:%Y-%m-%d} 至 {end:%Y-%m-%d} 未查询到中证1000交易日")
-        trading_days = pd.to_datetime(calendar["trading_day"]).dt.normalize()
-        actual_start = trading_days.min()
-        actual_end = trading_days.max()
-        logger.info("开始检查 %s: start_date=%s, end_date=%s, 交易日数=%s", source, actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(trading_days))
-
-        reports = []
-        for day in trading_days:
-            day_str = day.strftime("%Y-%m-%d")
-            data = dai.query(
-                f"SELECT * FROM {source}",
-                filters={"date": [f"{day_str} 00:00:00", f"{day_str} 23:59:59"]},
-                compression=True,
-            ).df()
-            if data.empty:
-                raise StockBar1mDataTestError(f"{day_str} 整日缺少分钟行情")
-            cls.run_tests(data, require_complete_day=True)
-            reports.append({"trading_day": day, "start_date": actual_start, "end_date": actual_end, "row_count": len(data), "stock_count": data["instrument"].nunique(), "passed": True})
-            logger.info("%s: 检查通过，%s 行", day_str, len(data))
-        report = pd.DataFrame(reports)
-        logger.info("检查完成: start_date=%s, end_date=%s, 通过交易日数=%s", actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(report))
-        return report
 
     def test_unique_keys_and_valid_dates(self):
         """日期必须有效，且 date、instrument 联合键不能重复。"""
@@ -219,3 +175,48 @@ class CptJyc2026StockBar1mTester(unittest.TestCase):
             0,
             f"全市场集中缺分钟: {missing_records[:20]}",
         )
+
+
+class CptJyc2026StockBar1mTester:
+    """按照中证1000交易日逐日读取并测试一分钟行情。"""
+
+    def __init__(self, start_date: str, end_date: str, datasource_id: str = "cpt_jyc_2026_stock_bar1m") -> None:
+        self.start_date = start_date
+        self.end_date = end_date
+        self.datasource_id = datasource_id
+
+    def run(self) -> pd.DataFrame:
+        start = pd.Timestamp(self.start_date).normalize()
+        end = pd.Timestamp(self.end_date).normalize()
+        if start > end:
+            raise ValueError("start_date 不能晚于 end_date")
+
+        calendar = dai.query(
+            """
+            SELECT DISTINCT CAST(date AS DATE) AS trading_day
+            FROM cn_stock_index_component
+            WHERE instrument = '000852.SH'
+            ORDER BY trading_day
+            """,
+            filters={"date": [start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")]},
+        ).df()
+        if calendar.empty:
+            raise StockBar1mDataTestError(f"{start:%Y-%m-%d} 至 {end:%Y-%m-%d} 未查询到中证1000交易日")
+
+        trading_days = pd.to_datetime(calendar["trading_day"]).dt.normalize()
+        actual_start, actual_end = trading_days.min(), trading_days.max()
+        logger.info("开始检查 %s: start_date=%s, end_date=%s, 交易日数=%s", self.datasource_id, actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(trading_days))
+
+        reports = []
+        for day in trading_days:
+            day_str = day.strftime("%Y-%m-%d")
+            data = dai.query(f"SELECT * FROM {self.datasource_id}", filters={"date": [f"{day_str} 00:00:00", f"{day_str} 23:59:59"]}, compression=True).df()
+            if data.empty:
+                raise StockBar1mDataTestError(f"{day_str} 整日缺少分钟行情")
+            _StockBar1mDataTests.check(data, require_complete_day=True)
+            reports.append({"trading_day": day, "start_date": actual_start, "end_date": actual_end, "row_count": len(data), "stock_count": data["instrument"].nunique(), "passed": True})
+            logger.info("%s: 检查通过，%s 行", day_str, len(data))
+
+        report = pd.DataFrame(reports)
+        logger.info("检查完成: start_date=%s, end_date=%s, 通过交易日数=%s", actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(report))
+        return report
