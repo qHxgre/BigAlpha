@@ -208,14 +208,55 @@ class CptJyc2026StockBar1mTester:
         logger.info("开始检查 %s: start_date=%s, end_date=%s, 交易日数=%s", self.datasource_id, actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(trading_days))
 
         reports = []
-        for day in trading_days:
-            day_str = day.strftime("%Y-%m-%d")
-            data = dai.query(f"SELECT * FROM {self.datasource_id}", filters={"date": [f"{day_str} 00:00:00", f"{day_str} 23:59:59"]}, compression=True).df()
-            if data.empty:
-                raise StockBar1mDataTestError(f"{day_str} 整日缺少分钟行情")
-            _StockBar1mDataTests.check(data, require_complete_day=True)
-            reports.append({"trading_day": day, "start_date": actual_start, "end_date": actual_end, "row_count": len(data), "stock_count": data["instrument"].nunique(), "passed": True})
-            logger.info("%s: 检查通过，%s 行", day_str, len(data))
+        trading_days_by_month = trading_days.groupby(trading_days.dt.to_period("M"))
+        for month, monthly_days in trading_days_by_month:
+            monthly_issues = []
+            logger.info("开始检查月份 %s，交易日数=%s", month, len(monthly_days))
+
+            for day in monthly_days:
+                day_str = day.strftime("%Y-%m-%d")
+                data = dai.query(
+                    f"SELECT * FROM {self.datasource_id}",
+                    filters={
+                        "date": [
+                            f"{day_str} 00:00:00",
+                            f"{day_str} 23:59:59",
+                        ]
+                    },
+                    compression=True,
+                ).df()
+                try:
+                    if data.empty:
+                        raise StockBar1mDataTestError(
+                            f"{day_str} 整日缺少分钟行情"
+                        )
+                    _StockBar1mDataTests.check(data, require_complete_day=True)
+                except StockBar1mDataTestError as exc:
+                    issue = f"[{day_str}] {exc}"
+                    monthly_issues.append(issue)
+                    logger.error(issue)
+                    continue
+
+                reports.append(
+                    {
+                        "trading_day": day,
+                        "start_date": actual_start,
+                        "end_date": actual_end,
+                        "row_count": len(data),
+                        "stock_count": data["instrument"].nunique(),
+                        "passed": True,
+                    }
+                )
+                logger.info("%s: 检查通过，%s 行", day_str, len(data))
+
+            if monthly_issues:
+                raise StockBar1mDataTestError(
+                    f"{month} 月度分钟行情测试失败，共 "
+                    f"{len(monthly_issues)} 个异常交易日:\n"
+                    + "\n\n".join(monthly_issues)
+                )
+
+            logger.info("%s: 月度检查通过", month)
 
         report = pd.DataFrame(reports)
         logger.info("检查完成: start_date=%s, end_date=%s, 通过交易日数=%s", actual_start.strftime("%Y-%m-%d"), actual_end.strftime("%Y-%m-%d"), len(report))

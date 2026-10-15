@@ -10,8 +10,6 @@ class OneMinuteBarBuilder:
     _CUMULATIVE_FIELDS = ["volume", "amount", "num_trades"]
     _PRICE_FIELDS = ["open", "high", "low", "close"]
     _IDENTITY_FIELDS = ["instrument_id", "adjust_factor"]
-    _AMOUNT_ABSOLUTE_TOLERANCE = 1e-2
-    _AMOUNT_RELATIVE_TOLERANCE = 1e-10
 
     @staticmethod
     def _elapsed_ms(date: pd.Series) -> pd.Series:
@@ -26,8 +24,9 @@ class OneMinuteBarBuilder:
 
         集合竞价也逐分钟切分，09:25:00 的撮合结果归入 09:25；常规分钟
         ``[HH:MM:00, HH:MM+1:00)`` 标记为下一分钟。收盘分钟额外接纳
-        收盘后一段快照，即 ``[14:59:00, 15:01:00)`` 都标记为 15:00
-        （上午收盘同理）。
+        下午收盘延迟快照 ``[14:59:00, 15:01:00)`` 都标记为 15:00。
+        上午最后一个窗口为 ``[11:29:00, 11:31:00)``，用于接纳收市后
+        延迟几秒的快照；``[11:31:00, 13:00:00)`` 的午休快照全部剔除。
         """
         date = pd.to_datetime(date)
         day = date.dt.normalize()
@@ -94,41 +93,10 @@ class OneMinuteBarBuilder:
         data = data.sort_values(["instrument", "date"]).reset_index(drop=True)
         data["__trading_day"] = data["date"].dt.normalize()
 
-        # 必须先排除午休等非交易时段快照，再计算累计字段差分。部分历史
-        # 快照在午休期间会把 volume/num_trades 临时写成 0，但 amount 仍
-        # 保持日内累计值；若直接对全天快照 diff，下午第一条累计成交量会
-        # 被误当成一分钟增量。
+        # 只使用能够归属到交易分钟的快照，避免午休等非交易时段参与差分。
+        # 对保留下来的快照不做修订或异常过滤；源数据问题由 tester 检出。
         data["__minute_end"] = cls.assign_minute_end(data["date"])
         data = data.dropna(subset=["__minute_end"])
-        if data.empty:
-            return pd.DataFrame(columns=output_columns)
-
-        group_keys = [data["instrument"], data["__trading_day"]]
-        volume = pd.to_numeric(data["volume"], errors="coerce")
-        amount = pd.to_numeric(data["amount"], errors="coerce")
-
-        # 累计量额必须相对“此前有效累计基准”保持非递减。这里使用此前
-        # 累计最大值而非相邻行差分，因此一次归零后的连续零值都会被剔除，
-        # 恢复后的快照也会直接和归零前的有效值比较。
-        previous_volume = volume.groupby(group_keys, sort=False).cummax().groupby(
-            group_keys, sort=False
-        ).shift()
-        previous_amount = amount.groupby(group_keys, sort=False).cummax().groupby(
-            group_keys, sort=False
-        ).shift()
-        amount_tolerance = np.maximum(
-            cls._AMOUNT_ABSOLUTE_TOLERANCE,
-            previous_amount.abs() * cls._AMOUNT_RELATIVE_TOLERANCE,
-        )
-        volume_is_valid = volume.ge(0) & (
-            previous_volume.isna() | volume.ge(previous_volume)
-        )
-        amount_is_valid = amount.ge(0) & (
-            previous_amount.isna() | amount.add(amount_tolerance).ge(previous_amount)
-        )
-        volume_amount_agree = volume.gt(0).eq(amount.gt(0))
-        valid_cumulative = volume_is_valid & amount_is_valid & volume_amount_agree
-        data = data.loc[valid_cumulative].copy()
         if data.empty:
             return pd.DataFrame(columns=output_columns)
 
@@ -137,20 +105,15 @@ class OneMinuteBarBuilder:
         )
 
         for field in cls._CUMULATIVE_FIELDS:
-            numeric = pd.to_numeric(data[field], errors="coerce").clip(lower=0)
-            # 日内累计字段按定义不应回退。用 cummax 吸收源数据的临时归零
-            # 和小幅修订，避免恢复后的累计值被重复计入；每天第一条有效
-            # 快照仍以其当前累计值作为从日初到该时刻的增量。
-            repaired = numeric.groupby(
-                [data["instrument"], data["__trading_day"]],
-                sort=False,
-            ).cummax()
-            delta = repaired.groupby(
+            numeric = pd.to_numeric(data[field], errors="coerce")
+            # 默认快照累计字段正确，直接按日内相邻快照差分。每天第一条
+            # 快照以其当前累计值作为从日初到该时刻的增量，不修订源值。
+            delta = numeric.groupby(
                 [data["instrument"], data["__trading_day"]],
                 sort=False,
             ).diff()
             first_in_day = groups.cumcount().eq(0)
-            data[f"__{field}_delta"] = delta.mask(first_in_day, repaired).fillna(0)
+            data[f"__{field}_delta"] = delta.mask(first_in_day, numeric)
 
         data["__valid_price"] = data["price"].where(data["price"] > 0)
         elapsed_ms = cls._elapsed_ms(data["date"])
