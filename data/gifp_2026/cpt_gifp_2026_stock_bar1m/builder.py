@@ -12,6 +12,10 @@ from gifp_2026.cpt_gifp_2026_stock_bar1m.minute_builder import (
 from gifp_2026.cpt_gifp_2026_stock_bar1m.schema import (
     CptGifp2026StockBar1mSchema,
 )
+from gifp_2026.cpt_gifp_2026_stock_bar1m.tester import (
+    CptGifp2026StockBar1mTester,
+    StockBar1mDataTestError,
+)
 
 
 class CptGifp2026StockBar1mBuilder(BaseBuilder):
@@ -56,6 +60,11 @@ class CptGifp2026StockBar1mBuilder(BaseBuilder):
 
         name = "cpt_gifp_2026_stock_bar1m"
         self.datasource_id = f"{name}_{suffix}" if suffix else name
+        self.tester = CptGifp2026StockBar1mTester(
+            start_date,
+            end_date,
+            datasource_id=self.datasource_id,
+        )
         print(
             f"初始化！{self.datasource_id}, 频率: 1分钟, "
             f"时间周期: {self.start_date}, {self.end_date}"
@@ -224,6 +233,20 @@ class CptGifp2026StockBar1mBuilder(BaseBuilder):
             print(
                 f"[{day_str}] 数据存储耗时: "
                 f"{round((write_end - build_end).total_seconds(), 4)} 秒"
+            )
+            try:
+                checked = self.tester.check_day(day_str, instruments)
+            except StockBar1mDataTestError as exc:
+                print(
+                    f"[{day_str}] 数据测试未通过，当日数据已入库，"
+                    "修复后需重建，构建中止"
+                )
+                raise StockBar1mDataTestError(f"[{day_str}] {exc}") from exc
+            print(
+                f"[{day_str}] 数据测试通过, "
+                f"耗时: {round((datetime.now() - write_end).total_seconds(), 4)} 秒, "
+                f"行数: {len(checked)}, "
+                f"股票数: {checked['instrument'].nunique()}"
             )
             all_daily_bars.append(daily_bars)
             built_days += 1

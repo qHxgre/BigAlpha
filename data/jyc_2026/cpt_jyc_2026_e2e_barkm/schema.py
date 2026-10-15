@@ -49,13 +49,13 @@ class CptJyc2026E2EBarKmSchema(BaseSchema):
     bid_volume2: np.int32 = Field(description="2档委买量", default=0)
     bid_volume3: np.int32 = Field(description="3档委买量", default=0)
 
-    # 委托比数(降为 int16)
-    ask_num_orders1: np.int16 = Field(description="卖1档委托笔数", default=0)
-    ask_num_orders2: np.int16 = Field(description="卖2档委托笔数", default=0)
-    ask_num_orders3: np.int16 = Field(description="卖3档委托笔数", default=0)
-    bid_num_orders1: np.int16 = Field(description="买1档委托笔数", default=0)
-    bid_num_orders2: np.int16 = Field(description="买2档委托笔数", default=0)
-    bid_num_orders3: np.int16 = Field(description="买3档委托笔数", default=0)
+    # 委托比数
+    ask_num_orders1: np.int32 = Field(description="卖1档委托笔数", default=0)
+    ask_num_orders2: np.int32 = Field(description="卖2档委托笔数", default=0)
+    ask_num_orders3: np.int32 = Field(description="卖3档委托笔数", default=0)
+    bid_num_orders1: np.int32 = Field(description="买1档委托笔数", default=0)
+    bid_num_orders2: np.int32 = Field(description="买2档委托笔数", default=0)
+    bid_num_orders3: np.int32 = Field(description="买3档委托笔数", default=0)
 
     class Config:
         arbitrary_types_allowed = True
