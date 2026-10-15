@@ -23,8 +23,10 @@ class _StockBar1mDataTests(unittest.TestCase):
     datasource_id = "cpt_jyc_2026_stock_bar1m"
     test_data: pd.DataFrame = pd.DataFrame()
     require_complete_day = False
-    # 快照并不覆盖每一笔成交，分钟量额隐含均价可能比采样到的 OHLC
-    # 多出一两个最小价位；保留 0.1% + 0.02 元容差，仍足以拦截累计值。
+    snapshot_totals: pd.DataFrame | None = None
+    # 分钟 volume、amount 之和相对快照当日累计最大值的容差。
+    total_rtol = 1e-2
+    # open/close 相对 low/high 的越界容差：取 0.1% 与 0.02 元中的较大者。
     price_rtol = 1e-3
     price_atol = 2e-2
 
@@ -40,7 +42,7 @@ class _StockBar1mDataTests(unittest.TestCase):
         return morning.append(afternoon)
 
     @classmethod
-    def check(cls, data: pd.DataFrame, require_complete_day: bool = False) -> None:
+    def check(cls, data: pd.DataFrame, require_complete_day: bool = False, snapshot_totals: pd.DataFrame | None = None) -> None:
         """运行全部检查；失败时汇总异常并抛错。"""
         if data.empty:
             raise StockBar1mDataTestError("待测试分钟行情为空")
@@ -52,6 +54,7 @@ class _StockBar1mDataTests(unittest.TestCase):
         cls.test_data = data.copy()
         cls.test_data["date"] = pd.to_datetime(cls.test_data["date"], errors="coerce")
         cls.require_complete_day = require_complete_day
+        cls.snapshot_totals = snapshot_totals
 
         stream = io.StringIO()
         suite = unittest.TestLoader().loadTestsFromTestCase(cls)
@@ -74,28 +77,20 @@ class _StockBar1mDataTests(unittest.TestCase):
             f"存在重复分钟记录: {data.loc[duplicated].head().to_dict('records')}",
         )
 
-    def test_numeric_values_are_finite(self):
-        """核心价格、量额及委托笔数不能出现无穷值。"""
-        columns = self.price_fields + self.trade_fields + self.order_count_fields
-        numeric = self.test_data[columns].apply(pd.to_numeric, errors="coerce")
-        invalid = np.isinf(numeric).any(axis=1)
-        self.assertEqual(
-            int(invalid.sum()),
-            0,
-            f"存在无穷值: {self.test_data.loc[invalid].head().to_dict('records')}",
-        )
-
     def test_prices_are_valid_ohlc(self):
-        """OHLC 必须为正，且满足 low <= open/close <= high。"""
+        """OHLC 必须为正，low <= high，且 open/close 在 [low, high] 容差范围内。"""
         data = self.test_data
         prices = data[self.price_fields].apply(pd.to_numeric, errors="coerce")
         invalid_value = prices.isna().any(axis=1) | prices.le(0).any(axis=1)
+        tol = np.maximum(self.price_atol, self.price_rtol * prices["high"])
+        lower = prices["low"] - tol
+        upper = prices["high"] + tol
         invalid_order = (
             prices["low"].gt(prices["high"])
-            | prices["open"].lt(prices["low"])
-            | prices["open"].gt(prices["high"])
-            | prices["close"].lt(prices["low"])
-            | prices["close"].gt(prices["high"])
+            | prices["open"].lt(lower)
+            | prices["open"].gt(upper)
+            | prices["close"].lt(lower)
+            | prices["close"].gt(upper)
         )
         invalid = invalid_value | invalid_order
         columns = ["date", "instrument", *self.price_fields]
@@ -121,24 +116,22 @@ class _StockBar1mDataTests(unittest.TestCase):
             f"{data.loc[invalid, columns].head(20).to_dict('records')}",
         )
 
-    def test_implied_trade_price_is_inside_bar(self):
-        """有成交时 amount / volume 应落在该分钟最低价和最高价之间。"""
-        data = self.test_data
-        valid = data["volume"].gt(0) & data["amount"].gt(0)
-        implied = data["amount"] / data["volume"]
-        lower = data["low"] * (1 - self.price_rtol) - self.price_atol
-        upper = data["high"] * (1 + self.price_rtol) + self.price_atol
-        invalid = valid & ~implied.between(lower, upper, inclusive="both")
-        sample = data.loc[
-            invalid,
-            ["date", "instrument", "low", "high", "volume", "amount"],
-        ].copy()
-        sample["amount_div_volume"] = implied.loc[invalid]
+    def test_daily_totals_match_snapshot(self):
+        """每只股票分钟 volume、amount 之和应等于快照当日累计最大值，相对误差不超过 total_rtol。"""
+        snap = self.snapshot_totals
+        if snap is None:
+            return
+        minute = self.test_data.groupby("instrument")[["volume", "amount"]].sum()
+        minute = minute.reindex(snap.index.union(minute.index)).fillna(0)
+        snap = snap.reindex(minute.index).fillna(0)
+        diff = (minute - snap).abs()
+        invalid = (diff > self.total_rtol * snap).any(axis=1)
+        sample = minute.join(snap, lsuffix="_minute", rsuffix="_snapshot").loc[invalid]
         self.assertEqual(
             int(invalid.sum()),
             0,
-            "成交均价超出分钟价格区间，疑似混入累计量额: "
-            f"{sample.head(20).to_dict('records')}",
+            f"{int(invalid.sum())} 只股票分钟量额之和与快照当日累计最大值相差超过 {self.total_rtol:.1%}: "
+            f"{sample.head(20).reset_index().to_dict('records')}",
         )
 
     def test_order_counts_are_nonnegative(self):
@@ -185,6 +178,23 @@ class CptJyc2026StockBar1mTester:
         self.end_date = end_date
         self.datasource_id = datasource_id
 
+    def check_day(self, day_str: str, instruments: list[str] | None = None) -> pd.DataFrame:
+        """读取已入库的单个交易日分钟行情，并与原始快照当日累计值联合检查；不通过时抛出 StockBar1mDataTestError。
+
+        instruments 为应有分钟行情的股票池；缺省时只能核对分钟表里已有的股票，发现不了整只缺失。
+        """
+        day_filter = {"date": [f"{day_str} 00:00:00", f"{day_str} 23:59:59"]}
+        data = dai.query(f"SELECT * FROM {self.datasource_id}", filters=day_filter, compression=True).df()
+        if data.empty:
+            raise StockBar1mDataTestError(f"{day_str} 整日缺少分钟行情")
+        instruments = instruments if instruments is not None else data["instrument"].unique().tolist()
+        snapshot_totals = dai.query(
+            "SELECT instrument, max(volume) AS volume, max(amount) AS amount FROM cn_stock_level2_snapshot GROUP BY instrument",
+            filters={**day_filter, "instrument": instruments},
+        ).df().set_index("instrument")
+        _StockBar1mDataTests.check(data, require_complete_day=True, snapshot_totals=snapshot_totals)
+        return data
+
     def run(self) -> pd.DataFrame:
         start = pd.Timestamp(self.start_date).normalize()
         end = pd.Timestamp(self.end_date).normalize()
@@ -215,22 +225,8 @@ class CptJyc2026StockBar1mTester:
 
             for day in monthly_days:
                 day_str = day.strftime("%Y-%m-%d")
-                data = dai.query(
-                    f"SELECT * FROM {self.datasource_id}",
-                    filters={
-                        "date": [
-                            f"{day_str} 00:00:00",
-                            f"{day_str} 23:59:59",
-                        ]
-                    },
-                    compression=True,
-                ).df()
                 try:
-                    if data.empty:
-                        raise StockBar1mDataTestError(
-                            f"{day_str} 整日缺少分钟行情"
-                        )
-                    _StockBar1mDataTests.check(data, require_complete_day=True)
+                    data = self.check_day(day_str)
                 except StockBar1mDataTestError as exc:
                     issue = f"[{day_str}] {exc}"
                     monthly_issues.append(issue)

@@ -10,6 +10,10 @@ from jyc_2026.cpt_jyc_2026_stock_barkm.constant import TIME_SETS
 from jyc_2026.cpt_jyc_2026_stock_barkm.kminute_builder import KMinuteBarBuilder
 from jyc_2026.cpt_jyc_2026_stock_barkm.minute_builder import OneMinuteBarBuilder
 from jyc_2026.cpt_jyc_2026_stock_barkm.schema import CptJyc2026StockBarKmSchema
+from jyc_2026.cpt_jyc_2026_stock_barkm.tester import (
+    CptJyc2026StockBar1mTester,
+    StockBar1mDataTestError,
+)
 
 
 class _CptJyc2026StockBarBaseBuilder(BaseBuilder):
@@ -84,6 +88,9 @@ class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
 
         name = "cpt_jyc_2026_stock_bar1m"
         self.datasource_id = f"{name}_{suffix}" if suffix else name
+        self.tester = CptJyc2026StockBar1mTester(
+            start_date, end_date, datasource_id=self.datasource_id
+        )
         print(
             f"初始化！{self.datasource_id}, 频率: 1分钟, "
             f"时间周期: {self.start_date}, {self.end_date}"
@@ -152,78 +159,41 @@ class CptJyc2026StockBar1mBuilder(_CptJyc2026StockBarBaseBuilder):
         return out.drop(columns="trading_day")
 
     def build(self) -> pd.DataFrame:
-        start_date = pd.Timestamp(self.start_date).normalize()
-        end_date = pd.Timestamp(self.end_date).normalize()
+        start_date, end_date = pd.Timestamp(self.start_date).normalize(), pd.Timestamp(self.end_date).normalize()
         if start_date > end_date:
             raise ValueError("start_date 不能晚于 end_date")
 
-        all_daily_bars = []
-        built_days = 0
-        total_start = datetime.now()
-
         for trading_day in pd.date_range(start_date, end_date, freq="D"):
             day_str = trading_day.strftime("%Y-%m-%d")
-            day_start = datetime.now()
+            t0 = datetime.now()
             snapshots = self.get_data(day_str, day_str)
-            read_end = datetime.now()
-            print(
-                f"[{day_str}] 获取快照耗时: "
-                f"{round((read_end - day_start).total_seconds(), 4)} 秒, "
-                f"行数: {len(snapshots)}"
-            )
-
+            t1 = datetime.now()
+            print(f"[{day_str}] 获取快照耗时: {(t1 - t0).total_seconds():.4f} 秒, 行数: {len(snapshots)}")
             if snapshots.empty:
                 print(f"[{day_str}] 源数据为空，跳过计算和入库")
                 continue
-
             instruments = snapshots["instrument"].dropna().unique().tolist()
-            instrument_batches = [
-                instruments[i : i + self.instrument_batch_size]
-                for i in range(0, len(instruments), self.instrument_batch_size)
-            ]
-            snapshot_batches = [
-                snapshots.loc[snapshots["instrument"].isin(batch)].copy()
-                for batch in instrument_batches
-            ]
+            batches = [instruments[i : i + self.instrument_batch_size] for i in range(0, len(instruments), self.instrument_batch_size)]
+            snapshot_batches = [snapshots.loc[snapshots["instrument"].isin(batch)].copy() for batch in batches]
             del snapshots
-
-            parallel_result = Parallel(backend="loky", n_jobs=self.n_jobs)(
-                delayed(OneMinuteBarBuilder.build)(snapshot_batch)
-                for snapshot_batch in snapshot_batches
-            )
-            parallel_result = [df for df in parallel_result if not df.empty]
-            if not parallel_result:
+            results = Parallel(backend="loky", n_jobs=self.n_jobs)(delayed(OneMinuteBarBuilder.build)(b) for b in snapshot_batches)
+            results = [df for df in results if not df.empty]
+            if not results:
                 print(f"[{day_str}] 分钟行情构建结果为空，跳过入库")
                 continue
-
-            daily_bars = pd.concat(parallel_result, ignore_index=True)
-            daily_bars = self.enrich_one_minute(daily_bars, day_str, day_str)
-            daily_bars = self.normalize(daily_bars)
-            build_end = datetime.now()
-            print(
-                f"[{day_str}] 分钟行情构建耗时: "
-                f"{round((build_end - read_end).total_seconds(), 4)} 秒, "
-                f"股票数: {len(instruments)}, 批次数: {len(instrument_batches)}, "
-                f"行数: {len(daily_bars)}"
-            )
-
+            daily_bars = self.normalize(self.enrich_one_minute(pd.concat(results, ignore_index=True), day_str, day_str))
+            t2 = datetime.now()
+            print(f"[{day_str}] 分钟行情构建耗时: {(t2 - t1).total_seconds():.4f} 秒, 股票数: {len(instruments)}, 批次数: {len(batches)}, 行数: {len(daily_bars)}")
             self.dai_write(daily_bars)
-            write_end = datetime.now()
-            print(
-                f"[{day_str}] 数据存储耗时: "
-                f"{round((write_end - build_end).total_seconds(), 4)} 秒"
-            )
-            all_daily_bars.append(daily_bars)
-            built_days += 1
+            t3 = datetime.now()
+            print(f"[{day_str}] 数据存储耗时: {(t3 - t2).total_seconds():.4f} 秒")
+            try:
+                checked = self.tester.check_day(day_str, self.instruments)
+            except StockBar1mDataTestError as exc:
+                print(f"[{day_str}] 数据测试未通过，当日数据已入库，修复后需重建，构建中止")
+                raise StockBar1mDataTestError(f"[{day_str}] {exc}") from exc
+            print(f"[{day_str}] 数据测试通过, 耗时: {(datetime.now() - t3).total_seconds():.4f} 秒, 行数: {len(checked)}, 股票数: {checked['instrument'].nunique()}")
 
-        total_end = datetime.now()
-        print(
-            f"构建完成，成功入库交易日数: {built_days}, "
-            f"总耗时: {round((total_end - total_start).total_seconds(), 4)} 秒"
-        )
-        if not all_daily_bars:
-            return pd.DataFrame(columns=self.schema.columns())
-        return pd.concat(all_daily_bars, ignore_index=True)
 
 
 class CptJyc2026StockBarKmBuilder(_CptJyc2026StockBarBaseBuilder):
