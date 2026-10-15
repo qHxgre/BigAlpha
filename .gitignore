@@ -9,6 +9,7 @@ __pycache__/
 .claude/
 .codex/
 .agents/
+.cowork/
 
 
 files/
